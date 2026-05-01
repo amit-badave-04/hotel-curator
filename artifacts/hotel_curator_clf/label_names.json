@@ -1,0 +1,18 @@
+[
+  "cleanliness_positive",
+  "cleanliness_negative",
+  "room_positive",
+  "room_negative",
+  "staff_positive",
+  "staff_negative",
+  "location_positive",
+  "location_negative",
+  "noise_positive",
+  "noise_negative",
+  "wifi_positive",
+  "wifi_negative",
+  "value_positive",
+  "value_negative",
+  "breakfast_positive",
+  "breakfast_negative"
+]

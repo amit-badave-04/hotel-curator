@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hotel-curator"
+version = "0.1.0"
+description = "Multi-attribute hotel quality classifier and tier ranking system"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = [
+    "torch>=2.0",
+    "transformers>=4.40",
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "pyarrow>=15.0",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.2",
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.29",
+    "sqlmodel>=0.0.16",
+    "aiosqlite>=0.20",
+    "httpx>=0.27",
+    "typer>=0.12",
+    "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+dashboard = ["taipy>=3.1"]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.4",
+    "pre-commit>=3.7",
+]
+
+[project.scripts]
+curator = "hotel_curator.cli.main:app"
+
+[tool.ruff]
+line-length = 80
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["hotel_curator"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

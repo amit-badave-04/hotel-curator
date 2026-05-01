@@ -1,0 +1,177 @@
+{
+  "model_name": "roberta-base",
+  "clf_base_model": "roberta-base",
+  "mlm_adapted": false,
+  "max_seq_length": 256,
+  "num_epochs": 5,
+  "batch_size": 64,
+  "learning_rate": 2e-05,
+  "pos_weight_strategy": "sqrt",
+  "pos_weight_cap": 50.0,
+  "pos_weight_per_label": {
+    "cleanliness_positive": 1.2410334348678589,
+    "cleanliness_negative": 3.619344711303711,
+    "room_positive": 1.1791222095489502,
+    "room_negative": 2.599963665008545,
+    "staff_positive": 0.935078501701355,
+    "staff_negative": 3.493356466293335,
+    "location_positive": 1.3121451139450073,
+    "location_negative": 6.239541053771973,
+    "noise_positive": 2.5584657192230225,
+    "noise_negative": 3.3869049549102783,
+    "wifi_positive": 5.533746719360352,
+    "wifi_negative": 16.109249114990234,
+    "value_positive": 2.449228525161743,
+    "value_negative": 3.648099660873413,
+    "breakfast_positive": 4.1736979484558105,
+    "breakfast_negative": 7.469198703765869
+  },
+  "val_f1_per_label": {
+    "cleanliness_positive": 0.9737010904425915,
+    "cleanliness_negative": 0.7811158798283261,
+    "room_positive": 0.9116022099447514,
+    "room_negative": 0.7564766839378239,
+    "staff_positive": 0.9301397205588823,
+    "staff_negative": 0.7219512195121951,
+    "location_positive": 0.9184549356223176,
+    "location_negative": 0.6808510638297872,
+    "noise_positive": 0.9740740740740741,
+    "noise_negative": 0.9261744966442953,
+    "wifi_positive": 0.9655172413793104,
+    "wifi_negative": 0.375,
+    "value_positive": 0.9020408163265305,
+    "value_negative": 0.7142857142857142,
+    "breakfast_positive": 0.7051282051282052,
+    "breakfast_negative": 0.4827586206896552
+  },
+  "test_overall": {
+    "micro_f1": 0.9004474272930649,
+    "macro_f1": 0.7451474957683025,
+    "weighted_f1": 0.9030227741970414
+  },
+  "test_per_label": {
+    "cleanliness_positive": {
+      "support": 782,
+      "precision": 0.97911227154047,
+      "recall": 0.959079283887468,
+      "f1": 0.9689922480620154,
+      "threshold": 0.6127732396125793
+    },
+    "cleanliness_negative": {
+      "support": 114,
+      "precision": 0.7739130434782608,
+      "recall": 0.7807017543859649,
+      "f1": 0.777292576419214,
+      "threshold": 0.6132365465164185
+    },
+    "room_positive": {
+      "support": 746,
+      "precision": 0.9325842696629213,
+      "recall": 0.8900804289544236,
+      "f1": 0.9108367626886146,
+      "threshold": 0.7146279811859131
+    },
+    "room_negative": {
+      "support": 208,
+      "precision": 0.7604166666666666,
+      "recall": 0.7019230769230769,
+      "f1": 0.73,
+      "threshold": 0.7505527138710022
+    },
+    "staff_positive": {
+      "support": 938,
+      "precision": 0.9139004149377593,
+      "recall": 0.9392324093816631,
+      "f1": 0.9263932702418507,
+      "threshold": 0.6220002174377441
+    },
+    "staff_negative": {
+      "support": 77,
+      "precision": 0.528,
+      "recall": 0.8571428571428571,
+      "f1": 0.6534653465346535,
+      "threshold": 0.7356416583061218
+    },
+    "location_positive": {
+      "support": 650,
+      "precision": 0.8969957081545065,
+      "recall": 0.9646153846153847,
+      "f1": 0.9295774647887324,
+      "threshold": 0.7386690378189087
+    },
+    "location_negative": {
+      "support": 27,
+      "precision": 0.6111111111111112,
+      "recall": 0.4074074074074074,
+      "f1": 0.4888888888888889,
+      "threshold": 0.74167400598526
+    },
+    "noise_positive": {
+      "support": 283,
+      "precision": 0.9774436090225563,
+      "recall": 0.9187279151943463,
+      "f1": 0.9471766848816029,
+      "threshold": 0.6566582322120667
+    },
+    "noise_negative": {
+      "support": 179,
+      "precision": 0.9277777777777778,
+      "recall": 0.9329608938547486,
+      "f1": 0.9303621169916435,
+      "threshold": 0.6619228720664978
+    },
+    "wifi_positive": {
+      "support": 56,
+      "precision": 0.9464285714285714,
+      "recall": 0.9464285714285714,
+      "f1": 0.9464285714285714,
+      "threshold": 0.8558511734008789
+    },
+    "wifi_negative": {
+      "support": 3,
+      "precision": 0.25,
+      "recall": 0.6666666666666666,
+      "f1": 0.36363636363636365,
+      "threshold": 0.575588047504425
+    },
+    "value_positive": {
+      "support": 204,
+      "precision": 0.897196261682243,
+      "recall": 0.9411764705882353,
+      "f1": 0.9186602870813397,
+      "threshold": 0.7826625108718872
+    },
+    "value_negative": {
+      "support": 84,
+      "precision": 0.6263736263736264,
+      "recall": 0.6785714285714286,
+      "f1": 0.6514285714285715,
+      "threshold": 0.8187368512153625
+    },
+    "breakfast_positive": {
+      "support": 72,
+      "precision": 0.7317073170731707,
+      "recall": 0.8333333333333334,
+      "f1": 0.7792207792207793,
+      "threshold": 0.8587185740470886
+    },
+    "breakfast_negative": {
+      "support": 8,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "threshold": 0.684264063835144
+    }
+  },
+  "low_support_labels": [
+    "location_negative",
+    "wifi_negative",
+    "breakfast_negative"
+  ],
+  "splits": {
+    "train": 16412,
+    "val": 2046,
+    "test": 2017
+  },
+  "quick_test": false
+}
