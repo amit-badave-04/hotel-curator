@@ -398,8 +398,8 @@ length drift); OpinRank sub-rating validity check; aspect span extraction.
 | Step 0 tooling | inventory + baseline | `docs/TOOLING.md`; v1 tests 11 passed, 35% coverage | done |
 | Step 1 audit | `docs/v1-audit.md` | four independent reviewers; numbers cited by cell/file | done |
 | Step 2 plan | this file + ADRs 001-010 | dataset panel unanimous on A; tier panel: simplest-credible design 163 / traveler-first 153 / risk-first 149 | done (M0) |
-| M1 data | contracts pass on full data | `curator data build`: 515,212 reviews, 1,494 hotels, 66 s | in progress |
-| M2 labels/models | promotion rule | train labels 3,997/4,000 (1 batch re-run); gold-dev complete (Fleiss' kappa 0.94-0.997 per label); gold-test 3 of 12 batches | in progress |
+| M1 data | contracts pass on full data | `curator data build`: 515,738 raw rows -> 515,212 reviews, 1,494 hotels (1,048/220/226 train/val/test); contracts pass; rebuild byte-identical (sha256 of both tables unchanged); 47 s with cached downloads | done (M1) |
+| M2 labels/models | promotion rule | panel labels complete: train 4,000 reviews (annotator A; 1 batch re-run for 3 omitted items), gold-dev 600 and gold-test 1,200 reviews (3 annotators, Fleiss' kappa 0.94-0.997 per label); models not yet trained | in progress |
 | M3 backend | API tests, coverage | — | not started |
 | M4 frontend | component, e2e, a11y | — | not started |
 | M5 polish | compose up, CI | — | not started |

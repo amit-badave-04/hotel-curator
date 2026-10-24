@@ -1,0 +1,18 @@
+# Conda environment for hotel-curator v2.
+#
+# Conda provides the interpreter and toolchain only. Every Python package is
+# pinned in uv.lock and installed with `make setup` (uv sync), so conda and
+# uv never fight over the same packages.
+#
+#   conda env create -f environment.yml
+#   conda activate hotel-curator
+#   make setup
+name: hotel-curator
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - uv>=0.5
+  - nodejs=22
+  - make
+  - git-lfs

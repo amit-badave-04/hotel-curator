@@ -1,3 +1,3 @@
-"""Hotel Curator -- Multi-Attribute Hotel Quality Classifier."""
+"""hotel-curator: attribute-level hotel quality tiers from guest reviews."""
 
-__version__ = "0.1.0"
+__version__ = "2.0.0"

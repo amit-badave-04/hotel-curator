@@ -1,0 +1,59 @@
+{
+  "code_commit": "802999984c038a5ca8092f599dd38c749103a24f-dirty",
+  "created_at": "2026-10-24T17:26:43+00:00",
+  "inputs": {
+    "output_0.csv": "8b6a682ee59a2d535e21f4f62a82953e38e942fc20bece21a068f2398c9cd5a1",
+    "output_1.csv": "08c6f604edca3b56e48c399d2bd5af28db933e8aa1e59fa5d4c7b91c2cc7c66a",
+    "output_10.csv": "ce6783ec5d831a5084140eb1e0030e9bb1847bc8564b264be8a8fb0df4d450d4",
+    "output_2.csv": "557b91abd7127d69e27d762849dc43ba6c8e3c7c857255cde4ccb4d22993bfa2",
+    "output_3.csv": "d5418a95170c917c3d7126d26ac2d5f7c8b448c23f3d5ec8291aa2072538f5c2",
+    "output_4.csv": "f32556340d1927bf3f167d1b4dbc6296f5212a5cc7c6adfc56bb7b4183f6a33f",
+    "output_5.csv": "a309244c18be676e5495191232c72adb098a721e78dc0df46ed3496bef0c74b2",
+    "output_6.csv": "46c7238b84d7eb55856d7b5df7de0f04f1979c915622b796163b244f5163d6f4",
+    "output_7.csv": "90d4c87378fd7cc800c35bc9d2f703e8db2e9b41caba4958e42692d67ff41157",
+    "output_8.csv": "d2c6518f5304bf162055c2c1b1bbd963bfcfab146694179761d6f89f1e11fb88",
+    "output_9.csv": "7d85b03b9da4c8c28ebb2133a847f8b070fcc3bc09affa8c864588e216886cbc",
+    "raw_content_fingerprint": "968ec35cdd25b30defab347d7f7a41b423e1a85cd8e576f195b48c73040e3f40"
+  },
+  "outputs": [
+    {
+      "path": "data/processed/hotels.parquet",
+      "rows": 1494,
+      "sha256": "d199b74c1cf79da8379bf118f8866248eee8669407e751ff5c9c8cf33c8fa5c6",
+      "size_bytes": 130281
+    },
+    {
+      "path": "data/processed/reviews.parquet",
+      "rows": 515212,
+      "sha256": "a80708290c8b458f324f457963863bf63edea6b6462eb13395a2e1af942eee03",
+      "size_bytes": 65105413
+    }
+  ],
+  "stage": "data",
+  "stats": {
+    "duplicate_rows_dropped": 526,
+    "hotels": 1494,
+    "hotels_missing_coordinates": 17,
+    "hotels_per_city": {
+      "Amsterdam": 105,
+      "Barcelona": 211,
+      "London": 400,
+      "Milan": 162,
+      "Paris": 458,
+      "Vienna": 158
+    },
+    "hotels_per_split": {
+      "test": 226,
+      "train": 1048,
+      "val": 220
+    },
+    "raw_rows": 515738,
+    "reviews": 515212,
+    "reviews_per_split": {
+      "test": 78739,
+      "train": 356035,
+      "val": 80438
+    },
+    "reviews_without_text": 236
+  }
+}

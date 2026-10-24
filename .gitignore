@@ -5,25 +5,50 @@ __pycache__/
 dist/
 build/
 .eggs/
-
-# Credentials
-.env
-
-# Environments
 .venv/
 venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 
-# IDE
+# Credentials (never commit; see .env.example)
+.env
+.env.*
+!.env.example
+
+# Data that is rebuilt by `make data` (manifests in data/manifests are committed)
+data/raw/
+data/processed/
+# Evaluation-only external data with unverified licences (never committed)
+data/external/
+*.part
+
+# Runtime state
+var/
+*.db
+*.db-journal
+mlruns/
+mlflow.db
+
+# Model training scratch (promoted packages live in artifacts/models/*/package)
+checkpoints/
+artifacts/models/*/checkpoint/
+
+# Frontend
+node_modules/
+web/dist/
+web/playwright-report/
+web/test-results/
+web/coverage/
+
+# IDE / OS
 .idea/
 .vscode/
 *.swp
-
-# OS
 .DS_Store
 Thumbs.db
-
-# Jupyter
 .ipynb_checkpoints/
-
-# SQLite runtime DB
-*.db
