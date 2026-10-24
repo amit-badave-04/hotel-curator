@@ -1,7 +1,8 @@
 """Parse the Booking.com "515K Hotel Reviews Data in Europe" raw CSV.
 
 Source: Kaggle ``jiashenliu/515k-hotel-reviews-data-in-europe`` (CC0),
-scraped from Booking.com, 2015-08 to 2017-08, 1,492 hotels in six cities.
+scraped from Booking.com, 2015-08 to 2017-08, 1,492 hotel names in six
+cities (1,494 hotels once name and address identify a hotel).
 See ``docs/data/DATA_CARD.md`` for provenance and known quirks.
 
 This module turns the 17 raw columns into the two canonical tables

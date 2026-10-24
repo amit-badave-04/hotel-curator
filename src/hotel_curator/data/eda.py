@@ -53,6 +53,10 @@ def _style(ax: Axes, title: str, xlabel: str, ylabel: str) -> None:
     ax.set_facecolor(SURFACE)
 
 
+HIGH_SCORE = 8
+"""Reviewer score summarised in the score chart's description."""
+
+
 def _save(fig: MplFigure, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.patch.set_facecolor(SURFACE)
@@ -63,7 +67,8 @@ def _save(fig: MplFigure, path: Path) -> None:
 
 def _reviews_per_hotel(hotels: pd.DataFrame, out: Path) -> Figure:
     fig, ax = plt.subplots(figsize=(7, 3.2))
-    bins = np.logspace(np.log10(8), np.log10(hotels["n_reviews"].max() + 1), 40)
+    low, high = int(hotels["n_reviews"].min()), int(hotels["n_reviews"].max())
+    bins = np.logspace(np.log10(max(low, 1)), np.log10(high + 1), 40)
     ax.hist(
         hotels["n_reviews"],
         bins=bins.tolist(),
@@ -76,15 +81,22 @@ def _reviews_per_hotel(hotels: pd.DataFrame, out: Path) -> Figure:
     path = out / "reviews_per_hotel.png"
     _save(fig, path)
     return Figure(
-        path, "Histogram of reviews per hotel on a log scale, from 8 to 4,789."
+        path,
+        "Histogram of reviews per hotel on a log scale, "
+        f"from {low:,} to {high:,}.",
     )
 
 
 def _reviews_per_month(reviews: pd.DataFrame, out: Path) -> Figure:
     monthly = reviews.set_index("review_date").resample("MS").size()
-    last_day = reviews["review_date"].max()
+    first_day, last_day = (
+        reviews["review_date"].min(),
+        reviews["review_date"].max(),
+    )
+    if first_day.day > 1:
+        monthly = monthly.iloc[1:]  # the first month is partial
     if last_day < last_day + pd.offsets.MonthEnd(0):
-        monthly = monthly.iloc[:-1]  # drop the partial final month
+        monthly = monthly.iloc[:-1]  # so is the last
     fig, ax = plt.subplots(figsize=(7, 3.2))
     ax.plot(monthly.index, monthly.to_numpy(), color=SERIES_1, linewidth=2)
     ax.set_ylim(bottom=0)
@@ -93,7 +105,8 @@ def _reviews_per_month(reviews: pd.DataFrame, out: Path) -> Figure:
     _save(fig, path)
     return Figure(
         path,
-        "Line chart of reviews per complete month, August 2015 to July 2017.",
+        "Line chart of reviews per complete month, "
+        f"{monthly.index[0]:%B %Y} to {monthly.index[-1]:%B %Y}.",
     )
 
 
@@ -106,8 +119,11 @@ def _reviewer_scores(reviews: pd.DataFrame, out: Path) -> Figure:
     )
     path = out / "reviewer_scores.png"
     _save(fig, path)
+    high_share = (reviews["reviewer_score"] >= HIGH_SCORE).mean()
     return Figure(
-        path, "Bar chart of reviewer scores; most reviews score 8 to 10."
+        path,
+        "Bar chart of reviewer scores; "
+        f"{high_share:.0%} of reviews score {HIGH_SCORE} or more.",
     )
 
 
@@ -147,7 +163,7 @@ def _pct(x: float) -> str:
     return f"{100 * x:.1f}%"
 
 
-def _summary_tables(hotels: pd.DataFrame, reviews: pd.DataFrame) -> str:
+def _facts(hotels: pd.DataFrame, reviews: pd.DataFrame) -> list[str]:
     no_text = reviews["liked_text"].isna() & reviews["disliked_text"].isna()
     rows = [
         ("Hotels", f"{len(hotels):,}"),
@@ -172,35 +188,44 @@ def _summary_tables(hotels: pd.DataFrame, reviews: pd.DataFrame) -> str:
             "Disliked part missing (site placeholder)",
             _pct(reviews["disliked_text"].isna().mean()),
         ),
-        (
-            "Reviews with no text at all",
-            f"{int(no_text.sum()):,}",
-        ),
+        ("Reviews with no text at all", f"{int(no_text.sum()):,}"),
         ("Hotels without coordinates", f"{int(hotels['lat'].isna().sum())}"),
         ("Mean reviewer score", f"{reviews['reviewer_score'].mean():.2f}"),
     ]
-    lines = ["| Fact | Value |", "|---|---|"] + [
+    return ["| Fact | Value |", "|---|---|"] + [
         f"| {k} | {v} |" for k, v in rows
     ]
+
+
+def _split_table(hotels: pd.DataFrame) -> list[str]:
     split = pd.crosstab(hotels["city"], hotels["split"])[
         ["train", "val", "test"]
     ]
-    lines += [
+    lines = [
         "",
         "Hotels per city and split (hotel-disjoint):",
         "",
         "| City | train | val | test |",
         "|---|---:|---:|---:|",
     ]
-    lines += [
+    return lines + [
         f"| {c} | {r.train} | {r.val} | {r.test} |" for c, r in split.iterrows()
     ]
-    trav = reviews["traveler_type"].value_counts(normalize=True)
-    trip = reviews["trip_type"].value_counts(normalize=True)
-    lines += ["", "| Traveler type | Share of reviews |", "|---|---:|"]
-    lines += [f"| {k} | {_pct(v)} |" for k, v in trav.items()]
-    lines += ["", "| Trip type | Share of reviews |", "|---|---:|"]
-    lines += [f"| {k} | {_pct(v)} |" for k, v in trip.items()]
+
+
+def _share_table(reviews: pd.DataFrame, column: str, title: str) -> list[str]:
+    shares = reviews[column].value_counts(normalize=True)
+    lines = ["", f"| {title} | Share of reviews |", "|---|---:|"]
+    return lines + [f"| {k} | {_pct(v)} |" for k, v in shares.items()]
+
+
+def _summary_tables(hotels: pd.DataFrame, reviews: pd.DataFrame) -> str:
+    lines = (
+        _facts(hotels, reviews)
+        + _split_table(hotels)
+        + _share_table(reviews, "traveler_type", "Traveler type")
+        + _share_table(reviews, "trip_type", "Trip type")
+    )
     return "\n".join(lines)
 
 

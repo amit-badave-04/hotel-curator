@@ -9,7 +9,8 @@ of a data-versioning service.
 """
 
 import json
-import subprocess
+import shutil
+import subprocess  # nosec B404
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -55,17 +56,24 @@ class Manifest:
 
 
 def git_commit(repo: Path) -> str:
-    """Current commit hash, with ``-dirty`` if the tree has changes."""
+    """Current commit hash, with ``-dirty`` if the tree has changes.
+
+    Runs ``git`` by absolute path with constant arguments (no user input
+    reaches the command line).
+    """
+    git = shutil.which("git")
+    if git is None:
+        return "unknown"
     try:
-        head = subprocess.run(
-            ["git", "rev-parse", "HEAD"],  # noqa: S607
+        head = subprocess.run(  # noqa: S603  # nosec B603
+            [git, "rev-parse", "HEAD"],
             cwd=repo,
             capture_output=True,
             text=True,
             check=True,
         ).stdout.strip()
-        dirty = subprocess.run(
-            ["git", "status", "--porcelain"],  # noqa: S607
+        dirty = subprocess.run(  # noqa: S603  # nosec B603
+            [git, "status", "--porcelain"],
             cwd=repo,
             capture_output=True,
             text=True,

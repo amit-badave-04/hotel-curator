@@ -51,9 +51,9 @@ Liked parts: mean 17.6 words, median 11, 95th percentile 56. Disliked parts: mea
 
 ![Histogram of reviews per hotel on a log scale, from 8 to 4,789.](figures/reviews_per_hotel.png)
 
-![Line chart of reviews per complete month, August 2015 to July 2017.](figures/reviews_per_month.png)
+![Line chart of reviews per complete month, September 2015 to July 2017.](figures/reviews_per_month.png)
 
-![Bar chart of reviewer scores; most reviews score 8 to 10.](figures/reviewer_scores.png)
+![Bar chart of reviewer scores; 65% of reviews score 8 or more.](figures/reviewer_scores.png)
 
 ![Two histograms of part length in words: Liked and Disliked.](figures/part_lengths.png)
 

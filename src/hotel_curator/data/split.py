@@ -48,8 +48,10 @@ def assign_splits(hotels: pd.DataFrame, config: SplitConfig) -> pd.DataFrame:
     """Return ``hotels`` with a ``split`` column (train / val / test).
 
     Within each (city, size band) stratum, hotels are ordered by a seeded
-    hash of their id and cut at the configured fractions, so each stratum
-    contributes proportionally to every split.
+    hash of their id and cut at the configured fractions. Strata of about
+    seven or more hotels contribute proportionally to every split; smaller
+    ones may miss a split, but every city and size band still appears in
+    each split.
 
     Args:
         hotels: Needs ``hotel_id``, ``city`` and ``n_reviews`` columns.

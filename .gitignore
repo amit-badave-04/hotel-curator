@@ -34,9 +34,12 @@ var/
 mlruns/
 mlflow.db
 
-# Model training scratch (promoted packages live in artifacts/models/*/package)
+# Model training scratch (the promoted package lives in artifacts/models/<rung>/)
 checkpoints/
 artifacts/models/*/checkpoint/
+# The promoted model's weights go through Git LFS, which this build
+# environment cannot reach (docs/BLOCKERS.md B8); add with `git add -f`.
+artifacts/models/*/model.onnx
 
 # Frontend
 node_modules/
@@ -52,3 +55,6 @@ web/coverage/
 .DS_Store
 Thumbs.db
 .ipynb_checkpoints/
+
+# Panel prompts are rebuilt from the committed samples (`curator label prompts`)
+data/labels/*/prompts/

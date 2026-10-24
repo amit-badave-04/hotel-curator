@@ -1,8 +1,9 @@
 """The label taxonomy: eight hotel attributes, two polarities, 16 labels.
 
 This module is the single source of truth for attribute names, their
-one-letter codes used by annotators, which attributes are "critical" for
-tiering, and how v1 label names map to v2. Every other module imports these
+one-letter codes used by annotators and how v1 label names map to v2.
+Which attributes are essential for the tiers is policy, not taxonomy: see
+``essentials`` in ``config/tier_policy.yaml``. Every other module imports these
 constants instead of spelling attribute names as strings.
 
 The compact code format ("S+ C+ R-") is what annotators return; see
@@ -42,61 +43,49 @@ class AttributeInfo:
         code: One-letter annotation code.
         display_name: Name shown in the UI and API docs.
         description: One-sentence plain-language scope.
-        critical: Whether a weak score on this attribute can block the top
-            tiers (see ``docs/decisions`` on the tier scheme).
     """
 
     code: str
     display_name: str
     description: str
-    critical: bool
 
 
 ATTRIBUTE_INFO: dict[Attribute, AttributeInfo] = {
     Attribute.CLEANLINESS: AttributeInfo(
-        "C", "Cleanliness", "Hygiene and tidiness anywhere in the hotel.", True
+        "C", "Cleanliness", "Hygiene and tidiness anywhere in the hotel."
     ),
     Attribute.ROOM: AttributeInfo(
         "R",
         "Room",
         "Size, beds, condition, bathroom fixtures, temperature, view.",
-        True,
     ),
     Attribute.STAFF: AttributeInfo(
         "S",
         "Staff",
         "Friendliness, helpfulness and handling of requests.",
-        True,
     ),
     Attribute.LOCATION: AttributeInfo(
         "L",
         "Location",
         "Closeness to sights and transport, the neighbourhood.",
-        False,
     ),
     Attribute.NOISE: AttributeInfo(
         "N",
         "Noise",
         "Quiet rooms versus street, neighbour or wall noise.",
-        False,
     ),
     Attribute.WIFI: AttributeInfo(
-        "W", "Wifi", "Internet availability, speed and cost.", False
+        "W", "Wifi", "Internet availability, speed and cost."
     ),
     Attribute.VALUE: AttributeInfo(
-        "V", "Value", "Price relative to what was received, fees.", False
+        "V", "Value", "Price relative to what was received, fees."
     ),
     Attribute.FOOD: AttributeInfo(
         "F",
         "Breakfast & food",
         "Breakfast and any food or drink served by the hotel.",
-        False,
     ),
 }
-
-CRITICAL_ATTRIBUTES: tuple[Attribute, ...] = tuple(
-    a for a, info in ATTRIBUTE_INFO.items() if info.critical
-)
 
 _SIGN_TO_POLARITY: dict[str, Polarity] = {
     "+": Polarity.POSITIVE,

@@ -71,8 +71,3 @@ def test_v1_mapping_renames_breakfast_to_food() -> None:
     assert V1_TO_V2_LABEL["breakfast_positive"] == "food_positive"
     assert V1_TO_V2_LABEL["noise_negative"] == "noise_negative"
     assert set(V1_TO_V2_LABEL.values()) == set(LABELS)
-
-
-def test_critical_attributes_are_cleanliness_room_staff() -> None:
-    critical = {a for a, info in ATTRIBUTE_INFO.items() if info.critical}
-    assert critical == {Attribute.CLEANLINESS, Attribute.ROOM, Attribute.STAFF}

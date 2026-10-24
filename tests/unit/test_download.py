@@ -6,6 +6,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+from hotel_curator.data import download
 from hotel_curator.data.download import (
     ChecksumMismatchError,
     download_file,
@@ -135,3 +136,24 @@ def test_mismatched_content_range_restarts(tmp_path: Path) -> None:
             "https://example.test/d", tmp_path / "x", DIGEST, client=client
         )
     assert out.read_bytes() == PAYLOAD
+
+
+def test_redirect_to_plain_http_is_refused(tmp_path: Path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.scheme == "https":
+            return httpx.Response(302, headers={"Location": "http://x.test/f"})
+        return httpx.Response(200, content=b"tampered")
+
+    transport = httpx.MockTransport(handler)
+    hooked = {"request": [download._require_https]}
+    for client in (
+        httpx.Client(transport=transport, follow_redirects=True),
+        httpx.Client(
+            transport=transport, follow_redirects=True, event_hooks=hooked
+        ),
+    ):
+        with client, pytest.raises(download.InsecureRedirectError):
+            download.download_file(
+                "https://x.test/f", tmp_path / "f", "0" * 64, client=client
+            )
+    assert not (tmp_path / "f").exists()

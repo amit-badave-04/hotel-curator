@@ -125,12 +125,27 @@ union of its parts' labels.
 | Set | Source hotels | Reviews | Annotators | Use |
 |---|---|---|---|---|
 | gold-test | test (226 hotels) | 1,200 | 3, majority vote | Final comparison table, once |
-| gold-dev | val (220 hotels) | 600 | 3, majority vote | Thresholds, calibration, model selection |
-| train (silver) | train (1,048 hotels) | 4,000 (expand if the learning curve has not flattened) | 1 | Training |
+| gold-dev | val (220 hotels) | 600 (*as built:* 594; the 6 reviews of the one val hotel moved to train went to the train labels, DATA_CARD §5) | 3, majority vote | Thresholds, calibration, model selection |
+| train (silver) | train (1,048 hotels) | 4,000 (expand if the learning curve has not flattened; *as built:* 4,006 with those 6 reviews) | 1 | Training |
+| train_2 (silver, *as built*) | train hotels | 4,000 more, no review shared with train (the learning curve had not flattened) | 1 | Training (rungs named `*-train2`) |
 | external human check | TripAdvisor Annotated | up to 442 | 3 | Panel-vs-human agreement on C, R, S, L, V, F |
 
 Each set: 30% from a rare-topic enriched stratum (wifi words, or location
 words in the Disliked part), 70% uniform; inverse-inclusion weights recorded.
+
+**Learning curve (M2).** `python scripts/learning_curve.py` (TF-IDF +
+logistic regression, gold-dev only, 3 seeds): review-level macro-F1 0.803,
+0.832, 0.843, 0.852 at 25/50/75/100% of the first 4,006 training reviews.
+The last quarter still adds 0.010, so the curve has not flattened and, as
+planned, a second training sample of 4,000 reviews (`train_2`, same
+stratification, disjoint from every set, `curator label sample-extra`) was
+labelled by the same annotator: 4,000 reviews, 6,901 parts, 829 hotels,
+every answer parsed (`data/manifests/labels.json`). Its per-label
+prevalences are within 0.014 of the first sample's (largest: room
+praise, 0.244 vs 0.231 of parts). The cheap rungs (TF-IDF,
+embeddings) and roberta-base were re-run on train + train_2
+(`--extra-train`; rung names end in `-train2`, `make train2`); ELECTRA-small
+and mmBERT-small were not, for CPU time.
 Agreement: Fleiss' kappa per label. A 100-review human audit sheet for the
 owner is generated (BLOCKERS B3). Weak supervision is out unless an
 experiment shows it helps.
@@ -145,30 +160,41 @@ experiment shows it helps.
 | c1 | Fine-tuned **roberta-base** | Hugging Face legacy S3, SHA-256 pinned | Same base model as v1: architecture-for-architecture comparison |
 | c2 | Fine-tuned ELECTRA-small (14M params) | Hugging Face legacy S3 | Fast, small serving footprint |
 | c3 | Fine-tuned mmBERT-small (ModernBERT architecture) | Docker Hub layer | The only modern-architecture encoder reachable |
-| v1 | v1 checkpoint, frozen, v1 thresholds | Git LFS | The comparison target |
+| v1 | v1 checkpoint, frozen, scored in four configurations (whole review or parts, shipped or gold-dev-tuned thresholds) | Git LFS | The comparison target is the configuration with the best gold-dev macro-F1 (§3.6); *as built:* parts with gold-dev-tuned thresholds |
 | d | LLM annotator panel | three independent LLM annotators | Labels only; never served |
 
 ModernBERT-base, DeBERTa-v3 and Ettin are the preferred modern encoders but
 are only distributed through huggingface.co, which is blocked (BLOCKERS B1).
-`make train-encoder BASE=<dir>` runs any of them once the owner unblocks it.
+`uv run curator model run-encoder <key> --base-dir <dir>` runs any of them
+once the owner unblocks it (BLOCKERS B1).
 
 Training details: class-weighted BCE (sqrt(neg/pos), capped), AdamW, linear
 warmup/decay, dynamic padding, max 128 tokens (covers the 95th percentile
 part), selection on **dev macro-F1 at dev-tuned thresholds** (the deployment
-metric; v1 selected at 0.5). Seeds fixed and recorded.
+metric; v1 selected at 0.5). Seeds fixed and recorded. *As built:* the epoch
+is selected on **part-level** gold-dev macro-F1 (each part scored on its
+own), not on review level; every encoder was trained this way, so the rungs
+are comparable, and the per-epoch history in each model card says so. Found
+by the independent review after training; not changed, to avoid retraining.
 
 ### 3.4 Calibration and thresholds
 
 Per-label isotonic calibration and F1-optimal thresholds, both fitted on
-gold-dev only, thresholds clamped to [0.1, 0.9], fallback 0.5 for labels with
+gold-dev only, thresholds kept within [0.1, 0.9] (*as built:* the F1-optimal
+threshold is searched among the gold-dev scores inside that range, rather
+than found unconstrained and then clipped), fallback 0.5 for labels with
 fewer than 10 dev positives. Calibration uses the recorded inverse-inclusion
 sampling weights (gold-dev oversamples rare topics). Calibration quality is
 reported as ECE and Brier on gold-test, and calibration-in-the-large
-(sum of probabilities vs number of positives, per label) on the gold-test
-uniform stratum. Hotel aggregates use **expected counts** (sums of
+(predicted versus observed share of positives, per label) on all of
+gold-test, weighted by the inverse-inclusion sampling weights so both shares
+estimate the corpus rate. (*Correction:* this first said "on the uniform
+stratum"; that stratum excludes every review with rare-topic words, so it
+contains no wifi reviews and is not a random sample of the corpus.) Hotel aggregates use **expected counts** (sums of
 calibrated probabilities), not thresholded counts; reviews that were used as
-training data are excluded from hotel aggregates (about 1% of train-hotel
-reviews) so no hotel score rests on in-sample predictions.
+training data are excluded from hotel aggregates (2.2% of train-hotel
+reviews once both training samples are counted) so no hotel score rests on
+in-sample predictions.
 
 ### 3.5 Evaluation
 
@@ -178,8 +204,8 @@ reviews) so no hotel score rests on in-sample predictions.
   ECE.
 - Slices: Liked vs Disliked part; **cross-polarity** labels (negative labels in
   Liked parts, positive labels in Disliked parts; catches a "part implies
-  polarity" shortcut); sampling stratum (uniform only = unbiased); city;
-  length band.
+  polarity" shortcut); sampling stratum ("uniform": reviews without
+  rare-topic words; "enriched": reviews with them); city; length band.
 - Error analysis: per-label false positives / negatives with text, written to
   `docs/model/ERRORS.md`.
 - Hotel-level validity (non-circular): (1) **out-of-time**: attribute scores
@@ -205,6 +231,39 @@ A model ships only if, on **gold-test**:
 The comparison table (all rungs plus v1, with intervals) goes in
 `docs/model/COMPARISON.md`. Eval tests with thresholds (`pytest -m eval`)
 encode rule 1 and minimum per-label recall on the fixture.
+
+**Clarifications fixed before any v2 model was scored** (written in M2, before
+the first `curator model run-*`; they share the M2 commit with the results,
+so git history alone cannot prove the order):
+
+- *Rule 2's dev metric* is review-level macro-F1 on gold-dev at the
+  thresholds tuned on gold-dev (the same harness and level as rule 1).
+- *Rule 3's ECE* is measured on **review-level probabilities** (noisy-OR of
+  the calibrated part probabilities), because that is the quantity the hotel
+  scores add up (ADR 006). It is the mean over the 16 labels of 10-bin ECE on
+  gold-test. Part-level ECE is reported next to it.
+- *v1's configuration*: v1 is scored with two inputs (whole review
+  lowercased, the input shape it was trained on; or each part separately)
+  and two threshold sets (its shipped thresholds; thresholds tuned on
+  gold-dev). The configuration with the best gold-dev macro-F1 is "the v1
+  checkpoint" in rule 1. All four are reported.
+- *Encoder hyperparameters* are fixed per base model from the published
+  fine-tuning recipes and not searched on gold data: roberta-base lr 3e-5,
+  4 epochs; ELECTRA-small lr 1e-4, 5 epochs; mmBERT-small lr 5e-5, 4 epochs;
+  batch 32, warmup 6%, weight decay 0.01, max length 128, seed 20261024. The
+  epoch is selected on gold-dev (§3.3).
+- *Rule 4* is checked by timing the packaged ONNX model on a fixed sample of
+  20,000 corpus parts and extrapolating to the corpus.
+- *The served package* (added on 24 October at 21:01 UTC, before any
+  package had been built or scored): what ships is the candidate's ONNX
+  package, int8 when that loses at most 0.005 gold-dev macro-F1. Rules 1
+  and 3 are therefore checked again on the package's own gold-test scores
+  ("package holds", column P in `COMPARISON.md`). This check can only
+  block a promotion; it never selects a different model.
+- *Ties under rule 2* ("the smaller, faster model") are broken by
+  parameter count, as coded before any result. When measured corpus speed
+  would break the tie differently, `COMPARISON.md` says so in a note; the
+  decision does not change.
 
 ### 3.7 Model card
 
@@ -253,7 +312,8 @@ the market average). Summary:
   with **Alembic** migrations; **PostgreSQL** in Docker, **SQLite** for local
   development and tests; the same migrations run on both.
 - Typed settings (`hotel_curator.config`), structured JSON logs with request
-  ids (structlog), `/healthz` (liveness) and `/readyz` (database + model).
+  ids (structlog), `/healthz` (liveness) and `/readyz` (database and hotel
+  data; the model is reported, not required).
 - Rate limiting per client, request body size limit, strict input validation on
   every endpoint (lengths, enums, page bounds), consistent error schema,
   CORS allow-list, no echo of input in responses.
@@ -344,10 +404,11 @@ is left to the owner.
 Built (each testable and explained in plain language):
 
 1. **What changed at this hotel.** For each attribute, the satisfaction share in
-   the most recent six months of the data vs the twelve months before, with a
+   the most recent six months of the data vs the 18 months before, with a
    posterior probability that it really moved. Flags only credible changes.
-2. **Who this hotel suits.** Attribute satisfaction by traveler type (couples,
-   families, solo, business) where evidence is sufficient: "families complain
+2. **Who this hotel suits.** Attribute satisfaction by traveler segment
+   (couples, families, groups and friends, solo travellers, business trips)
+   where evidence is sufficient: "families complain
    about room size twice as often as couples here".
 3. **What would change the tier.** For each hotel, the smallest attribute
    improvement that would move it up one tier, computed by re-running the tier
@@ -399,7 +460,7 @@ length drift); OpinRank sub-rating validity check; aspect span extraction.
 | Step 1 audit | `docs/v1-audit.md` | four independent reviewers; numbers cited by cell/file | done |
 | Step 2 plan | this file + ADRs 001-010 | dataset panel unanimous on A; tier panel: simplest-credible design 163 / traveler-first 153 / risk-first 149 | done (M0) |
 | M1 data | contracts pass on full data | `curator data build`: 515,738 raw rows -> 515,212 reviews, 1,494 hotels (1,048/220/226 train/val/test); contracts pass; rebuild byte-identical (sha256 of both tables unchanged); 47 s with cached downloads | done (M1) |
-| M2 labels/models | promotion rule | panel labels complete: train 4,000 reviews (annotator A; 1 batch re-run for 3 omitted items), gold-dev 600 and gold-test 1,200 reviews (3 annotators, Fleiss' kappa 0.94-0.997 per label); models not yet trained | in progress |
+| M2 labels/models | promotion rule | Labels: gold-test 1,200 and gold-dev 594 reviews (3 LLM annotators, majority; Fleiss' kappa 0.943-0.997 per label), train 4,006 + train_2 4,000 reviews (1 annotator). 14 rungs scored by one harness; `curator model compare` promotes `roberta-base-ft-train2`: gold-test review macro-F1 0.922 [0.911, 0.932] vs v1 0.687 [0.668, 0.705], paired difference +0.236 [+0.216, +0.255], review ECE 0.010; its int8 package 0.920 [0.909, 0.930], corpus in 1.07 h (224 parts/s, 4 threads); `pytest -m eval`: 3 passed | done (M2) |
 | M3 backend | API tests, coverage | — | not started |
 | M4 frontend | component, e2e, a11y | — | not started |
 | M5 polish | compose up, CI | — | not started |

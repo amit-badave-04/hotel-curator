@@ -37,6 +37,16 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+class InsecureRedirectError(ValueError):
+    """A download was redirected to a URL that is not HTTPS."""
+
+
+def _require_https(request: httpx.Request) -> None:
+    """Event hook: refuse to send any request (redirects too) without TLS."""
+    if request.url.scheme != "https":
+        raise InsecureRedirectError(f"refusing non-https request {request.url}")
+
+
 class _RestartDownloadError(Exception):
     """The partial file cannot be resumed; start again from byte 0."""
 
@@ -45,6 +55,8 @@ def _stream_to_part(client: httpx.Client, url: str, part: Path) -> None:
     offset = part.stat().st_size if part.exists() else 0
     headers = {"Range": f"bytes={offset}-"} if offset else {}
     with client.stream("GET", url, headers=headers) as response:
+        if response.url.scheme != "https":  # an injected client without hook
+            raise InsecureRedirectError(f"redirected to {response.url}")
         if response.status_code == 416:
             raise _RestartDownloadError("range not satisfiable")
         response.raise_for_status()
@@ -85,6 +97,7 @@ def download_file(
 
     Raises:
         ValueError: If the URL is not HTTPS or the digest is malformed.
+        InsecureRedirectError: If a redirect leads away from HTTPS.
         ChecksumMismatchError: If the downloaded bytes do not match.
         httpx.HTTPError: On network or HTTP errors.
     """
@@ -92,31 +105,17 @@ def download_file(
         raise ValueError(f"Only https URLs are allowed, got {url!r}")
     if not _SHA256_RE.match(sha256):
         raise ValueError(f"Expected a 64-char lowercase hex sha256: {sha256!r}")
-    if target.exists() and sha256_file(target) == sha256:
-        logger.info("Verified cached file %s", target)
-        return target
-
-    target.parent.mkdir(parents=True, exist_ok=True)
     part = target.with_name(target.name + ".part")
-    if part.exists() and sha256_file(part) == sha256:
-        part.replace(target)
-        logger.info("Promoted verified partial file %s", target)
+    if _already_verified(target, part, sha256):
         return target
+    target.parent.mkdir(parents=True, exist_ok=True)
     owns_client = client is None
-    http = client or httpx.Client(
-        timeout=TIMEOUT_SECONDS, follow_redirects=True
-    )
+    http = client or _default_client()
     try:
-        try:
-            _stream_to_part(http, url, part)
-        except _RestartDownloadError as exc:
-            logger.info("Restarting %s from scratch: %s", url, exc)
-            part.unlink(missing_ok=True)
-            _stream_to_part(http, url, part)
+        _fetch_part(http, url, part)
     finally:
         if owns_client:
             http.close()
-
     actual = sha256_file(part)
     if actual != sha256:
         part.unlink(missing_ok=True)
@@ -126,3 +125,34 @@ def download_file(
     part.replace(target)
     logger.info("Downloaded and verified %s", target)
     return target
+
+
+def _default_client() -> httpx.Client:
+    """Follows redirects, but never to a non-HTTPS URL."""
+    return httpx.Client(
+        timeout=TIMEOUT_SECONDS,
+        follow_redirects=True,
+        event_hooks={"request": [_require_https]},
+    )
+
+
+def _already_verified(target: Path, part: Path, sha256: str) -> bool:
+    """True if ``target`` (or a complete ``.part``, then promoted) matches."""
+    if target.exists() and sha256_file(target) == sha256:
+        logger.info("Verified cached file %s", target)
+        return True
+    if part.exists() and sha256_file(part) == sha256:
+        part.replace(target)
+        logger.info("Promoted verified partial file %s", target)
+        return True
+    return False
+
+
+def _fetch_part(client: httpx.Client, url: str, part: Path) -> None:
+    """Resume into ``part``; start over once if the server cannot resume."""
+    try:
+        _stream_to_part(client, url, part)
+    except _RestartDownloadError as exc:
+        logger.info("Restarting %s from scratch: %s", url, exc)
+        part.unlink(missing_ok=True)
+        _stream_to_part(client, url, part)

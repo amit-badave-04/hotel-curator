@@ -4,11 +4,11 @@ The primary source is Booking.com "515K Hotel Reviews Data in Europe"
 (Kaggle ``jiashenliu/515k-hotel-reviews-data-in-europe``, CC0). Kaggle needs
 an account and is blocked in the build environment, so v2 reads a public
 GitHub copy, pinned to one commit and to the digest of each of its 11
-chunks. The chunks re-assemble into exactly the documented shape of the
-original (515,738 rows x 17 columns, 1,492 hotel names); the build checks
-this. ``content_fingerprint`` gives a line-ending- and chunking-independent
-digest so the mirror can be compared with the Kaggle original
-(``make data-verify-kaggle``).
+chunks. The chunks re-assemble into the documented shape of the original:
+515,738 rows x 17 columns (the build checks the row count and column order)
+and 1,492 hotel names. ``content_fingerprint`` gives a line-ending- and
+chunking-independent digest so the mirror can be compared with the Kaggle
+original (``curator data fingerprint <csv>``, docs/BLOCKERS.md B2).
 """
 
 import hashlib

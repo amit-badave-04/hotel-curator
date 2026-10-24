@@ -36,6 +36,9 @@ postgres = ["psycopg[binary]>=3.2"]
 data = [
     "httpx>=0.28",
     "pandera[pandas]>=0.22",
+    # Person-name redaction in evidence quotes (offline scoring job only).
+    "spacy>=3.8.16,<3.9",
+    "en-core-web-sm==3.8.0",  # wheel URL pinned in [tool.uv.sources]
 ]
 ml = [
     "lightgbm>=4.5",
@@ -86,7 +89,7 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D", "S", "PTH", "N802"]
-"migrations/**" = ["D", "N999"]
+"src/hotel_curator/db/migrations/**" = ["D", "N999"]
 "notebooks/**" = ["D", "E402"]
 "scripts/**" = ["D"]
 
@@ -128,3 +131,8 @@ branch = true
 show_missing = true
 skip_covered = true
 exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "if __name__ == .__main__.:"]
+
+[tool.uv.sources]
+# spaCy's model is published as a GitHub release asset, not on PyPI; uv.lock
+# records the wheel's sha256.
+en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }

@@ -1,0 +1,601 @@
+{"_meta": {"annotator": "C", "role": "a different, smaller model, reviews in forward order", "batches": [0, 1, 2, 3, 4, 5], "prompt_sha256": {"0": "3493a908667162a75537a12ee1862ff9ed747e9ffa1a7e6d9c3e6684b96e2cbd", "1": "637b089d740434ea7341bfb0d609b9197a2a319c6b47c651f34273d1fc8336df", "2": "7599b84b426b50b6d07bfd32e80531c4115ed4f1e84d98a6069384b6e2a71e00", "3": "9202b21a5c5ec36280aa717032d5e20375183d8aa3a2b52deb90522d33aa0e16", "4": "313b8ab441bdda69e6782b5bcfc576b2a0b52cc1324b7caa5ccb07b54fc39242", "5": "715cdfb2fabef108859bfe6c947b6147067cde628bef708952d70d30dae1f56f"}, "guideline_sha256": "32e27f892472f3f910847589abeac0c4b834227b0833b81e9464d6fbac1a482c"}}
+{"id": "r_372837c6c5f9", "liked": "S+", "disliked": "R-"}
+{"id": "r_b827825700a4", "liked": "L+ C+ S+", "disliked": "R- F-"}
+{"id": "r_c1ac859e0c72", "liked": "R+ S+ L+", "disliked": "R- C-"}
+{"id": "r_54ad1f640cea", "liked": "R+ L+", "disliked": "R-"}
+{"id": "r_6b029e07fdaa", "liked": "L+", "disliked": "N-"}
+{"id": "r_29e49f34a441", "liked": "L+ S+ V+", "disliked": "C-"}
+{"id": "r_62118e85e19e", "liked": "C+ R+ R- V+", "disliked": ""}
+{"id": "r_00fc1fb68e10", "liked": "R+ C+", "disliked": "S+ S- V-"}
+{"id": "r_53fb0d794a6d", "liked": "L+ S+ R+", "disliked": ""}
+{"id": "r_5340fdc131d9", "liked": "L+ S+", "disliked": "R- C-"}
+{"id": "r_c2cf6543fcdc", "liked": "R-", "disliked": "R-"}
+{"id": "r_e1d4591aa87c", "liked": "L+", "disliked": ""}
+{"id": "r_79a2fff06751", "liked": "R+ C+", "disliked": "R-"}
+{"id": "r_69e071eb422f", "liked": "L+", "disliked": "L-"}
+{"id": "r_52c104493952", "liked": "L+ N+", "disliked": "R-"}
+{"id": "r_00ac93005620", "liked": "S+ R+ C+ L+", "disliked": ""}
+{"id": "r_65ab02af403a", "liked": "", "disliked": ""}
+{"id": "r_85126bffb78a", "liked": "", "disliked": "R-"}
+{"id": "r_e58056583c9d", "liked": "L+", "disliked": ""}
+{"id": "r_1f9aece912fb", "liked": "R+ L+ S+", "disliked": "R- W-"}
+{"id": "r_9461257434c3", "liked": "L+ C+", "disliked": "R-"}
+{"id": "r_ce86c1c49946", "liked": "R+ W+ C+", "disliked": "F- V-"}
+{"id": "r_52cb3a96d572", "liked": "", "disliked": "S-"}
+{"id": "r_587aa5e11c27", "liked": "N+", "disliked": ""}
+{"id": "r_04fca5e33918", "liked": "S+", "disliked": ""}
+{"id": "r_10bea20464f9", "liked": "L+", "disliked": ""}
+{"id": "r_143d7b6296fe", "liked": "", "disliked": ""}
+{"id": "r_cc87b37af2c0", "liked": "R+", "disliked": "S-"}
+{"id": "r_bd37eabde795", "liked": "R+ S+ F+", "disliked": "R-"}
+{"id": "r_677921527571", "liked": "N+ C+", "disliked": ""}
+{"id": "r_5e70db44d052", "liked": "L+", "disliked": "S- R- V- L+"}
+{"id": "r_f0c2a9b35e0d", "liked": "S+ L+", "disliked": "R-"}
+{"id": "r_3eb5e198df11", "liked": "R+ C+ L+ F+", "disliked": ""}
+{"id": "r_1da2c3cfdb6d", "liked": "L+ C+ R+", "disliked": "S-"}
+{"id": "r_85877f3e8f92", "liked": "R+", "disliked": "L- N-"}
+{"id": "r_d29ba03fdf1c", "liked": "F+", "disliked": "V- F-"}
+{"id": "r_0bdaa8181923", "liked": "L+", "disliked": ""}
+{"id": "r_d2a0902d25d6", "liked": "R+ C+", "disliked": ""}
+{"id": "r_f71286c0ba91", "liked": "L+ R+ F+", "disliked": "R- V-"}
+{"id": "r_0a5d19cd561f", "liked": "L+", "disliked": ""}
+{"id": "r_f22abfa6e721", "liked": "L+", "disliked": "V-"}
+{"id": "r_df32c1f2c371", "liked": "C+ S+", "disliked": ""}
+{"id": "r_90f5533fc198", "liked": "F+ R+ R- C+ S+", "disliked": "L-"}
+{"id": "r_03218c5ec17a", "liked": "R+", "disliked": ""}
+{"id": "r_7d671c3b072b", "liked": "R+ C+ L+", "disliked": "W- V-"}
+{"id": "r_4152dd74a387", "liked": "C+ L+ S+ R+", "disliked": "R- W-"}
+{"id": "r_15aee7838b19", "liked": "L+ S+ R+", "disliked": "R-"}
+{"id": "r_0cc1e3286369", "liked": "S+ F+", "disliked": ""}
+{"id": "r_b40a8645a87f", "liked": "L+ R+", "disliked": ""}
+{"id": "r_4d278c7519f8", "liked": "R+", "disliked": "N-"}
+{"id": "r_20448e801041", "liked": "S+", "disliked": ""}
+{"id": "r_a171b4c61242", "liked": "L+", "disliked": "R-"}
+{"id": "r_8172742d729b", "liked": "R+ S+ L+", "disliked": ""}
+{"id": "r_7af3d17002d3", "liked": "L+ S+ N+", "disliked": ""}
+{"id": "r_c35a9140e89b", "liked": "L+ R+", "disliked": "S-"}
+{"id": "r_6d2cc410843a", "liked": "L+", "disliked": ""}
+{"id": "r_296a3b3fa117", "liked": "R+", "disliked": "R-"}
+{"id": "r_ca622dde75cf", "liked": "L+", "disliked": "R-"}
+{"id": "r_47b28feb48f4", "liked": "L+ S+ R+ C+ F+", "disliked": ""}
+{"id": "r_9361eafb79c9", "liked": "L+", "disliked": ""}
+{"id": "r_db316dae6c30", "liked": "", "disliked": "R- V-"}
+{"id": "r_cc2163351100", "liked": "R+ S+", "disliked": ""}
+{"id": "r_7a8be8230eee", "liked": "S+ R+ L+", "disliked": "S- C- R-"}
+{"id": "r_0e689b1c4d51", "liked": "L+ C+ R+ S+", "disliked": ""}
+{"id": "r_a43babb49362", "liked": "C+", "disliked": "N-"}
+{"id": "r_d80ec54b12c4", "liked": "", "disliked": ""}
+{"id": "r_8bbe988383fe", "liked": "S+", "disliked": "L- C- N-"}
+{"id": "r_c06077d548bf", "liked": "C+", "disliked": "R-"}
+{"id": "r_5e5ec71df63a", "liked": "F+", "disliked": "S-"}
+{"id": "r_f7e1bea73b56", "liked": "L+ S+", "disliked": "R- C-"}
+{"id": "r_defafbb4cb94", "liked": "R+ S+ F+", "disliked": "V- R-"}
+{"id": "r_53d3fa53330b", "liked": "L+ R+ S+", "disliked": ""}
+{"id": "r_8b708a5c4915", "liked": "L+", "disliked": ""}
+{"id": "r_5ec59b6800ae", "liked": "R+ L+", "disliked": "R-"}
+{"id": "r_576278d8c5fd", "liked": "S+ F+ R+ R- C+ L+", "disliked": ""}
+{"id": "r_e11b0ce0ff38", "liked": "L+ S+ R+", "disliked": ""}
+{"id": "r_3dfcc7b0b644", "liked": "C+ R+ S+ F+", "disliked": "L- V+ N+"}
+{"id": "r_6d23887eb0c5", "liked": "", "disliked": "S-"}
+{"id": "r_61153bb99ab5", "liked": "S+", "disliked": ""}
+{"id": "r_69bde031a0c5", "liked": "C+ R+", "disliked": "R-"}
+{"id": "r_eca2399309b6", "liked": "L+ S+", "disliked": ""}
+{"id": "r_cb1db78ba74f", "liked": "L+ C+", "disliked": "S- V- N- W-"}
+{"id": "r_fe3634e8eeeb", "liked": "V+ L+", "disliked": "R-"}
+{"id": "r_c627e5d6ecbd", "liked": "L+ R+", "disliked": "S- F+ F-"}
+{"id": "r_4238dd619b02", "liked": "S+", "disliked": ""}
+{"id": "r_8bcbe2b5225f", "liked": "S+ L+ R+", "disliked": "F- S+"}
+{"id": "r_c94b0d930c1f", "liked": "C+ S+", "disliked": ""}
+{"id": "r_ea3430beaf00", "liked": "C+ R+ L+ S+ N+", "disliked": "R-"}
+{"id": "r_10eb2205e8d0", "liked": "S+", "disliked": "C- S-"}
+{"id": "r_611a90689b48", "liked": "R+", "disliked": "R-"}
+{"id": "r_f93286327b61", "liked": "R+ C+ S+", "disliked": ""}
+{"id": "r_bf5d2d166c8a", "liked": "L+ C+ R+ N+", "disliked": "N-"}
+{"id": "r_50be8238fdaf", "liked": "R+ N+ S+", "disliked": "S+ S-"}
+{"id": "r_962b813a93c0", "liked": "", "disliked": "R- V-"}
+{"id": "r_897ac02c6e6b", "liked": "L+ F+", "disliked": "R-"}
+{"id": "r_dc0b86cc6ab3", "liked": "C+ R+", "disliked": ""}
+{"id": "r_4ff165447e2e", "liked": "L+", "disliked": "R-"}
+{"id": "r_18ca133c82a7", "liked": "L+ R+ V+ S+", "disliked": ""}
+{"id": "r_020544736f48", "liked": "L+", "disliked": "R- C-"}
+{"id": "r_479c0ee45f9f", "liked": "L+", "disliked": "R-"}
+{"id": "r_86ff866d1d73", "liked": "L+ S+ R+ C+", "disliked": "L- F-"}
+{"id": "r_c4eb1e2c8fd6", "liked": "L+", "disliked": "C- S- N-"}
+{"id": "r_951ef0866185", "liked": "S+ L+", "disliked": "R-"}
+{"id": "r_5df4d188e7f0", "liked": "F+ R+", "disliked": ""}
+{"id": "r_6114760080ae", "liked": "R+ N+ F+ S+", "disliked": "L-"}
+{"id": "r_01be07a1d152", "liked": "L+", "disliked": "S- R- R+"}
+{"id": "r_9b6b8bb405cd", "liked": "S+ R+ F+", "disliked": ""}
+{"id": "r_ac54f1b5016f", "liked": "L+ F+ S+", "disliked": ""}
+{"id": "r_d9a057f1603d", "liked": "L+ S+ F+", "disliked": "R- R+"}
+{"id": "r_fa6aed25f18e", "liked": "L+", "disliked": ""}
+{"id": "r_495ada2ba090", "liked": "L+", "disliked": "V-"}
+{"id": "r_5f857e06f6a7", "liked": "L+ S+ R+", "disliked": "R- W-"}
+{"id": "r_04f75ccb9703", "liked": "R+", "disliked": ""}
+{"id": "r_f23d88644002", "liked": "L+ R+ S+", "disliked": ""}
+{"id": "r_b509111a9b83", "liked": "C+ R+ F+", "disliked": "R- S-"}
+{"id": "r_cb39856027be", "liked": "R+", "disliked": "V-"}
+{"id": "r_9cfb2cbea44f", "liked": "", "disliked": ""}
+{"id": "r_a1c7c2fb89b8", "liked": "V+", "disliked": ""}
+{"id": "r_bcba37b5d0bd", "liked": "L+ N+", "disliked": "R-"}
+{"id": "r_afa2560638a6", "liked": "", "disliked": "R-"}
+{"id": "r_9479ee0bb68b", "liked": "R+", "disliked": "V-"}
+{"id": "r_74b4faa87170", "liked": "L+", "disliked": "W- V- C-"}
+{"id": "r_c8d5f5fbbbdc", "liked": "L+", "disliked": "R-"}
+{"id": "r_75a8741cdced", "liked": "S+ R+ F+", "disliked": "R-"}
+{"id": "r_a8aac19d882f", "liked": "S+ C+ N+ F+", "disliked": ""}
+{"id": "r_a0fcf8160123", "liked": "L+ S+ F+ R+", "disliked": "R- F-"}
+{"id": "r_7528ea7999a1", "liked": "", "disliked": "N-"}
+{"id": "r_abc34f127d8d", "liked": "F+", "disliked": "R-"}
+{"id": "r_922b9080fb81", "liked": "R+", "disliked": ""}
+{"id": "r_bb8386a098e5", "liked": "", "disliked": "S-"}
+{"id": "r_08af89c2aa6f", "liked": "L+ R+ R- S+", "disliked": "V- S-"}
+{"id": "r_eebb9aaa2dfa", "liked": "S+", "disliked": ""}
+{"id": "r_1425741bf459", "liked": "C+ R+", "disliked": "S- F-"}
+{"id": "r_b678b8ae8bc6", "liked": "L+", "disliked": "N- R-"}
+{"id": "r_e0c0e7e8fe6d", "liked": "S+", "disliked": "V- L-"}
+{"id": "r_1e85bd7540bb", "liked": "L+ F+", "disliked": "N-"}
+{"id": "r_cf079130bca1", "liked": "R+ S+", "disliked": "V- F- R- R+"}
+{"id": "r_88019691bb59", "liked": "L+ R+ F+", "disliked": ""}
+{"id": "r_97378b957155", "liked": "L+", "disliked": ""}
+{"id": "r_c8e077cb9033", "liked": "L+ S+", "disliked": "R-"}
+{"id": "r_939f94ac6e99", "liked": "R+ S+", "disliked": "F-"}
+{"id": "r_24da477375eb", "liked": "S+", "disliked": "R-"}
+{"id": "r_13143f884ab1", "liked": "L+ S+", "disliked": ""}
+{"id": "r_dc9daf8641b7", "liked": "R+ L+ F+ W+", "disliked": "R-"}
+{"id": "r_af95197dc26e", "liked": "L+ R+", "disliked": "R- N-"}
+{"id": "r_6dbe65f848c6", "liked": "S+", "disliked": ""}
+{"id": "r_a2b7d32f3f74", "liked": "R+ S+ L+", "disliked": ""}
+{"id": "r_c579ef9baa4b", "liked": "L+ S+", "disliked": ""}
+{"id": "r_ff32a376fecd", "liked": "", "disliked": "V-"}
+{"id": "r_d8966554d0ad", "liked": "S+ F+ L+", "disliked": ""}
+{"id": "r_e03dea53b48d", "liked": "S+ L+", "disliked": "V- F- R-"}
+{"id": "r_29f09a41b70f", "liked": "F+", "disliked": "R-"}
+{"id": "r_d662399b83ce", "liked": "R+", "disliked": "F- S-"}
+{"id": "r_a90673aea37d", "liked": "L+", "disliked": "R-"}
+{"id": "r_274b84e78910", "liked": "S+ L+", "disliked": ""}
+{"id": "r_091bc0ff1cf0", "liked": "S+", "disliked": ""}
+{"id": "r_24a0afebcc42", "liked": "", "disliked": ""}
+{"id": "r_2e06d09c5917", "liked": "S+ F+ L+", "disliked": ""}
+{"id": "r_ce924fef3a4b", "liked": "F+ R+", "disliked": "R-"}
+{"id": "r_d50ae1785677", "liked": "S+ R+ F+", "disliked": "R-"}
+{"id": "r_07fa2a2de2cb", "liked": "L+ S+", "disliked": ""}
+{"id": "r_bb69229b0f21", "liked": "L+", "disliked": "R-"}
+{"id": "r_f9590a01d05e", "liked": "", "disliked": "S-"}
+{"id": "r_dc01bd9fa8bf", "liked": "", "disliked": "R- S-"}
+{"id": "r_9473f4a3651c", "liked": "", "disliked": "F-"}
+{"id": "r_37fb719d2794", "liked": "L+ R+", "disliked": ""}
+{"id": "r_e5aae1d6ae11", "liked": "L+", "disliked": "R-"}
+{"id": "r_9f4ae5873563", "liked": "R+ C+ L+", "disliked": ""}
+{"id": "r_93d3432423ca", "liked": "R+ R- L+", "disliked": "F-"}
+{"id": "r_3e3f4c33ced9", "liked": "C+ L+ S+", "disliked": "R- V-"}
+{"id": "r_20c4f41c023a", "liked": "L+ V+ R+ S+", "disliked": "S+ L+ V+"}
+{"id": "r_473c3e34b662", "liked": "L+ R+", "disliked": "S- R-"}
+{"id": "r_368766201176", "liked": "S+ L+ R+ C+ N+", "disliked": ""}
+{"id": "r_45edd48981fc", "liked": "S+ S- C+ L+", "disliked": "V-"}
+{"id": "r_312968280567", "liked": "", "disliked": "C- R-"}
+{"id": "r_b139e24ffa9a", "liked": "L+ S+ F+ C+ R+", "disliked": "R-"}
+{"id": "r_d9562ca1d40b", "liked": "S+ F+", "disliked": ""}
+{"id": "r_8c391513945a", "liked": "S+", "disliked": ""}
+{"id": "r_9bb6cbdaf7a9", "liked": "L+ R+", "disliked": "R-"}
+{"id": "r_53bd51a6e3aa", "liked": "F+ C+ S+", "disliked": "R-"}
+{"id": "r_56ab1689cd2f", "liked": "L+ R+ S+ F+", "disliked": "R- N-"}
+{"id": "r_e08611254815", "liked": "", "disliked": ""}
+{"id": "r_57017608fcc9", "liked": "R+", "disliked": "C- S-"}
+{"id": "r_88ef64640de6", "liked": "R+ N+ C+ S+ L+ F+", "disliked": "F-"}
+{"id": "r_ae9a447822ba", "liked": "L+", "disliked": "F-"}
+{"id": "r_7ac3e4a9ac9b", "liked": "L+", "disliked": "R-"}
+{"id": "r_c744e783dc58", "liked": "L+ R+ C+ S+ F+", "disliked": "V-"}
+{"id": "r_76f6fc26327f", "liked": "C+ S+", "disliked": "F- V-"}
+{"id": "r_902f23c32d99", "liked": "R- R+", "disliked": "W-"}
+{"id": "r_cf9b36073a8a", "liked": "F+", "disliked": ""}
+{"id": "r_27464e95703e", "liked": "S+ R+ L+", "disliked": ""}
+{"id": "r_37b79ad2d4d8", "liked": "S+", "disliked": "V-"}
+{"id": "r_8284d64abcfb", "liked": "S+", "disliked": "R-"}
+{"id": "r_57545026b201", "liked": "R+", "disliked": "S- F-"}
+{"id": "r_ce08df69770d", "liked": "L+ S+", "disliked": "S- F-"}
+{"id": "r_eaa8cfe06fab", "liked": "N+ R+ L+ V+", "disliked": "R-"}
+{"id": "r_5a932396b8a9", "liked": "S+", "disliked": ""}
+{"id": "r_624b597914a0", "liked": "", "disliked": "R-"}
+{"id": "r_3bb3902543ce", "liked": "R+ F+", "disliked": "W- V-"}
+{"id": "r_7851cb9a7bd3", "liked": "L+", "disliked": "R-"}
+{"id": "r_d1dcdcc29490", "liked": "L+", "disliked": "F-"}
+{"id": "r_769fc3570a02", "liked": "C+ R+ N+ S+ F+ L+", "disliked": ""}
+{"id": "r_0b42adaa7d58", "liked": "L+ R+", "disliked": "C- S+"}
+{"id": "r_d74e10024b52", "liked": "", "disliked": "R-"}
+{"id": "r_c4660028affa", "liked": "R+", "disliked": "R-"}
+{"id": "r_ab2445db916a", "liked": "", "disliked": "C- R-"}
+{"id": "r_7152a07447df", "liked": "S+ L+ C+ R+", "disliked": "F-"}
+{"id": "r_372c176c8367", "liked": "L+", "disliked": "S-"}
+{"id": "r_088f29282c06", "liked": "L+", "disliked": "R- V-"}
+{"id": "r_7eed4d836b4c", "liked": "L+ S+", "disliked": "R-"}
+{"id": "r_797ab734dded", "liked": "R+", "disliked": "S-"}
+{"id": "r_e491f2e613fc", "liked": "R+", "disliked": ""}
+{"id": "r_bb6f0a93c6f4", "liked": "R+ C+ L+", "disliked": "R- W-"}
+{"id": "r_d1c56d21bb02", "liked": "R+ V- F+ S+", "disliked": "R-"}
+{"id": "r_002372764234", "liked": "R+", "disliked": ""}
+{"id": "r_cc0ed9bbb01f", "liked": "", "disliked": "F- V-"}
+{"id": "r_f79bcbe705ec", "liked": "R+ F+", "disliked": "R- F-"}
+{"id": "r_f78e38f95a6e", "liked": "L+ S+", "disliked": "R- W-"}
+{"id": "r_b761b695b50b", "liked": "F+ S+", "disliked": "R+ N-"}
+{"id": "r_ce0362ecb519", "liked": "S+ L+", "disliked": "R-"}
+{"id": "r_ed5fdf7dd44b", "liked": "L+ F+ S+ R- V-", "disliked": "R- V-"}
+{"id": "r_83603f115a75", "liked": "L+ W+ F+ S+", "disliked": "V- R- S-"}
+{"id": "r_43d3e8143938", "liked": "L+ S+ R+", "disliked": "R-"}
+{"id": "r_16040a0f6170", "liked": "R+", "disliked": "R-"}
+{"id": "r_1623855b8fce", "liked": "L+", "disliked": "F-"}
+{"id": "r_5a786f31e346", "liked": "", "disliked": ""}
+{"id": "r_3f2e6a662e34", "liked": "", "disliked": "R-"}
+{"id": "r_30d91af5445b", "liked": "S+", "disliked": ""}
+{"id": "r_7942e6dbc6e8", "liked": "L+", "disliked": "R-"}
+{"id": "r_2edb54318725", "liked": "R+ F+", "disliked": ""}
+{"id": "r_dcb695b2fb3a", "liked": "L+ C+", "disliked": "R+ R-"}
+{"id": "r_ef3c22a99aa1", "liked": "F+ S+", "disliked": "R-"}
+{"id": "r_4e855916c08b", "liked": "S+", "disliked": "R-"}
+{"id": "r_cf87657574f7", "liked": "L+ R+", "disliked": "R-"}
+{"id": "r_6bb6a08293ab", "liked": "S+ S-", "disliked": "R-"}
+{"id": "r_bbce85d159ab", "liked": "R+ L+", "disliked": "N-"}
+{"id": "r_2edf9e561d6a", "liked": "", "disliked": "S+ S-"}
+{"id": "r_64c5e4f59ebd", "liked": "R+", "disliked": ""}
+{"id": "r_cc8585b2d7bd", "liked": "", "disliked": "R-"}
+{"id": "r_0fd28452884b", "liked": "S+ R+ C+", "disliked": ""}
+{"id": "r_78602d34b43c", "liked": "S+", "disliked": "F-"}
+{"id": "r_51b1ceabb8bc", "liked": "R+ C+ L+ S+", "disliked": ""}
+{"id": "r_e715c9f7706a", "liked": "L+ S+", "disliked": ""}
+{"id": "r_36b7327504c1", "liked": "C+ R+ R- L+ F+", "disliked": ""}
+{"id": "r_1b808ef7f5f7", "liked": "L+ S+", "disliked": "R-"}
+{"id": "r_e43ecb78577a", "liked": "R+", "disliked": "N-"}
+{"id": "r_ad57578801b7", "liked": "R+ R- C+ S+ L+", "disliked": "R- V- S-"}
+{"id": "r_7981a29d82f6", "liked": "F+", "disliked": "R-"}
+{"id": "r_8c52d9c44554", "liked": "", "disliked": "F- V- R-"}
+{"id": "r_fcd9d9094156", "liked": "", "disliked": ""}
+{"id": "r_13eaac1a3b67", "liked": "S+", "disliked": ""}
+{"id": "r_ccb01e7c8653", "liked": "S+ R+", "disliked": ""}
+{"id": "r_c1e472ec758c", "liked": "R+ R- S+ L+", "disliked": "R-"}
+{"id": "r_acea1dc78bf4", "liked": "L+", "disliked": "V- F- S- C- R-"}
+{"id": "r_9743221dcdba", "liked": "S+ R+ F+ V+", "disliked": ""}
+{"id": "r_92541b8dfe86", "liked": "R+", "disliked": "S-"}
+{"id": "r_f813f9d2a4bd", "liked": "R+", "disliked": ""}
+{"id": "r_3c76e92df1e9", "liked": "L+ S+", "disliked": ""}
+{"id": "r_053d3bef45d3", "liked": "F+ R+ C+", "disliked": "S+ S-"}
+{"id": "r_06a708f14754", "liked": "C+ R+ F+", "disliked": ""}
+{"id": "r_dfb17a41f861", "liked": "R+ L+", "disliked": ""}
+{"id": "r_44fb3e00c80d", "liked": "S+", "disliked": "N-"}
+{"id": "r_85f33fc23c22", "liked": "C+", "disliked": "S-"}
+{"id": "r_79cf472786f4", "liked": "R+", "disliked": "R-"}
+{"id": "r_dcdb07e1f5dd", "liked": "C+ S+", "disliked": ""}
+{"id": "r_48f7135c9480", "liked": "F+", "disliked": "C- R-"}
+{"id": "r_5d64648222cc", "liked": "", "disliked": ""}
+{"id": "r_38b440e3112b", "liked": "R+", "disliked": "R-"}
+{"id": "r_86c27a66e1a9", "liked": "R+ L+", "disliked": "R-"}
+{"id": "r_94a99e880771", "liked": "", "disliked": "F-"}
+{"id": "r_750e9ba96105", "liked": "L+ V+", "disliked": "C- R-"}
+{"id": "r_ff0a23492bf4", "liked": "R+ L+", "disliked": "C- R- V-"}
+{"id": "r_7495b4f93368", "liked": "C+ R+", "disliked": "V- L-"}
+{"id": "r_be5cd5b6fe12", "liked": "L+", "disliked": ""}
+{"id": "r_671c932ecc97", "liked": "S+", "disliked": "C+ C- R- N-"}
+{"id": "r_bd891b45d5cf", "liked": "F+", "disliked": ""}
+{"id": "r_5c552c03531d", "liked": "L+", "disliked": ""}
+{"id": "r_18389b73d180", "liked": "L+ S+", "disliked": ""}
+{"id": "r_7e6452feb22e", "liked": "", "disliked": ""}
+{"id": "r_6eb5f2b71680", "liked": "S+", "disliked": "C-"}
+{"id": "r_441b96c48e63", "liked": "R+ S+", "disliked": "R-"}
+{"id": "r_7afb00deb8be", "liked": "L+", "disliked": ""}
+{"id": "r_e4bd460e5634", "liked": "", "disliked": "R-"}
+{"id": "r_80db434cc8b6", "liked": "L+ S+", "disliked": ""}
+{"id": "r_a3feb884f2b1", "liked": "L+ S+ N+ F+", "disliked": "N+ N-"}
+{"id": "r_9a9e5889d4b2", "liked": "F+ S+ R+ L+", "disliked": "R- N- C-"}
+{"id": "r_bb4b52c63d0b", "liked": "L+ S+ F+", "disliked": ""}
+{"id": "r_8011ae93503e", "liked": "L+", "disliked": "R- F-"}
+{"id": "r_4960a2cea0d7", "liked": "S+ R+ C+", "disliked": "F- L-"}
+{"id": "r_80ab6c5b560f", "liked": "", "disliked": "R- N-"}
+{"id": "r_840b2f95c107", "liked": "L+ C+ F+", "disliked": ""}
+{"id": "r_3d42e388771c", "liked": "R+", "disliked": ""}
+{"id": "r_99973e49a50d", "liked": "S+", "disliked": ""}
+{"id": "r_4efb401901b9", "liked": "V+", "disliked": ""}
+{"id": "r_d4502fbc4e06", "liked": "L+ R+ F+ S+ V+", "disliked": "R-"}
+{"id": "r_ffdc6f548f99", "liked": "L+ S+", "disliked": "F- R-"}
+{"id": "r_b0d2015a9b77", "liked": "L+ F+ R+", "disliked": ""}
+{"id": "r_0f9d64b1c83b", "liked": "C+ L+", "disliked": ""}
+{"id": "r_68f216ce7077", "liked": "L+ S+", "disliked": "N-"}
+{"id": "r_37585e1e410a", "liked": "", "disliked": "S- C- R-"}
+{"id": "r_ce8254467316", "liked": "L+", "disliked": "C- R-"}
+{"id": "r_7ff36b3b9df5", "liked": "R+", "disliked": "R- S- V-"}
+{"id": "r_426699b2303d", "liked": "", "disliked": "C- R- S- V-"}
+{"id": "r_c13a05e09096", "liked": "F+ L+ S+", "disliked": "S-"}
+{"id": "r_9c941199cd23", "liked": "C+ S+", "disliked": "R- S- V-"}
+{"id": "r_913f4354a18a", "liked": "F+", "disliked": "R-"}
+{"id": "r_0a75d1aa87d1", "liked": "L+ R+", "disliked": "S- W-"}
+{"id": "r_bedd152c90e9", "liked": "L+", "disliked": "W-"}
+{"id": "r_7398cdb969fd", "liked": "F+", "disliked": ""}
+{"id": "r_2bf230b7eeb3", "liked": "", "disliked": ""}
+{"id": "r_4512ad5fc0b2", "liked": "F+ R+ S+", "disliked": "C+ R- V-"}
+{"id": "r_9418f1095d80", "liked": "", "disliked": ""}
+{"id": "r_afc7410e137e", "liked": "L+ R+", "disliked": "R- S+ S-"}
+{"id": "r_8bb927ad12e1", "liked": "L+ R+", "disliked": "F- R+ R- S- V-"}
+{"id": "r_3cd86ae460a0", "liked": "L+ S+", "disliked": ""}
+{"id": "r_a0a7f30c5678", "liked": "S+", "disliked": "S-"}
+{"id": "r_b2b5e382835d", "liked": "S+ V+", "disliked": ""}
+{"id": "r_ff2b083c3e29", "liked": "F+ L+ R+ S+", "disliked": ""}
+{"id": "r_8b4726234cbd", "liked": "", "disliked": ""}
+{"id": "r_fe1ba8155a77", "liked": "", "disliked": "W-"}
+{"id": "r_d6407a6fdba2", "liked": "F+ R+ S+", "disliked": ""}
+{"id": "r_1296c3eb79a2", "liked": "C+ R+", "disliked": "R-"}
+{"id": "r_e3487ccc895c", "liked": "L+", "disliked": "F-"}
+{"id": "r_620ee59d203b", "liked": "", "disliked": ""}
+{"id": "r_f3ce082a23cf", "liked": "L+ R+", "disliked": ""}
+{"id": "r_c554d46431e9", "liked": "L+ N+ R+", "disliked": "R-"}
+{"id": "r_f28d7a5c5880", "liked": "C+ F+ F- S+", "disliked": "S- V-"}
+{"id": "r_dfc93361c515", "liked": "L+ S+ V+", "disliked": ""}
+{"id": "r_d4691d23e0cf", "liked": "R+", "disliked": "R-"}
+{"id": "r_071caa31475f", "liked": "L+ S+", "disliked": ""}
+{"id": "r_8c42b85052ae", "liked": "C+ L+ N+ S+", "disliked": ""}
+{"id": "r_e971d6b973d8", "liked": "F+ L+ R+ S+ W+", "disliked": ""}
+{"id": "r_fb9f8189d28c", "liked": "C+ L+ R+ S+", "disliked": ""}
+{"id": "r_da33f85c4472", "liked": "", "disliked": ""}
+{"id": "r_dfadb2ce79e9", "liked": "C+ F+ R+ S+", "disliked": "R- S-"}
+{"id": "r_fc4a52f389cd", "liked": "L+ S+ V+", "disliked": "R-"}
+{"id": "r_e7e7ebef0a23", "liked": "L+", "disliked": ""}
+{"id": "r_dca71802740d", "liked": "C+ L+ R+", "disliked": "F- N- S-"}
+{"id": "r_d03f326e6d64", "liked": "R+ R- S+", "disliked": "C- R-"}
+{"id": "r_0f59a4018c12", "liked": "", "disliked": ""}
+{"id": "r_7504fea31b1f", "liked": "F+ L+ R+", "disliked": "F- S+"}
+{"id": "r_aced331022f1", "liked": "L+ R+ S+", "disliked": ""}
+{"id": "r_6425f22e1312", "liked": "L+", "disliked": "R-"}
+{"id": "r_8038d89996b6", "liked": "L+ R+ S+", "disliked": "F+ F-"}
+{"id": "r_56f84c93f508", "liked": "C+ L+", "disliked": "R- V-"}
+{"id": "r_fc4806f9a69a", "liked": "L+", "disliked": "S-"}
+{"id": "r_75f2115e056d", "liked": "L+", "disliked": "R-"}
+{"id": "r_a5c5bb71fcb0", "liked": "", "disliked": "V-"}
+{"id": "r_5774659f0e3c", "liked": "R+ S+", "disliked": ""}
+{"id": "r_eadc9ec4c866", "liked": "R+ R-", "disliked": "V-"}
+{"id": "r_3c6e68cbaccc", "liked": "S+", "disliked": "L-"}
+{"id": "r_6fb80f36a2f6", "liked": "L+ R+", "disliked": "S-"}
+{"id": "r_58ec05c1bb80", "liked": "R+", "disliked": "C- R- S- V-"}
+{"id": "r_e7698fda2250", "liked": "L+ R+ S+", "disliked": ""}
+{"id": "r_1c875b178c45", "liked": "S+", "disliked": "R-"}
+{"id": "r_5f6b7b73b578", "liked": "C+ L+ S+", "disliked": ""}
+{"id": "r_a3c4df0c05df", "liked": "R+ S+", "disliked": "R-"}
+{"id": "r_b79496ae06b3", "liked": "N+", "disliked": ""}
+{"id": "r_4bfae16e2bdd", "liked": "C+ F+ L+", "disliked": ""}
+{"id": "r_0c394056398a", "liked": "S+ V+ W+", "disliked": "S+ S-"}
+{"id": "r_77767e427574", "liked": "", "disliked": "W-"}
+{"id": "r_effa1b137ecc", "liked": "C+ L+ S+", "disliked": "R-"}
+{"id": "r_5138dc6348fd", "liked": "S+ S-", "disliked": "R-"}
+{"id": "r_b7960c609588", "liked": "", "disliked": ""}
+{"id": "r_abafbf817801", "liked": "L+ R+", "disliked": "C-"}
+{"id": "r_56d0738bfe51", "liked": "L+ R+ S+", "disliked": "R- V-"}
+{"id": "r_5d6d650e79d3", "liked": "R+", "disliked": ""}
+{"id": "r_8e4b866f165b", "liked": "", "disliked": "R-"}
+{"id": "r_7409e318909f", "liked": "F+ L+ R+ S+", "disliked": "R- V-"}
+{"id": "r_547188fe4909", "liked": "C+ R+", "disliked": ""}
+{"id": "r_d3bc5115c077", "liked": "R+", "disliked": "R-"}
+{"id": "r_81bdcc39b92a", "liked": "F+", "disliked": ""}
+{"id": "r_f2028dc07d59", "liked": "S+", "disliked": ""}
+{"id": "r_3ff7cec68d06", "liked": "L+", "disliked": "R-"}
+{"id": "r_a04539f8eda3", "liked": "S+", "disliked": ""}
+{"id": "r_2365e03bc5f3", "liked": "L+ R+ S+", "disliked": "N- R-"}
+{"id": "r_bcb45dbf1adf", "liked": "F+ L+ R+ S+", "disliked": ""}
+{"id": "r_7bcf2cb48bef", "liked": "", "disliked": "R-"}
+{"id": "r_8edb7d5bfb58", "liked": "L+", "disliked": ""}
+{"id": "r_5cfa75bc07e0", "liked": "L+", "disliked": "F-"}
+{"id": "r_c30e5ee4208a", "liked": "S+", "disliked": ""}
+{"id": "r_7de5a68fce28", "liked": "L+ S+", "disliked": "N- R-"}
+{"id": "r_c5233b278397", "liked": "N+ R+ S+", "disliked": "F- S-"}
+{"id": "r_ac8e577fd468", "liked": "", "disliked": "F- R- S-"}
+{"id": "r_972f11cb6ef7", "liked": "S+", "disliked": ""}
+{"id": "r_fcc76af91a5e", "liked": "R+", "disliked": "S-"}
+{"id": "r_4071caefa681", "liked": "L+", "disliked": "N-"}
+{"id": "r_94fe00ee5640", "liked": "F+ L+", "disliked": "R-"}
+{"id": "r_bdeec84d993e", "liked": "L+ V+", "disliked": ""}
+{"id": "r_45656bd461dc", "liked": "L+ S+", "disliked": "R-"}
+{"id": "r_bfdb47fb3c8d", "liked": "", "disliked": "R-"}
+{"id": "r_f1c0b22d86b5", "liked": "F+ S+", "disliked": ""}
+{"id": "r_e5ff42f192b6", "liked": "", "disliked": "R- V-"}
+{"id": "r_7cd534967f03", "liked": "L+ N+", "disliked": ""}
+{"id": "r_787c5d3ade64", "liked": "S+", "disliked": ""}
+{"id": "r_fa5d30bdb0b4", "liked": "", "disliked": "F-"}
+{"id": "r_f8f2985b07c3", "liked": "C+ L+ R+ S+ V+", "disliked": ""}
+{"id": "r_8db8c169429f", "liked": "L+ R+ S+", "disliked": ""}
+{"id": "r_8d677f524132", "liked": "C+ F+ L+ N+ R+ S+", "disliked": ""}
+{"id": "r_ca8db9d01b4a", "liked": "R+ S+", "disliked": "L- R-"}
+{"id": "r_a50c05fac152", "liked": "C+ R+", "disliked": "V-"}
+{"id": "r_973b13c802a9", "liked": "R+", "disliked": "W-"}
+{"id": "r_4d71f6118a20", "liked": "L+ C+", "disliked": "R- V-"}
+{"id": "r_ec6693c427d7", "liked": "L+ S+ F+ V+", "disliked": ""}
+{"id": "r_10205d586490", "liked": "R+", "disliked": "R+ R- S-"}
+{"id": "r_4ef4ff01c3a7", "liked": "R+ F+", "disliked": "S-"}
+{"id": "r_5a919c2861d9", "liked": "L+ S+", "disliked": ""}
+{"id": "r_ed44cc9d8ebf", "liked": "S+ L+", "disliked": "R- N-"}
+{"id": "r_de36558ae33a", "liked": "S+ C+ L+", "disliked": "R-"}
+{"id": "r_e51f7a9b2b11", "liked": "", "disliked": "F-"}
+{"id": "r_617a490eebbd", "liked": "L+", "disliked": "R+ R-"}
+{"id": "r_0e8a74e049f0", "liked": "L+ S+ C+ W+", "disliked": ""}
+{"id": "r_0ea225b8472a", "liked": "S+", "disliked": ""}
+{"id": "r_3250a8c1961a", "liked": "", "disliked": "S- V-"}
+{"id": "r_e2161a34718d", "liked": "L+", "disliked": ""}
+{"id": "r_e579996d9868", "liked": "L+ S+", "disliked": "V-"}
+{"id": "r_da90dafcb57d", "liked": "L+ R+", "disliked": "W- R-"}
+{"id": "r_d4c47ffc96db", "liked": "L+", "disliked": ""}
+{"id": "r_9e90abc7c555", "liked": "S+ L+", "disliked": ""}
+{"id": "r_c42587496766", "liked": "S+", "disliked": ""}
+{"id": "r_da016fbf73eb", "liked": "S+ C+ L+", "disliked": ""}
+{"id": "r_0182cd9c0604", "liked": "S+", "disliked": "R- S-"}
+{"id": "r_e3f357b80c28", "liked": "L+ F+", "disliked": "L-"}
+{"id": "r_9e81affaa9fa", "liked": "C+ V+", "disliked": "W-"}
+{"id": "r_3e43ceb6ae41", "liked": "L+ R+ R- C+", "disliked": "R-"}
+{"id": "r_b4e0eaece809", "liked": "N+ L+", "disliked": ""}
+{"id": "r_0300aaa453be", "liked": "S+", "disliked": ""}
+{"id": "r_5b906684a155", "liked": "L+", "disliked": "R-"}
+{"id": "r_2151da603dc5", "liked": "S+ V+ F+", "disliked": "F-"}
+{"id": "r_7dac6b7be187", "liked": "C+ R+ V+", "disliked": ""}
+{"id": "r_a34b696fd736", "liked": "R+", "disliked": "R-"}
+{"id": "r_c22fcf2860d9", "liked": "R+ L+", "disliked": "R-"}
+{"id": "r_718ddbed3e4c", "liked": "S+ R+ F+ L+", "disliked": ""}
+{"id": "r_103bc4fde7e2", "liked": "C+ S+ F+", "disliked": ""}
+{"id": "r_2f9b570c2d4d", "liked": "S+ F+", "disliked": "R-"}
+{"id": "r_331a98d0800e", "liked": "S+", "disliked": ""}
+{"id": "r_f3f40b3e52ca", "liked": "L+", "disliked": "S- V-"}
+{"id": "r_8f9b53fc91e1", "liked": "L+", "disliked": "F- S- R-"}
+{"id": "r_fba370a9d4ad", "liked": "R+ F+ S+", "disliked": "R-"}
+{"id": "r_2bdaed9bbf7c", "liked": "L+ S+ R+ C+ F+", "disliked": "V-"}
+{"id": "r_917036c32e9b", "liked": "", "disliked": "R- R+"}
+{"id": "r_58b5ecb07f24", "liked": "R+ L+", "disliked": "L-"}
+{"id": "r_fadc45ecd2ce", "liked": "C+ L+ R+ R- F+ S+", "disliked": "R-"}
+{"id": "r_7c4281d0e89a", "liked": "F+ L+", "disliked": "R- N-"}
+{"id": "r_b30ae49c5d14", "liked": "L+ R+", "disliked": "V-"}
+{"id": "r_4a1d708d4cd1", "liked": "", "disliked": "R-"}
+{"id": "r_3ca248ae8ea8", "liked": "R+ F+", "disliked": "S-"}
+{"id": "r_b8575d1c6eba", "liked": "V+ C+", "disliked": "L-"}
+{"id": "r_a9bf20327fd3", "liked": "S+", "disliked": ""}
+{"id": "r_19bc3bf9ceda", "liked": "L+", "disliked": "S- W-"}
+{"id": "r_88cbdbb87819", "liked": "F+", "disliked": "R-"}
+{"id": "r_6a41a4fb13e1", "liked": "R+ S+", "disliked": ""}
+{"id": "r_d7a981623d03", "liked": "R+", "disliked": "R- V-"}
+{"id": "r_6a7db0d00759", "liked": "L+ F+ S+", "disliked": ""}
+{"id": "r_974cd43c8995", "liked": "S+", "disliked": ""}
+{"id": "r_6b6d1a5562ca", "liked": "F+", "disliked": ""}
+{"id": "r_8d5c888a921c", "liked": "", "disliked": ""}
+{"id": "r_d9ae0a6e1f02", "liked": "S+ L+", "disliked": "F-"}
+{"id": "r_2f55cee3e3ad", "liked": "L+ R+", "disliked": "R-"}
+{"id": "r_648192b65989", "liked": "S+ F+", "disliked": "R-"}
+{"id": "r_427f35b20426", "liked": "L+ S+", "disliked": ""}
+{"id": "r_a364419d7111", "liked": "S+ F+ R+", "disliked": ""}
+{"id": "r_f2f4cb7a8dad", "liked": "", "disliked": "F-"}
+{"id": "r_b57c4ee184af", "liked": "R-", "disliked": "R-"}
+{"id": "r_2292f9a3c5b5", "liked": "", "disliked": "R- F-"}
+{"id": "r_5f6cd825ecea", "liked": "F+", "disliked": ""}
+{"id": "r_546297171a9e", "liked": "L+ S+", "disliked": ""}
+{"id": "r_76fdfc3fd93e", "liked": "F+", "disliked": "W-"}
+{"id": "r_3c40e2bd707a", "liked": "R+ L+", "disliked": ""}
+{"id": "r_885a74dc31e9", "liked": "L+", "disliked": "S- V- L-"}
+{"id": "r_12a3a967a561", "liked": "L+ C+ R+ S+", "disliked": ""}
+{"id": "r_60005fa517aa", "liked": "", "disliked": "L-"}
+{"id": "r_e3b5b5879bef", "liked": "", "disliked": "C- W- F-"}
+{"id": "r_1da754b9f9a8", "liked": "L+", "disliked": "W- V- S-"}
+{"id": "r_effc748f9170", "liked": "L+", "disliked": "W- R- S-"}
+{"id": "r_668700f017c6", "liked": "S+ F+ V+ L+", "disliked": "L- R- V-"}
+{"id": "r_94255ffb531b", "liked": "W+ S+ L+", "disliked": "V-"}
+{"id": "r_3d9e7d14bb0b", "liked": "R+", "disliked": "L-"}
+{"id": "r_8de7f5aa2df5", "liked": "L+ F+ S+", "disliked": "F-"}
+{"id": "r_b155fc99db37", "liked": "L+ C+ S+", "disliked": "R- V- C-"}
+{"id": "r_52f73dcefbec", "liked": "R+", "disliked": "L-"}
+{"id": "r_1c9aa71a7bf5", "liked": "S+", "disliked": "R- W-"}
+{"id": "r_a741b130e306", "liked": "C+ R+ F+ S+ L+", "disliked": "R- W- C-"}
+{"id": "r_12df0d6e885b", "liked": "L+ R+", "disliked": ""}
+{"id": "r_720b27a2c2b9", "liked": "F+", "disliked": "L- L+ N-"}
+{"id": "r_f73d327abaac", "liked": "L+ C+ R+ R-", "disliked": "F- V- L-"}
+{"id": "r_c94b44efec89", "liked": "S+ L+", "disliked": "R- C- W-"}
+{"id": "r_e144eebc2c5b", "liked": "S+ L+", "disliked": "W-"}
+{"id": "r_1cfb146fc975", "liked": "", "disliked": "W-"}
+{"id": "r_939cc78923f5", "liked": "L+ R+ S+", "disliked": "S+ S-"}
+{"id": "r_a242790f3b7a", "liked": "L+", "disliked": "R- V-"}
+{"id": "r_b775ca788789", "liked": "", "disliked": "S- F- L- R- C-"}
+{"id": "r_af3ea63df6c5", "liked": "L+ R+ C+ W+", "disliked": "S-"}
+{"id": "r_ad626e0e71df", "liked": "C+ R+ F+", "disliked": "R- W-"}
+{"id": "r_7385423add6a", "liked": "R+", "disliked": "S- S+ L- F-"}
+{"id": "r_2ce30842ec80", "liked": "R+", "disliked": "N-"}
+{"id": "r_2686ef04b8b3", "liked": "R+ F+ S+", "disliked": "F-"}
+{"id": "r_e39397af8161", "liked": "C+ N+ R+ L+", "disliked": "R- L-"}
+{"id": "r_5d5af5f6b533", "liked": "C+ N+", "disliked": "R-"}
+{"id": "r_90007085f9a1", "liked": "R+ S+", "disliked": "V- L-"}
+{"id": "r_93712c601dc5", "liked": "", "disliked": "R- W- V-"}
+{"id": "r_8cd032ff4e60", "liked": "L+ S+ W+", "disliked": ""}
+{"id": "r_cb2e5b16506c", "liked": "R+ L+ S+", "disliked": "R- S- W-"}
+{"id": "r_6d78341e96a2", "liked": "W+", "disliked": "S-"}
+{"id": "r_6fbe00684f29", "liked": "R+", "disliked": "L+ L-"}
+{"id": "r_91ed87cee6cf", "liked": "S+ L+ R+", "disliked": ""}
+{"id": "r_3b4d66510458", "liked": "S+ R+", "disliked": "R- W-"}
+{"id": "r_d13247a85a94", "liked": "L+", "disliked": "R- L-"}
+{"id": "r_60ce565689c9", "liked": "", "disliked": "L- R- S+ S-"}
+{"id": "r_1999473f0b69", "liked": "R+ R- L+", "disliked": "V-"}
+{"id": "r_352e0de149af", "liked": "R+", "disliked": ""}
+{"id": "r_5cbfd55ab6ca", "liked": "R+ C+ N+ L+", "disliked": "R- L+ L- V-"}
+{"id": "r_c1b0b2d8e920", "liked": "L+ S+ F+", "disliked": "W-"}
+{"id": "r_7ef1c2e215df", "liked": "C+ R+", "disliked": "R- F-"}
+{"id": "r_234ad7a9d0b6", "liked": "R+ F+ S+", "disliked": "C-"}
+{"id": "r_7ed051ce149a", "liked": "L+", "disliked": "C-"}
+{"id": "r_77afcc43437e", "liked": "S+", "disliked": "W-"}
+{"id": "r_2d3206365796", "liked": "S+", "disliked": "C- R-"}
+{"id": "r_fac43baa8ad4", "liked": "L+ F+ R+", "disliked": "W-"}
+{"id": "r_c26cc3162ee2", "liked": "F+ R+", "disliked": "W- L+ L-"}
+{"id": "r_061ba6446324", "liked": "L+ R+", "disliked": "W-"}
+{"id": "r_473b38123ca9", "liked": "S+ F+ L+", "disliked": ""}
+{"id": "r_3237e3bcce28", "liked": "R+", "disliked": "F- L-"}
+{"id": "r_0f8772d169dc", "liked": "R+ C+", "disliked": "R+ N-"}
+{"id": "r_e3434510f594", "liked": "", "disliked": ""}
+{"id": "r_ccb4c561e58f", "liked": "R+ F+ S+", "disliked": "L-"}
+{"id": "r_0ad679a258d0", "liked": "C+ R+", "disliked": "R- F- C-"}
+{"id": "r_4774ad94604b", "liked": "F+ R+", "disliked": "S-"}
+{"id": "r_10de52cb34b4", "liked": "F+", "disliked": "L+ V-"}
+{"id": "r_177ac5c0b8a2", "liked": "S+ R+ L+ V+", "disliked": "L-"}
+{"id": "r_635305cf8f1b", "liked": "R+ V+ W+", "disliked": "W- S- V-"}
+{"id": "r_aa253e47f142", "liked": "C+ R+ W+ S+", "disliked": "L-"}
+{"id": "r_bf559e70cc3d", "liked": "L+", "disliked": "R- N- L+ V- S- C+"}
+{"id": "r_57f8269d3fc2", "liked": "R+ F+", "disliked": "W- V- N-"}
+{"id": "r_af29893e3697", "liked": "S+", "disliked": "F- R+ R- W-"}
+{"id": "r_0ab495544f44", "liked": "L+ V+", "disliked": "W-"}
+{"id": "r_1c5a6ebea67e", "liked": "S+ L+", "disliked": "L- V-"}
+{"id": "r_4f62391c8f77", "liked": "S+", "disliked": "R- V-"}
+{"id": "r_e9fe385ddf41", "liked": "C+ R+ W+ L+ S+", "disliked": ""}
+{"id": "r_cfc55e57f790", "liked": "L+", "disliked": ""}
+{"id": "r_d449a11cce1d", "liked": "R+ S+", "disliked": "W-"}
+{"id": "r_c6b099d257b0", "liked": "S+ L+ V+ V-", "disliked": "V- W- R-"}
+{"id": "r_cb745bcb0e14", "liked": "R+ S+", "disliked": "L+ V-"}
+{"id": "r_b26eba34b9f5", "liked": "L+ S+", "disliked": "R+ R- N- C-"}
+{"id": "r_285c2f2511aa", "liked": "C+ R+ F+", "disliked": "W- V-"}
+{"id": "r_0f8a3147d12e", "liked": "", "disliked": "W-"}
+{"id": "r_1808b82aad75", "liked": "", "disliked": "W-"}
+{"id": "r_577da5d41f5e", "liked": "R+ N+ L+", "disliked": "W- F-"}
+{"id": "r_e4e4f0d45cf9", "liked": "R+ S+ F+", "disliked": "L+ L-"}
+{"id": "r_ea59ab02f8a5", "liked": "F+ W+ S+ C+", "disliked": ""}
+{"id": "r_8e216146692a", "liked": "L+ F+", "disliked": "W-"}
+{"id": "r_3d602b5c6195", "liked": "W+ L+ S+ C+", "disliked": "R- V-"}
+{"id": "r_0f8d76e90a3c", "liked": "C+ L+ F+", "disliked": "F- S- W-"}
+{"id": "r_8b17f2df5675", "liked": "L+ R+ S+ W+ F+", "disliked": "V-"}
+{"id": "r_e3a2085fcb10", "liked": "S+", "disliked": "L-"}
+{"id": "r_5bf5e514be1b", "liked": "", "disliked": "R-"}
+{"id": "r_0bcd3c708f33", "liked": "S+ R+ W+", "disliked": "V-"}
+{"id": "r_4907a36c4e50", "liked": "R+ C+", "disliked": ""}
+{"id": "r_6fde7f5ca230", "liked": "C+ R+ S+", "disliked": "V- R- L-"}
+{"id": "r_53f67f421a87", "liked": "R+ W+", "disliked": "R- C-"}
+{"id": "r_b88e655e2de0", "liked": "S+", "disliked": "L- R-"}
+{"id": "r_764260faee2c", "liked": "L+ R+", "disliked": "L- C-"}
+{"id": "r_251261540bfe", "liked": "L+", "disliked": "C- R- W-"}
+{"id": "r_6c66ffa68f3d", "liked": "S+", "disliked": "W-"}
+{"id": "r_42b3594641e7", "liked": "L+", "disliked": "R- N- V- S-"}
+{"id": "r_39a07250a0cd", "liked": "R+", "disliked": ""}
+{"id": "r_bb279087015d", "liked": "L+", "disliked": "L+ L-"}
+{"id": "r_1f8849c3f744", "liked": "L+ R+ S+", "disliked": "L-"}
+{"id": "r_459a5a9fdbfa", "liked": "", "disliked": "W-"}
+{"id": "r_01a7c6e11b91", "liked": "L+ S+ R-", "disliked": "R-"}
+{"id": "r_906196c18379", "liked": "L+", "disliked": "W- S+ S-"}
+{"id": "r_9a56a0050573", "liked": "S+", "disliked": "L- R-"}
+{"id": "r_1aac0aa86a06", "liked": "S+", "disliked": "W-"}
+{"id": "r_fefbd6c9334c", "liked": "R+ W+ S+", "disliked": ""}
+{"id": "r_05ac33bf6dfc", "liked": "S+ L+ W+", "disliked": "V-"}
+{"id": "r_59ac2c45de99", "liked": "R+", "disliked": "L- R- C- V- S-"}
+{"id": "r_bd20025c3353", "liked": "C+", "disliked": "W+ W- S-"}
+{"id": "r_d8dabd95c87a", "liked": "L+ S+", "disliked": "S-"}
+{"id": "r_0ea827f2d20d", "liked": "", "disliked": ""}
+{"id": "r_5158c725b667", "liked": "L+ S+ R+", "disliked": "W- R- V-"}
+{"id": "r_381bf1fcb185", "liked": "", "disliked": "W-"}
+{"id": "r_79e758cf867f", "liked": "S+ R+", "disliked": "N-"}
+{"id": "r_97b642c96f10", "liked": "F+ C+ L+", "disliked": ""}
+{"id": "r_af5f6dd80ad0", "liked": "L+ W+", "disliked": "R- C- S-"}
+{"id": "r_e2e6d48008c1", "liked": "L+ W+ S+", "disliked": "R-"}
+{"id": "r_42187029cd66", "liked": "R+ N-", "disliked": "V-"}
+{"id": "r_4e2b7c400a4c", "liked": "L+ R+ W+", "disliked": "V- F+"}
+{"id": "r_f5e80b32c35d", "liked": "L+ R+ V+", "disliked": "W-"}
+{"id": "r_627e76a08154", "liked": "L+ S+", "disliked": "V-"}
+{"id": "r_be7acfacfdb9", "liked": "L+ S+", "disliked": "R- W-"}
+{"id": "r_23a55585cd0e", "liked": "S+ L+ W+", "disliked": "R- V-"}
+{"id": "r_a780f7e9680c", "liked": "L+ F+ W+ S+", "disliked": "C- R- F+ F-"}
+{"id": "r_7863d13184ee", "liked": "R+ S+ W+ F+ L+", "disliked": ""}
+{"id": "r_9ac98ef7d750", "liked": "R+ F+ L+ S+", "disliked": "C- R- V- F-"}
+{"id": "r_aed27236e320", "liked": "R+ C+ L+", "disliked": "L+ L-"}
+{"id": "r_bdbca83edfa5", "liked": "L+", "disliked": ""}
+{"id": "r_6526ecdf5732", "liked": "V+ F+ R+", "disliked": "S+ S- L-"}
+{"id": "r_22342b1491ce", "liked": "L+", "disliked": "R- V- L+"}
+{"id": "r_343d10d24f5b", "liked": "R+", "disliked": "L-"}
+{"id": "r_4ed51f8b94d3", "liked": "F+", "disliked": "L-"}

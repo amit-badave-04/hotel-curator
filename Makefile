@@ -29,6 +29,53 @@ data: ## Download the pinned source, build and validate canonical tables (~1 min
 eda: ## Regenerate docs/data/EDA.md and figures from the canonical tables
 	$(RUN) curator data report
 
+# --- labels ----------------------------------------------------------------
+.PHONY: labels
+labels: ## Merge committed panel answers into label tables; rebuild + verify prompts
+	$(RUN) curator label merge
+	$(RUN) curator label prompts
+
+# --- models (needs `make setup-ml`) ----------------------------------------
+.PHONY: base-models baselines embeddings encoders train2 v1-eval compare package publish model-report models
+base-models: ## Download and verify the pinned pretrained encoders (~1.3 GB)
+	$(RUN) curator model fetch-base
+
+baselines: ## Rung a: TF-IDF + logistic regression / LightGBM (~10 min)
+	$(RUN) curator model run-tfidf
+
+embeddings: ## Rung b: frozen bge-small embeddings + logistic heads (~1 min)
+	$(RUN) curator model run-embeddings
+
+encoders: ## Rung c: fine-tune ELECTRA-small, roberta-base, mmBERT-small (CPU: hours)
+	$(RUN) curator model run-encoder electra-small
+	$(RUN) curator model run-encoder roberta-base
+	$(RUN) curator model run-encoder mmbert-small
+
+train2: ## Rungs a, b and roberta-base again on train + train_2 (names end in -train2)
+	$(RUN) curator model run-tfidf --extra-train
+	$(RUN) curator model run-embeddings --extra-train
+	$(RUN) curator model run-encoder roberta-base --extra-train
+
+v1-eval: ## Score the frozen v1 checkpoint on the v2 gold sets (~5 min)
+	$(RUN) curator model eval-v1
+
+compare: ## Apply the promotion rule; write docs/model/COMPARISON.md
+	$(RUN) curator model compare
+
+ENCODER_RUNGS := electra-small-ft roberta-base-ft mmbert-small-ft \
+	roberta-base-ft-train2
+
+package: ## Package every fine-tuned encoder (ONNX, int8 check, throughput)
+	for rung in $(ENCODER_RUNGS); do $(RUN) curator model package $$rung; done
+
+publish: ## Copy the promoted package to artifacts/models/
+	$(RUN) curator model publish
+
+model-report: ## Write docs/model/ERRORS.md and the model card
+	$(RUN) curator model report
+
+models: base-models baselines embeddings v1-eval encoders train2 package compare publish model-report ## Whole ladder, end to end
+
 # --- quality ---------------------------------------------------------------
 .PHONY: lint format typecheck test test-fast cov check
 lint: ## Ruff lint + format check

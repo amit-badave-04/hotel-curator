@@ -37,5 +37,7 @@ Option 2 for the live endpoint, with option 3 for everything else:
 - The API image needs no PyTorch or scikit-learn.
 - Model files are a versioned "package" directory (`model.onnx`,
   `tokenizer.json`, `metadata.json`, thresholds, calibration, model card).
-- Readiness (`/readyz`) reports not ready until the package and database are
-  loaded.
+- Readiness (`/readyz`) reports not ready until the database answers and hotel
+  data is loaded. The model package is loaded once at startup and its name is
+  reported, but it is not required: if it is missing or broken, the reason is
+  logged and only `/v1/analyze` answers 503.

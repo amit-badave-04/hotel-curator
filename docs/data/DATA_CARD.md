@@ -34,7 +34,7 @@ code (`make data`, `make eda`).
 | Hotels without coordinates | 17 |
 | Traveler types | couple 48.9%, solo 21.0%, group 12.7%, family with young children 11.8%, family with older children 5.1%, friends 0.4% |
 | Trip types | leisure 81.0%, business 16.1%, unknown 2.9% |
-| Language | English (99.6% of a 20,000-review sample, measured with py3langid during research) |
+| Language | English by the publisher's description; a research-phase check put 99.6% of a 20,000-review sample in English (py3langid). That check is not part of the pipeline and was not reproduced. |
 
 Columns used by v2 (canonical tables, contract in
 `hotel_curator.data.contracts`):
@@ -64,16 +64,50 @@ Columns used by v2 (canonical tables, contract in
 
 Hotel-disjoint, stratified by city and review-count band, seeded and
 independent of row order (`hotel_curator.data.split`):
-**1,048 train / 220 val / 226 test hotels** (355,302 / 81,171 / 78,739 reviews
-before the same-address adjustment; exact current numbers in the manifest).
-No hotel appears in two splits.
+**1,048 train / 220 val / 226 test hotels** with **356,035 / 80,438 / 78,739
+reviews** (`data/manifests/data.json`). Before the same-address adjustment
+(one hotel in val shared its address with a train hotel and moved to train)
+the split was 1,047 / 221 / 226 hotels. No hotel appears in two splits.
 
 ## 5. Labels
 
 See [`docs/labeling/GUIDELINES.md`](../labeling/GUIDELINES.md) and ADR 004.
 Gold-test comes only from test hotels, gold-dev only from validation hotels,
-training labels only from train hotels. Labels are produced by an LLM
+training labels only from train hotels. The two training samples share hotels (709 of them) but no reviews. Labels are produced by an LLM
 annotator panel and are **not human ground truth**.
+
+| Set | Reviews | Parts with text | Hotels | Annotators | Use |
+|---|---:|---:|---:|---|---|
+| gold-test | 1,200 | 2,060 | 182 | 3, majority vote | final comparison, once |
+| gold-dev | 594 | 1,030 | 142 | 3, majority vote | thresholds, calibration, model selection |
+| train | 4,006 | 6,944 | 836 | 1 | training |
+| train_2 | 4,000 | 6,901 | 829 | 1 | training (second sample, plan §3.2) |
+
+Source: `data/manifests/labels.json` (`curator label merge`). Each set has
+two strata: 30% drawn from the reviews that match rare-topic patterns (wifi
+words anywhere, or location words in the Disliked part) and 70% drawn from
+all other reviews. The 70% is therefore **not** a random sample of the whole
+split: it has no wifi reviews by construction. Every row carries its
+inverse-inclusion `sampling_weight`, and population estimates (calibration,
+label rates) use those weights over both strata.
+
+Gold-test, gold-dev and train were drawn before the same-address adjustment
+in section 4, so their sampling weights describe the split populations of
+that time (for gold-dev, a uniform-stratum weight of 172.3 rather than 170.7
+today); `curator label sample` therefore refuses to redraw an existing set.
+The six gold-dev reviews (11 parts) of the hotel that moved to train were
+moved into the training labels.
+
+- Panel agreement (Fleiss' kappa per label): 0.943-0.997
+  ([`AGREEMENT.md`](../labeling/AGREEMENT.md)). High agreement among models of
+  one family is a consistency signal, not accuracy.
+- Panel versus people on an external human-labelled set: on the 73 reviews
+  three people labelled, the panel agrees with a person at least as well as
+  the people agree with each other on 9 of 12 checkable labels; it marks more
+  mild complaints than the original annotators
+  ([`EXTERNAL_CHECK.md`](../labeling/EXTERNAL_CHECK.md)).
+- A 100-review human audit sheet is prepared for the owner
+  (`data/labels/human_audit_template.csv`, docs/BLOCKERS.md B3).
 
 ## 6. Personal data
 

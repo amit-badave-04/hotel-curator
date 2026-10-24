@@ -125,7 +125,7 @@ are to commit `85813b4`.
 | A5 | DB layer is dead; `seed_db.py` writes 0.0 to all 16 attribute columns for all 200 hotels | Ran with sqlmodel 0.0.48 | SQLAlchemy 2 + Alembic, seeded and tested |
 | A6 | 10 of 23 settings fields are read nowhere (e.g. `CURATOR_ELITE_MIN_AVG` has no effect); `threshold_set` is a free string, so `Gold` silently means `val` | grep; `classifier.py:67` | Typed settings with `Literal`s; every field used and documented |
 | A7 | `core/__init__.py` imports torch eagerly, so pure-pandas helpers need torch (5.1 s import) | `python -X importtime` | Serving uses ONNX Runtime; torch only in the `ml` extra |
-| A8 | Health check triggers the model load and hard-codes `model_loaded=True`; no readiness probe | `routes/health.py` | `/healthz` (liveness) and `/readyz` (DB + model) |
+| A8 | Health check triggers the model load and hard-codes `model_loaded=True`; no readiness probe | `routes/health.py` | `/healthz` (liveness) and `/readyz` (DB + hotel data; the model is reported, not required) |
 | A9 | Model load failures are retried on every request (`lru_cache` does not cache exceptions) | `api/deps.py:18` | Load once at startup in the lifespan hook |
 | A10 | Container runs as root, floating base tag, no healthcheck, ~500 MB model and a pickle baked in | `docker/Dockerfile` | Non-root user, pinned base, healthcheck, no pickles |
 | A11 | Review text with staff first names, room numbers and stay details is shipped in `hotel_evidence.json` | Regex scan of 7,242 unique snippets | Evidence snippets length-capped; DATA_CARD documents what is shown and why |

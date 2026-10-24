@@ -13,6 +13,9 @@ from typing import Literal
 from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+MAX_PAGE_SIZE = 100
+"""Upper bound for search page sizes, in the API schema and in settings."""
+
 
 class Settings(BaseSettings):
     """Application settings."""
@@ -22,7 +25,6 @@ class Settings(BaseSettings):
     )
 
     home: Path = Field(default_factory=Path.cwd)
-    environment: Literal["dev", "test", "prod"] = "dev"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_format: Literal["console", "json"] = "console"
 
@@ -35,7 +37,17 @@ class Settings(BaseSettings):
     analyze_rate_limit_per_minute: int = Field(default=30, ge=1, le=10_000)
     max_request_bytes: int = Field(default=64_000, ge=1_024, le=10_000_000)
     max_part_chars: int = Field(default=2_000, ge=10, le=20_000)
-    max_page_size: int = Field(default=100, ge=1, le=1_000)
+    max_page_size: int = Field(
+        default=MAX_PAGE_SIZE,
+        ge=1,
+        le=MAX_PAGE_SIZE,
+        description="Largest page a search may request (can only be lowered).",
+    )
+    forwarded_allow_ips: str | None = Field(
+        default=None,
+        description="Proxy addresses whose X-Forwarded-For is trusted for "
+        "client identity (rate limits). Unset: use the TCP peer.",
+    )
     seed: int = 20261024
 
     @computed_field  # type: ignore[prop-decorator]
@@ -74,6 +86,26 @@ class Settings(BaseSettings):
     def manifests_dir(self) -> Path:
         """Committed manifests describing every built data file."""
         return self.data_dir / "manifests"
+
+    @property
+    def work_dir(self) -> Path:
+        """Gitignored scratch space: base models, checkpoints, MLflow store."""
+        return self.home / "var"
+
+    @property
+    def base_models_dir(self) -> Path:
+        """Downloaded pretrained encoders (never committed)."""
+        return self.work_dir / "models" / "base"
+
+    @property
+    def runs_dir(self) -> Path:
+        """Training outputs (checkpoints, predictions); never committed."""
+        return self.work_dir / "runs"
+
+    @property
+    def models_dir(self) -> Path:
+        """Committed model packages and evaluation reports."""
+        return self.artifacts_dir / "models"
 
     @property
     def resolved_tier_policy(self) -> Path:

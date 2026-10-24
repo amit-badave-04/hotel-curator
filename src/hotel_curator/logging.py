@@ -12,6 +12,26 @@ import sys
 import structlog
 
 
+def _rendering(fmt: str) -> list[structlog.types.Processor]:
+    """Final processors: JSON lines or console lines.
+
+    Tracebacks never include local variables: they would hold submitted
+    review text and request headers.
+    """
+    if fmt == "json":
+        return [
+            structlog.processors.ExceptionRenderer(
+                structlog.tracebacks.ExceptionDictTransformer(show_locals=False)
+            ),
+            structlog.processors.JSONRenderer(),
+        ]
+    return [
+        structlog.dev.ConsoleRenderer(
+            colors=False, exception_formatter=structlog.dev.plain_traceback
+        )
+    ]
+
+
 def configure_logging(level: str = "INFO", fmt: str = "console") -> None:
     """Configure stdlib logging and structlog.
 
@@ -27,16 +47,11 @@ def configure_logging(level: str = "INFO", fmt: str = "console") -> None:
         structlog.stdlib.add_logger_name,
         timestamper,
     ]
-    renderer: structlog.types.Processor = (
-        structlog.processors.JSONRenderer()
-        if fmt == "json"
-        else structlog.dev.ConsoleRenderer(colors=False)
-    )
     formatter = structlog.stdlib.ProcessorFormatter(
         foreign_pre_chain=shared,
         processors=[
             structlog.stdlib.ProcessorFormatter.remove_processors_meta,
-            renderer,
+            *_rendering(fmt),
         ],
     )
     handler = logging.StreamHandler(sys.stderr)

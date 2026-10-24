@@ -19,15 +19,16 @@ decision can be traced. No external services or accounts may be created.
 
 ## Decision
 
-MLflow >= 3.17.2 with `sqlite:///mlflow.db` (gitignored) and artifacts in
-`mlruns/` (gitignored). Every training and evaluation run logs parameters,
-data and label manifest digests, metrics and the evaluation report. Because the
-tracking store is not committed, each run also writes a JSON summary next to
-its model under `artifacts/models/<name>/`, which **is** committed and is the
-source for `docs/model/COMPARISON.md`.
+MLflow >= 3.17.2 with `sqlite:///var/mlflow.db` and artifacts in
+`var/mlartifacts/` (both under the gitignored `var/`). Every training and
+evaluation run logs parameters, data and label manifest digests, metrics and
+the evaluation report. Because the tracking store is not committed, each run
+also writes its report to `artifacts/evals/<rung>/report.json`, which **is**
+committed and is the source for `docs/model/COMPARISON.md`.
 
 ## Consequences
 
-- `make mlflow-ui` opens the local browser on the runs.
+- `uv run mlflow ui --backend-store-uri sqlite:///var/mlflow.db` opens the
+  runs in a local browser.
 - MLflow is optional at runtime: if it is not installed, runs still write the
   JSON summaries.
