@@ -1,0 +1,1950 @@
+{
+ "components": {
+  "schemas": {
+   "AnalyzeRequest": {
+    "description": "A review split the way the booking site splits it.",
+    "properties": {
+     "disliked": {
+      "default": "",
+      "maxLength": 20000,
+      "title": "Disliked",
+      "type": "string"
+     },
+     "liked": {
+      "default": "",
+      "maxLength": 20000,
+      "title": "Liked",
+      "type": "string"
+     }
+    },
+    "title": "AnalyzeRequest",
+    "type": "object"
+   },
+   "AnalyzeResponse": {
+    "description": "Model output for the submitted review.",
+    "properties": {
+     "model": {
+      "title": "Model",
+      "type": "string"
+     },
+     "parts": {
+      "items": {
+       "$ref": "#/components/schemas/PartOut"
+      },
+      "title": "Parts",
+      "type": "array"
+     }
+    },
+    "required": [
+     "model",
+     "parts"
+    ],
+    "title": "AnalyzeResponse",
+    "type": "object"
+   },
+   "Attribute": {
+    "description": "A hotel quality attribute that guests judge in reviews.",
+    "enum": [
+     "cleanliness",
+     "room",
+     "staff",
+     "location",
+     "noise",
+     "wifi",
+     "value",
+     "food"
+    ],
+    "title": "Attribute",
+    "type": "string"
+   },
+   "AttributeInfo": {
+    "description": "One of the eight hotel attributes.",
+    "properties": {
+     "attribute": {
+      "$ref": "#/components/schemas/Attribute"
+     },
+     "description": {
+      "title": "Description",
+      "type": "string"
+     },
+     "display_name": {
+      "title": "Display Name",
+      "type": "string"
+     },
+     "essential": {
+      "title": "Essential",
+      "type": "boolean"
+     },
+     "family": {
+      "title": "Family",
+      "type": "string"
+     }
+    },
+    "required": [
+     "attribute",
+     "display_name",
+     "description",
+     "essential",
+     "family"
+    ],
+    "title": "AttributeInfo",
+    "type": "object"
+   },
+   "AttributeOut": {
+    "additionalProperties": false,
+    "description": "One attribute's grade and every number behind it.",
+    "properties": {
+     "attribute": {
+      "$ref": "#/components/schemas/Attribute"
+     },
+     "complaining_reviews": {
+      "title": "Complaining Reviews",
+      "type": "integer"
+     },
+     "complaint_rate": {
+      "title": "Complaint Rate",
+      "type": "number"
+     },
+     "display_name": {
+      "title": "Display Name",
+      "type": "string"
+     },
+     "essential": {
+      "title": "Essential",
+      "type": "boolean"
+     },
+     "family": {
+      "description": "two_sided: share of opinions that are praise; must_be: complaint rate among all reviews (noise, wifi).",
+      "enum": [
+       "two_sided",
+       "must_be"
+      ],
+      "title": "Family",
+      "type": "string"
+     },
+     "grade": {
+      "$ref": "#/components/schemas/Grade"
+     },
+     "high": {
+      "description": "Upper end of the 90% likely range.",
+      "title": "High",
+      "type": "number"
+     },
+     "lean": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Lean"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "low": {
+      "description": "Lower end of the 90% likely range.",
+      "title": "Low",
+      "type": "number"
+     },
+     "material": {
+      "title": "Material",
+      "type": "boolean"
+     },
+     "mean": {
+      "description": "Posterior mean of the same measure.",
+      "title": "Mean",
+      "type": "number"
+     },
+     "negative": {
+      "description": "N: expected number of reviews complaining about it.",
+      "title": "Negative",
+      "type": "number"
+     },
+     "negative_hard": {
+      "description": "Reviews with a part labelled as a complaint at probability >= 0.5.",
+      "title": "Negative Hard",
+      "type": "integer"
+     },
+     "observed": {
+      "description": "Raw share of praise (two_sided) or complaint rate (must_be).",
+      "title": "Observed",
+      "type": "number"
+     },
+     "opinions": {
+      "description": "M = P + N.",
+      "title": "Opinions",
+      "type": "number"
+     },
+     "positive": {
+      "description": "P: expected number of reviews praising the attribute.",
+      "title": "Positive",
+      "type": "number"
+     },
+     "positive_hard": {
+      "description": "Reviews with a part labelled as praise at probability >= 0.5 (used to confirm a Weak essential before Caution).",
+      "title": "Positive Hard",
+      "type": "integer"
+     },
+     "prob_strong": {
+      "title": "Prob Strong",
+      "type": "number"
+     },
+     "prob_weak": {
+      "title": "Prob Weak",
+      "type": "number"
+     },
+     "quotes": {
+      "items": {
+       "$ref": "#/components/schemas/QuoteOut"
+      },
+      "title": "Quotes",
+      "type": "array"
+     },
+     "reviews": {
+      "description": "n: eligible reviews of the hotel.",
+      "title": "Reviews",
+      "type": "integer"
+     },
+     "trend": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/TrendOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [
+     "attribute",
+     "display_name",
+     "essential",
+     "family",
+     "grade",
+     "lean",
+     "observed",
+     "mean",
+     "low",
+     "high",
+     "prob_strong",
+     "prob_weak",
+     "positive",
+     "negative",
+     "opinions",
+     "reviews",
+     "complaint_rate",
+     "material",
+     "complaining_reviews",
+     "positive_hard",
+     "negative_hard"
+    ],
+    "title": "AttributeOut",
+    "type": "object"
+   },
+   "BlockerKind": {
+    "description": "Why a hotel is not in the next tier up.",
+    "enum": [
+     "more_reviews",
+     "more_opinions",
+     "confirm_strong",
+     "share_too_low",
+     "weak_essential",
+     "material_weak",
+     "review_spread"
+    ],
+    "title": "BlockerKind",
+    "type": "string"
+   },
+   "BlockerOut": {
+    "additionalProperties": false,
+    "description": "One condition between the hotel and the next tier up.",
+    "properties": {
+     "attribute": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Attribute"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "kind": {
+      "$ref": "#/components/schemas/BlockerKind"
+     },
+     "more": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "More"
+     },
+     "text": {
+      "title": "Text",
+      "type": "string"
+     }
+    },
+    "required": [
+     "kind",
+     "attribute",
+     "more",
+     "text"
+    ],
+    "title": "BlockerOut",
+    "type": "object"
+   },
+   "City": {
+    "description": "A city with hotels.",
+    "properties": {
+     "city": {
+      "title": "City",
+      "type": "string"
+     },
+     "country": {
+      "title": "Country",
+      "type": "string"
+     },
+     "hotels": {
+      "title": "Hotels",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "city",
+     "country",
+     "hotels"
+    ],
+    "title": "City",
+    "type": "object"
+   },
+   "CompareRow": {
+    "description": "One attribute across the compared hotels.",
+    "properties": {
+     "attribute": {
+      "$ref": "#/components/schemas/Attribute"
+     },
+     "leader": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Hotel credibly better than every other one on this attribute (posterior probability >= 0.95), if any.",
+      "title": "Leader"
+     },
+     "leader_probability": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Leader Probability"
+     },
+     "values": {
+      "items": {
+       "$ref": "#/components/schemas/CompareValue"
+      },
+      "title": "Values",
+      "type": "array"
+     }
+    },
+    "required": [
+     "attribute",
+     "values",
+     "leader",
+     "leader_probability"
+    ],
+    "title": "CompareRow",
+    "type": "object"
+   },
+   "CompareValue": {
+    "description": "One hotel's numbers on one attribute.",
+    "properties": {
+     "grade": {
+      "$ref": "#/components/schemas/Grade"
+     },
+     "high": {
+      "title": "High",
+      "type": "number"
+     },
+     "hotel_id": {
+      "title": "Hotel Id",
+      "type": "string"
+     },
+     "low": {
+      "title": "Low",
+      "type": "number"
+     },
+     "observed": {
+      "title": "Observed",
+      "type": "number"
+     },
+     "opinions": {
+      "title": "Opinions",
+      "type": "number"
+     }
+    },
+    "required": [
+     "hotel_id",
+     "grade",
+     "observed",
+     "low",
+     "high",
+     "opinions"
+    ],
+    "title": "CompareValue",
+    "type": "object"
+   },
+   "Comparison": {
+    "description": "Side-by-side comparison of 2-4 hotels.",
+    "properties": {
+     "attributes": {
+      "items": {
+       "$ref": "#/components/schemas/CompareRow"
+      },
+      "title": "Attributes",
+      "type": "array"
+     },
+     "hotels": {
+      "items": {
+       "$ref": "#/components/schemas/HotelSummary"
+      },
+      "title": "Hotels",
+      "type": "array"
+     }
+    },
+    "required": [
+     "hotels",
+     "attributes"
+    ],
+    "title": "Comparison",
+    "type": "object"
+   },
+   "ErrorBody": {
+    "description": "Machine-readable code, human message, request id for support.",
+    "properties": {
+     "code": {
+      "title": "Code",
+      "type": "string"
+     },
+     "fields": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/FieldError"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Fields"
+     },
+     "message": {
+      "title": "Message",
+      "type": "string"
+     },
+     "request_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Request Id"
+     }
+    },
+    "required": [
+     "code",
+     "message"
+    ],
+    "title": "ErrorBody",
+    "type": "object"
+   },
+   "ErrorResponse": {
+    "description": "Body of every 4xx/5xx response.",
+    "properties": {
+     "error": {
+      "$ref": "#/components/schemas/ErrorBody"
+     }
+    },
+    "required": [
+     "error"
+    ],
+    "title": "ErrorResponse",
+    "type": "object"
+   },
+   "Evaluation": {
+    "description": "Headline gold-test numbers of the served model versus v1.\n\nFor a judged ONNX package these are the package's own numbers.",
+    "properties": {
+     "difference": {
+      "$ref": "#/components/schemas/Interval"
+     },
+     "macro_f1": {
+      "$ref": "#/components/schemas/Interval"
+     },
+     "mean_review_ece": {
+      "title": "Mean Review Ece",
+      "type": "number"
+     },
+     "model": {
+      "title": "Model",
+      "type": "string"
+     },
+     "rungs": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Rungs",
+      "type": "array"
+     },
+     "v1_configuration": {
+      "title": "V1 Configuration",
+      "type": "string"
+     },
+     "v1_macro_f1": {
+      "$ref": "#/components/schemas/Interval"
+     }
+    },
+    "required": [
+     "model",
+     "v1_configuration",
+     "macro_f1",
+     "v1_macro_f1",
+     "difference",
+     "mean_review_ece",
+     "rungs"
+    ],
+    "title": "Evaluation",
+    "type": "object"
+   },
+   "ExplanationOut": {
+    "additionalProperties": false,
+    "description": "Plain-language explanation generated from the fields above.",
+    "properties": {
+     "essentials": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Essentials",
+      "type": "array"
+     },
+     "for_you": {
+      "items": {
+       "type": "string"
+      },
+      "title": "For You",
+      "type": "array"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "verdict": {
+      "title": "Verdict",
+      "type": "string"
+     },
+     "what_would_change": {
+      "items": {
+       "type": "string"
+      },
+      "title": "What Would Change",
+      "type": "array"
+     },
+     "who_it_suits": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Who It Suits",
+      "type": "array"
+     }
+    },
+    "required": [
+     "label",
+     "verdict",
+     "essentials",
+     "what_would_change",
+     "for_you"
+    ],
+    "title": "ExplanationOut",
+    "type": "object"
+   },
+   "FieldError": {
+    "description": "One invalid input field.",
+    "properties": {
+     "location": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "title": "Location",
+      "type": "array"
+     },
+     "message": {
+      "title": "Message",
+      "type": "string"
+     }
+    },
+    "required": [
+     "location",
+     "message"
+    ],
+    "title": "FieldError",
+    "type": "object"
+   },
+   "Grade": {
+    "description": "Attribute grade; the API enum.",
+    "enum": [
+     "strong",
+     "weak",
+     "ok",
+     "too_few"
+    ],
+    "title": "Grade",
+    "type": "string"
+   },
+   "Health": {
+    "description": "Probe result.",
+    "properties": {
+     "hotels": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hotels"
+     },
+     "model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     }
+    },
+    "required": [
+     "status"
+    ],
+    "title": "Health",
+    "type": "object"
+   },
+   "HotelDetail": {
+    "additionalProperties": false,
+    "description": "Everything about one hotel's tier, with evidence.",
+    "properties": {
+     "address": {
+      "title": "Address",
+      "type": "string"
+     },
+     "attributes": {
+      "items": {
+       "$ref": "#/components/schemas/AttributeOut"
+      },
+      "title": "Attributes",
+      "type": "array"
+     },
+     "blockers": {
+      "items": {
+       "$ref": "#/components/schemas/BlockerOut"
+      },
+      "title": "Blockers",
+      "type": "array"
+     },
+     "catches": {
+      "items": {
+       "$ref": "#/components/schemas/Attribute"
+      },
+      "title": "Catches",
+      "type": "array"
+     },
+     "city": {
+      "title": "City",
+      "type": "string"
+     },
+     "country": {
+      "title": "Country",
+      "type": "string"
+     },
+     "essentials": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/Grade"
+      },
+      "propertyNames": {
+       "$ref": "#/components/schemas/Attribute"
+      },
+      "title": "Essentials",
+      "type": "object"
+     },
+     "explanation": {
+      "$ref": "#/components/schemas/ExplanationOut"
+     },
+     "first_month": {
+      "title": "First Month",
+      "type": "string"
+     },
+     "highlights": {
+      "items": {
+       "$ref": "#/components/schemas/Attribute"
+      },
+      "title": "Highlights",
+      "type": "array"
+     },
+     "hotel_id": {
+      "title": "Hotel Id",
+      "type": "string"
+     },
+     "if_ignored": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/Tier"
+      },
+      "propertyNames": {
+       "$ref": "#/components/schemas/Attribute"
+      },
+      "title": "If Ignored",
+      "type": "object"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "last_month": {
+      "title": "Last Month",
+      "type": "string"
+     },
+     "lat": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Lat"
+     },
+     "lng": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Lng"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "provenance": {
+      "$ref": "#/components/schemas/ProvenanceOut"
+     },
+     "review_volume": {
+      "description": "Usable reviews per month from first_month to last_month, months without reviews included as 0.",
+      "items": {
+       "$ref": "#/components/schemas/MonthCount"
+      },
+      "title": "Review Volume",
+      "type": "array"
+     },
+     "reviews_eligible": {
+      "title": "Reviews Eligible",
+      "type": "integer"
+     },
+     "reviews_total": {
+      "title": "Reviews Total",
+      "type": "integer"
+     },
+     "segments": {
+      "items": {
+       "$ref": "#/components/schemas/SegmentOut"
+      },
+      "title": "Segments",
+      "type": "array"
+     },
+     "site_average_score": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "The booking site's own average score, shown for reference only; it is never used by the tier rules.",
+      "title": "Site Average Score"
+     },
+     "sort_score": {
+      "description": "Cautious score used to order hotels within a tier.",
+      "title": "Sort Score",
+      "type": "number"
+     },
+     "tier": {
+      "$ref": "#/components/schemas/Tier"
+     }
+    },
+    "required": [
+     "hotel_id",
+     "name",
+     "city",
+     "country",
+     "address",
+     "lat",
+     "lng",
+     "tier",
+     "label",
+     "sort_score",
+     "reviews_eligible",
+     "reviews_total",
+     "catches",
+     "highlights",
+     "essentials",
+     "attributes",
+     "explanation",
+     "blockers",
+     "if_ignored",
+     "first_month",
+     "last_month",
+     "site_average_score",
+     "provenance"
+    ],
+    "title": "HotelDetail",
+    "type": "object"
+   },
+   "HotelPage": {
+    "description": "One page of search results.",
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/HotelSummary"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "page": {
+      "title": "Page",
+      "type": "integer"
+     },
+     "page_size": {
+      "title": "Page Size",
+      "type": "integer"
+     },
+     "total": {
+      "description": "Matches across all pages.",
+      "title": "Total",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "items",
+     "total",
+     "page",
+     "page_size"
+    ],
+    "title": "HotelPage",
+    "type": "object"
+   },
+   "HotelSummary": {
+    "additionalProperties": false,
+    "description": "A hotel as listed in search results.",
+    "properties": {
+     "address": {
+      "title": "Address",
+      "type": "string"
+     },
+     "catches": {
+      "items": {
+       "$ref": "#/components/schemas/Attribute"
+      },
+      "title": "Catches",
+      "type": "array"
+     },
+     "city": {
+      "title": "City",
+      "type": "string"
+     },
+     "country": {
+      "title": "Country",
+      "type": "string"
+     },
+     "essentials": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/Grade"
+      },
+      "propertyNames": {
+       "$ref": "#/components/schemas/Attribute"
+      },
+      "title": "Essentials",
+      "type": "object"
+     },
+     "highlights": {
+      "items": {
+       "$ref": "#/components/schemas/Attribute"
+      },
+      "title": "Highlights",
+      "type": "array"
+     },
+     "hotel_id": {
+      "title": "Hotel Id",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "lat": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Lat"
+     },
+     "lng": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Lng"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "reviews_eligible": {
+      "title": "Reviews Eligible",
+      "type": "integer"
+     },
+     "reviews_total": {
+      "title": "Reviews Total",
+      "type": "integer"
+     },
+     "sort_score": {
+      "description": "Cautious score used to order hotels within a tier.",
+      "title": "Sort Score",
+      "type": "number"
+     },
+     "tier": {
+      "$ref": "#/components/schemas/Tier"
+     }
+    },
+    "required": [
+     "hotel_id",
+     "name",
+     "city",
+     "country",
+     "address",
+     "lat",
+     "lng",
+     "tier",
+     "label",
+     "sort_score",
+     "reviews_eligible",
+     "reviews_total",
+     "catches",
+     "highlights",
+     "essentials"
+    ],
+    "title": "HotelSummary",
+    "type": "object"
+   },
+   "Interval": {
+    "description": "A point estimate with a 95% bootstrap interval.",
+    "properties": {
+     "high": {
+      "title": "High",
+      "type": "number"
+     },
+     "low": {
+      "title": "Low",
+      "type": "number"
+     },
+     "point": {
+      "title": "Point",
+      "type": "number"
+     }
+    },
+    "required": [
+     "point",
+     "low",
+     "high"
+    ],
+    "title": "Interval",
+    "type": "object"
+   },
+   "LabelOut": {
+    "description": "One label the model assigned to a part.",
+    "properties": {
+     "attribute": {
+      "title": "Attribute",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "polarity": {
+      "title": "Polarity",
+      "type": "string"
+     },
+     "probability": {
+      "description": "Calibrated probability.",
+      "title": "Probability",
+      "type": "number"
+     }
+    },
+    "required": [
+     "label",
+     "attribute",
+     "polarity",
+     "probability"
+    ],
+    "title": "LabelOut",
+    "type": "object"
+   },
+   "Lean": {
+    "description": "Display-only hint for an OK grade whose mean is past a line.",
+    "enum": [
+     "trending_strong",
+     "trending_weak"
+    ],
+    "title": "Lean",
+    "type": "string"
+   },
+   "Meta": {
+    "description": "Service metadata shown on the \"About the model\" page.",
+    "properties": {
+     "attributes": {
+      "items": {
+       "$ref": "#/components/schemas/AttributeInfo"
+      },
+      "title": "Attributes",
+      "type": "array"
+     },
+     "evaluation": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Evaluation"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "hotels": {
+      "title": "Hotels",
+      "type": "integer"
+     },
+     "model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model"
+     },
+     "params_version": {
+      "title": "Params Version",
+      "type": "string"
+     },
+     "policy": {
+      "additionalProperties": true,
+      "title": "Policy",
+      "type": "object"
+     },
+     "tiers": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Tiers",
+      "type": "object"
+     }
+    },
+    "required": [
+     "params_version",
+     "model",
+     "hotels",
+     "tiers",
+     "attributes",
+     "policy"
+    ],
+    "title": "Meta",
+    "type": "object"
+   },
+   "MonthCount": {
+    "additionalProperties": false,
+    "description": "Usable reviews in one calendar month.",
+    "properties": {
+     "month": {
+      "examples": [
+       "2016-03"
+      ],
+      "pattern": "^\\d{4}-\\d{2}$",
+      "title": "Month",
+      "type": "string"
+     },
+     "reviews": {
+      "minimum": 0.0,
+      "title": "Reviews",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "month",
+     "reviews"
+    ],
+    "title": "MonthCount",
+    "type": "object"
+   },
+   "PartOut": {
+    "description": "Labels for one part; the text itself is not echoed back.",
+    "properties": {
+     "characters": {
+      "title": "Characters",
+      "type": "integer"
+     },
+     "labels": {
+      "items": {
+       "$ref": "#/components/schemas/LabelOut"
+      },
+      "title": "Labels",
+      "type": "array"
+     },
+     "part": {
+      "title": "Part",
+      "type": "string"
+     }
+    },
+    "required": [
+     "part",
+     "characters",
+     "labels"
+    ],
+    "title": "PartOut",
+    "type": "object"
+   },
+   "Polarity": {
+    "description": "Direction of a guest's judgement about an attribute.",
+    "enum": [
+     "positive",
+     "negative"
+    ],
+    "title": "Polarity",
+    "type": "string"
+   },
+   "ProvenanceOut": {
+    "additionalProperties": false,
+    "description": "Where a result comes from, so it can be traced and corrected.",
+    "properties": {
+     "corrections": {
+      "title": "Corrections",
+      "type": "string"
+     },
+     "data_licence": {
+      "title": "Data Licence",
+      "type": "string"
+     },
+     "data_period": {
+      "title": "Data Period",
+      "type": "string"
+     },
+     "data_source": {
+      "title": "Data Source",
+      "type": "string"
+     },
+     "model": {
+      "title": "Model",
+      "type": "string"
+     },
+     "params_version": {
+      "title": "Params Version",
+      "type": "string"
+     }
+    },
+    "required": [
+     "params_version",
+     "model",
+     "data_source",
+     "data_licence",
+     "data_period",
+     "corrections"
+    ],
+    "title": "ProvenanceOut",
+    "type": "object"
+   },
+   "QuoteOut": {
+    "additionalProperties": false,
+    "description": "A review part quoted as evidence (redacted, truncated).",
+    "properties": {
+     "month": {
+      "description": "Month of the review, e.g. \"Aug 2017\".",
+      "title": "Month",
+      "type": "string"
+     },
+     "part": {
+      "enum": [
+       "liked",
+       "disliked"
+      ],
+      "title": "Part",
+      "type": "string"
+     },
+     "polarity": {
+      "$ref": "#/components/schemas/Polarity"
+     },
+     "probability": {
+      "description": "Calibrated probability of the cited label for this part.",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Probability",
+      "type": "number"
+     },
+     "supports": {
+      "description": "True when the quote backs the grade, false for a counter-example.",
+      "title": "Supports",
+      "type": "boolean"
+     },
+     "text": {
+      "description": "Redacted review text; punctuation was removed by the data publisher.",
+      "title": "Text",
+      "type": "string"
+     },
+     "traveler_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Couple, Solo traveller, Family with young children, Family with older children, Group or Friends; null when the reviewer gave none.",
+      "title": "Traveler Type"
+     }
+    },
+    "required": [
+     "text",
+     "part",
+     "month",
+     "traveler_type",
+     "probability",
+     "polarity",
+     "supports"
+    ],
+    "title": "QuoteOut",
+    "type": "object"
+   },
+   "SegmentOut": {
+    "additionalProperties": false,
+    "description": "A credible difference between one kind of guest and the others.",
+    "properties": {
+     "attribute": {
+      "$ref": "#/components/schemas/Attribute"
+     },
+     "direction": {
+      "enum": [
+       "better",
+       "worse"
+      ],
+      "title": "Direction",
+      "type": "string"
+     },
+     "others_value": {
+      "description": "The same for all other guests.",
+      "title": "Others Value",
+      "type": "number"
+     },
+     "probability": {
+      "description": "Posterior probability that the difference is at least the trend shift.",
+      "title": "Probability",
+      "type": "number"
+     },
+     "segment": {
+      "description": "couples, families, groups and friends, solo travellers or business trips",
+      "title": "Segment",
+      "type": "string"
+     },
+     "segment_size": {
+      "description": "Opinions (reviews for noise and wifi) from this segment.",
+      "title": "Segment Size",
+      "type": "number"
+     },
+     "segment_value": {
+      "description": "Posterior mean share of praise (complaint rate for noise and wifi) among this segment's guests.",
+      "title": "Segment Value",
+      "type": "number"
+     },
+     "text": {
+      "title": "Text",
+      "type": "string"
+     }
+    },
+    "required": [
+     "segment",
+     "attribute",
+     "direction",
+     "segment_value",
+     "others_value",
+     "segment_size",
+     "probability",
+     "text"
+    ],
+    "title": "SegmentOut",
+    "type": "object"
+   },
+   "SortOrder": {
+    "description": "Allow-listed sort orders (SR-14).",
+    "enum": [
+     "best",
+     "name",
+     "reviews"
+    ],
+    "title": "SortOrder",
+    "type": "string"
+   },
+   "Tier": {
+    "description": "Hotel tier; the API enum, best first.",
+    "enum": [
+     "excellent",
+     "good",
+     "fair",
+     "caution",
+     "not_enough_evidence",
+     "not_enough_reviews"
+    ],
+    "title": "Tier",
+    "type": "string"
+   },
+   "TrendOut": {
+    "additionalProperties": false,
+    "description": "Last 6 months of data versus the 18 months before.",
+    "properties": {
+     "baseline_mean": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Baseline Mean"
+     },
+     "prob_declined": {
+      "title": "Prob Declined",
+      "type": "number"
+     },
+     "prob_improved": {
+      "title": "Prob Improved",
+      "type": "number"
+     },
+     "recent_mean": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Recent Mean"
+     },
+     "state": {
+      "$ref": "#/components/schemas/TrendState"
+     }
+    },
+    "required": [
+     "state",
+     "recent_mean",
+     "baseline_mean",
+     "prob_improved",
+     "prob_declined"
+    ],
+    "title": "TrendOut",
+    "type": "object"
+   },
+   "TrendState": {
+    "description": "Direction of a confirmed change.",
+    "enum": [
+     "improved",
+     "declined",
+     "stable",
+     "too_few"
+    ],
+    "title": "TrendState",
+    "type": "string"
+   }
+  }
+ },
+ "info": {
+  "description": "\nHotel quality tiers built from guest reviews, with the evidence behind them.\n\n* Tiers and grades follow a pre-registered policy (`/v1/meta` shows every\n  value); every number can be recomputed from the `positive`, `negative`\n  and `reviews` fields.\n* Rate limits are per client and per process; exceeding them returns 429\n  with `Retry-After`.\n* Errors share one shape: `{\"error\": {\"code\", \"message\", \"request_id\"}}`.\n",
+  "title": "hotel-curator API",
+  "version": "2.0.0"
+ },
+ "openapi": "3.1.0",
+ "paths": {
+  "/healthz": {
+   "get": {
+    "description": "The process is up.",
+    "operationId": "healthz_healthz_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Health"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     },
+     "429": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Too Many Requests"
+     }
+    },
+    "summary": "Liveness probe",
+    "tags": [
+     "health"
+    ]
+   }
+  },
+  "/readyz": {
+   "get": {
+    "description": "Ready when the database answers and hotel data is loaded.\n\nThe model is reported but not required: search and details work without\nit; only ``/v1/analyze`` needs it.",
+    "operationId": "readyz_readyz_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Health"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     },
+     "429": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Too Many Requests"
+     }
+    },
+    "summary": "Readiness probe",
+    "tags": [
+     "health"
+    ]
+   }
+  },
+  "/v1/analyze": {
+   "post": {
+    "description": "Run the classifier on a Liked and/or Disliked text.\n\nNothing is stored and the text is not returned. Each part is capped at\n``CURATOR_MAX_PART_CHARS`` characters.",
+    "operationId": "analyze_v1_analyze_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AnalyzeRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AnalyzeResponse"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     },
+     "429": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Too Many Requests"
+     },
+     "503": {
+      "description": "Model not loaded"
+     }
+    },
+    "summary": "Label a review with the served model",
+    "tags": [
+     "analyze"
+    ]
+   }
+  },
+  "/v1/cities": {
+   "get": {
+    "description": "Cities in the data, with hotel counts.",
+    "operationId": "cities_v1_cities_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/City"
+         },
+         "title": "Response Cities V1 Cities Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     },
+     "429": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Too Many Requests"
+     }
+    },
+    "summary": "Cities with hotels",
+    "tags": [
+     "hotels"
+    ]
+   }
+  },
+  "/v1/compare": {
+   "get": {
+    "description": "Compare 2-4 hotels; differences are flagged only when credible.",
+    "operationId": "compare_v1_compare_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "ids",
+      "required": true,
+      "schema": {
+       "items": {
+        "pattern": "^h_[0-9a-f]{10}$",
+        "type": "string"
+       },
+       "maxItems": 4,
+       "minItems": 2,
+       "title": "Ids",
+       "type": "array"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Comparison"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     },
+     "429": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Too Many Requests"
+     }
+    },
+    "summary": "Compare hotels",
+    "tags": [
+     "hotels"
+    ]
+   }
+  },
+  "/v1/hotels": {
+   "get": {
+    "description": "Hotels matching the filters, best tier first by default.\n\n\"Best\" sorts by tier, then by a cautious score (the lowest 5th\npercentile of the essentials' share of praise), so hotels with more\nevidence rank above hotels with the same share but fewer reviews.",
+    "operationId": "list_hotels_v1_hotels_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "city",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "pattern": "^[A-Za-z][A-Za-z .'-]{0,59}$",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "City"
+      }
+     },
+     {
+      "in": "query",
+      "name": "tier",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "items": {
+          "$ref": "#/components/schemas/Tier"
+         },
+         "maxItems": 6,
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Tier"
+      }
+     },
+     {
+      "description": "Only hotels Strong in all of these.",
+      "in": "query",
+      "name": "strong",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "items": {
+          "$ref": "#/components/schemas/Attribute"
+         },
+         "maxItems": 8,
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Only hotels Strong in all of these.",
+       "title": "Strong"
+      }
+     },
+     {
+      "description": "Exclude hotels Weak in any of these.",
+      "in": "query",
+      "name": "avoid_weak",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "items": {
+          "$ref": "#/components/schemas/Attribute"
+         },
+         "maxItems": 8,
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Exclude hotels Weak in any of these.",
+       "title": "Avoid Weak"
+      }
+     },
+     {
+      "description": "Name contains",
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 80,
+         "minLength": 1,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Name contains",
+       "title": "Q"
+      }
+     },
+     {
+      "in": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+       "$ref": "#/components/schemas/SortOrder",
+       "default": "best"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "maximum": 10000,
+       "minimum": 1,
+       "title": "Page",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page_size",
+      "required": false,
+      "schema": {
+       "default": 20,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Page Size",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HotelPage"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     },
+     "429": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Too Many Requests"
+     }
+    },
+    "summary": "Search hotels",
+    "tags": [
+     "hotels"
+    ]
+   }
+  },
+  "/v1/hotels/{hotel_id}": {
+   "get": {
+    "description": "Everything behind one hotel's tier.",
+    "operationId": "get_hotel_v1_hotels__hotel_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "hotel_id",
+      "required": true,
+      "schema": {
+       "pattern": "^h_[0-9a-f]{10}$",
+       "title": "Hotel Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HotelDetail"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "description": "Unknown hotel"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     },
+     "429": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Too Many Requests"
+     }
+    },
+    "summary": "One hotel with grades, explanation and evidence",
+    "tags": [
+     "hotels"
+    ]
+   }
+  },
+  "/v1/meta": {
+   "get": {
+    "description": "Loaded dataset, tier counts, attribute definitions, policy values.",
+    "operationId": "meta_v1_meta_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Meta"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     },
+     "429": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Too Many Requests"
+     }
+    },
+    "summary": "Data, model and policy",
+    "tags": [
+     "meta"
+    ]
+   }
+  }
+ }
+}

@@ -1,0 +1,229 @@
+@import 'tailwindcss';
+
+/*
+ * Theme: tokens on :root, dark values under [data-theme='dark'] (set by the
+ * toggle, or from prefers-color-scheme at startup) and under the media query
+ * for the moment before the script runs. Components use the token colours
+ * below, so they never need a separate dark variant.
+ */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+:root {
+  color-scheme: light;
+  --background: #f7f7f5;
+  --foreground: #1a1a19;
+  --card: #ffffff;
+  --card-foreground: #1a1a19;
+  --muted: #eeede9;
+  --muted-foreground: #55554e;
+  --border: #d9d7d0;
+  --input: #8a887f;
+  --ring: #1f63b8;
+  --primary: #1f5faf;
+  --primary-hover: #194f93;
+  --primary-foreground: #ffffff;
+  --link: #1a5aa6;
+  --accent: #e8eef8;
+  --accent-foreground: #133f75;
+
+  --strong: #0f6a32;
+  --strong-bg: #e2f3e7;
+  --strong-border: #9fd1af;
+  --weak: #a3301c;
+  --weak-bg: #fbe8e3;
+  --weak-border: #eeac9c;
+  --ok: #3f3f3a;
+  --ok-bg: #efeeea;
+  --ok-border: #cfcdc5;
+  --unknown: #55554e;
+  --unknown-bg: transparent;
+  --unknown-border: #a19f96;
+  --info: #1d4f8c;
+  --info-bg: #e8f0fb;
+  --info-border: #a9c4ea;
+  --leader-bg: #fff1e8;
+  --leader-border: #c4501f;
+  --leader-foreground: #8a3410;
+
+  /* Chart palette (validated): blue primary marks, orange contrast marks. */
+  --chart-primary: #2a78d6;
+  --chart-contrast: #eb6834;
+  --chart-interval: #8f8d85;
+  --chart-grid: #e4e2dc;
+  --chart-reference: #6b6a63;
+  --chart-surface: #ffffff;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --background: #141413;
+  --foreground: #ededea;
+  --card: #1d1d1c;
+  --card-foreground: #ededea;
+  --muted: #2a2a28;
+  --muted-foreground: #b0afa7;
+  --border: #3b3b38;
+  --input: #8d8b83;
+  --ring: #79aef0;
+  --primary: #5b9ae6;
+  --primary-hover: #79aef0;
+  --primary-foreground: #0b1a2e;
+  --link: #8dbaf2;
+  --accent: #1f2b3b;
+  --accent-foreground: #cfe0f7;
+
+  --strong: #86d9a0;
+  --strong-bg: #13301d;
+  --strong-border: #2f6b44;
+  --weak: #ffa290;
+  --weak-bg: #3b1811;
+  --weak-border: #7d3627;
+  --ok: #dcdbd4;
+  --ok-bg: #2c2c2a;
+  --ok-border: #4a4a46;
+  --unknown: #b0afa7;
+  --unknown-bg: transparent;
+  --unknown-border: #6f6e68;
+  --info: #a9c8f3;
+  --info-bg: #172436;
+  --info-border: #34507a;
+  --leader-bg: #36200f;
+  --leader-border: #e07a4a;
+  --leader-foreground: #ffc7a8;
+
+  --chart-primary: #3987e5;
+  --chart-contrast: #d95926;
+  --chart-interval: #77756e;
+  --chart-grid: #2f2f2d;
+  --chart-reference: #a3a29a;
+  --chart-surface: #1d1d1c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --background: #141413;
+    --foreground: #ededea;
+    --card: #1d1d1c;
+    --card-foreground: #ededea;
+    --muted: #2a2a28;
+    --muted-foreground: #b0afa7;
+    --border: #3b3b38;
+    --input: #8d8b83;
+    --ring: #79aef0;
+    --primary: #5b9ae6;
+    --primary-hover: #79aef0;
+    --primary-foreground: #0b1a2e;
+    --link: #8dbaf2;
+    --accent: #1f2b3b;
+    --accent-foreground: #cfe0f7;
+  }
+}
+
+@theme inline {
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', 'Liberation Sans',
+    Arial, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-link: var(--link);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-strong: var(--strong);
+  --color-strong-bg: var(--strong-bg);
+  --color-strong-border: var(--strong-border);
+  --color-weak: var(--weak);
+  --color-weak-bg: var(--weak-bg);
+  --color-weak-border: var(--weak-border);
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-ok-border: var(--ok-border);
+  --color-unknown: var(--unknown);
+  --color-unknown-bg: var(--unknown-bg);
+  --color-unknown-border: var(--unknown-border);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --color-info-border: var(--info-border);
+  --color-leader-bg: var(--leader-bg);
+  --color-leader-border: var(--leader-border);
+  --color-leader-foreground: var(--leader-foreground);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-width: 320px;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Programmatic focus targets (main, headings) do not need a ring. */
+  [tabindex='-1']:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* Links in text are underlined, never colour alone (WCAG 1.4.1). */
+  a {
+    color: var(--link);
+    text-decoration-line: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  a:hover {
+    text-decoration-thickness: 2px;
+  }
+
+  .recharts-wrapper:focus,
+  .recharts-surface:focus {
+    outline: none;
+  }
+
+  .recharts-wrapper:focus-visible,
+  .recharts-surface:focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

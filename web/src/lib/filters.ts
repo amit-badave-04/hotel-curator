@@ -1,0 +1,94 @@
+/**
+ * Explorer filters live in the URL query string, so a search can be
+ * bookmarked, shared and navigated with Back/Forward. Values from the URL are
+ * validated against the API's enums and patterns before they reach the API.
+ */
+import type { Attribute, ListHotelsParams, SortOrder, Tier } from '@/api/generated/model';
+
+import { ATTRIBUTES, CITY_PATTERN, MAX_QUERY_LENGTH, TIERS } from './domain';
+
+export const PAGE_SIZE = 20;
+const MAX_PAGE = 10_000;
+const SORTS: readonly SortOrder[] = ['best', 'name', 'reviews'];
+
+export interface ExplorerFilters {
+  city: string | null;
+  tiers: Tier[];
+  strong: Attribute[];
+  avoidWeak: Attribute[];
+  q: string;
+  sort: SortOrder;
+  page: number;
+}
+
+export const DEFAULT_FILTERS: ExplorerFilters = {
+  city: null,
+  tiers: [],
+  strong: [],
+  avoidWeak: [],
+  q: '',
+  sort: 'best',
+  page: 1,
+};
+
+function pick<T extends string>(values: string[], allowed: readonly T[]): T[] {
+  const set = new Set<T>();
+  for (const value of values) {
+    if ((allowed as readonly string[]).includes(value)) set.add(value as T);
+  }
+  // Keep the canonical order so equal filters give equal URLs and cache keys.
+  return allowed.filter((a) => set.has(a));
+}
+
+export function parseFilters(params: URLSearchParams): ExplorerFilters {
+  const city = params.get('city');
+  const sort = params.get('sort');
+  const page = Number.parseInt(params.get('page') ?? '1', 10);
+  return {
+    city: city && CITY_PATTERN.test(city) ? city : null,
+    tiers: pick(params.getAll('tier'), TIERS),
+    strong: pick(params.getAll('strong'), ATTRIBUTES),
+    avoidWeak: pick(params.getAll('avoid_weak'), ATTRIBUTES),
+    q: (params.get('q') ?? '').trim().slice(0, MAX_QUERY_LENGTH),
+    sort: sort && (SORTS as readonly string[]).includes(sort) ? (sort as SortOrder) : 'best',
+    page: Number.isFinite(page) && page >= 1 && page <= MAX_PAGE ? page : 1,
+  };
+}
+
+/** The URL form of the filters; defaults are left out to keep URLs short. */
+export function filtersToSearchParams(filters: ExplorerFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.q) params.set('q', filters.q);
+  if (filters.city) params.set('city', filters.city);
+  for (const tier of filters.tiers) params.append('tier', tier);
+  for (const attribute of filters.strong) params.append('strong', attribute);
+  for (const attribute of filters.avoidWeak) params.append('avoid_weak', attribute);
+  if (filters.sort !== 'best') params.set('sort', filters.sort);
+  if (filters.page > 1) params.set('page', String(filters.page));
+  return params;
+}
+
+export function toApiParams(filters: ExplorerFilters): ListHotelsParams {
+  const params: ListHotelsParams = {
+    sort: filters.sort,
+    page: filters.page,
+    page_size: PAGE_SIZE,
+  };
+  if (filters.city) params.city = filters.city;
+  if (filters.q) params.q = filters.q;
+  if (filters.tiers.length > 0) params.tier = filters.tiers;
+  if (filters.strong.length > 0) params.strong = filters.strong;
+  if (filters.avoidWeak.length > 0) params.avoid_weak = filters.avoidWeak;
+  return params;
+}
+
+/** Number of filters that narrow the results (sort and page excluded). */
+export function activeFilterCount(filters: ExplorerFilters): number {
+  return (
+    (filters.city ? 1 : 0) +
+    (filters.q ? 1 : 0) +
+    filters.tiers.length +
+    filters.strong.length +
+    filters.avoidWeak.length
+  );
+}
