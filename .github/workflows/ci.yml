@@ -1,0 +1,94 @@
+# Continuous integration: Python (lint, types, tests, coverage), web (lint,
+# types, unit tests, build, API-client drift, npm audit), end-to-end browser
+# tests, and container builds. Actions are pinned to commit SHAs.
+name: ci
+
+on:
+  push:
+    branches: [main, v2]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_FROZEN: "1"
+  CURATOR_LOG_FORMAT: console
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          lfs: true
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.32"
+          enable-cache: true
+      - name: Install (all extras; torch comes from PyPI)
+        run: uv sync --all-extras
+      - name: Lint and format
+        run: |
+          uv run ruff check src tests scripts
+          uv run ruff format --check src tests scripts
+      - name: Types
+        run: uv run mypy
+      - name: Tests with coverage (fails under 80%)
+        run: uv run pytest --cov --cov-report=term-missing --cov-fail-under=80
+      - name: Generated OpenAPI schema is up to date
+        run: |
+          uv run python scripts/export_openapi.py
+          git diff --exit-code web/openapi.json
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Dependency audit (fails on high or critical)
+        run: npm audit --audit-level=high
+      - name: Generated API client is up to date
+        run: |
+          npm run generate:api
+          git diff --exit-code src/api/generated
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  containers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          lfs: true
+      - name: Build images
+        run: docker compose build
+      - name: Start the stack and check it answers
+        run: |
+          docker compose up -d --wait
+          curl --fail --silent http://127.0.0.1:8000/readyz
+          curl --fail --silent http://127.0.0.1:8080/ > /dev/null
+          curl --fail --silent "http://127.0.0.1:8080/api/v1/hotels?page_size=1"
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs
+      - name: Stop
+        if: always()
+        run: docker compose down -v

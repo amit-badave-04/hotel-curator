@@ -1,0 +1,81 @@
+# One command: `docker compose up --build`, then open http://localhost:8080
+#
+# db   Postgres 16, no published port (other containers on its network and
+#      processes on the Docker host can reach it). For a local demo it uses
+#      "trust" authentication so no password has to live in git; set
+#      POSTGRES_HOST_AUTH_METHOD=scram-sha-256 and POSTGRES_PASSWORD in an
+#      untracked .env file for anything else (see .env.example). Postgres
+#      applies them only when it creates the db-data volume, so run
+#      `docker compose down -v` before the first hardened start.
+# api  FastAPI + ONNX model; migrates and loads the committed demo data.
+# web  nginx serving the React app and proxying /api to the api service.
+name: hotel-curator
+
+services:
+  db:
+    image: postgres:16-alpine@sha256:f4610795587492cd4fb887c2dc3de301b813278bb6f616992061141b5f15ac36
+    environment:
+      POSTGRES_USER: curator
+      POSTGRES_DB: curator
+      POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-trust}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U curator -d curator"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backend]
+    restart: unless-stopped
+
+  api:
+    image: hotel-curator-api:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      CURATOR_DATABASE_URL: postgresql+psycopg://curator:${POSTGRES_PASSWORD:-}@db:5432/curator
+      # Rate limits key on the client address; trust X-Forwarded-For only
+      # from the web proxy's fixed address below.
+      CURATOR_FORWARDED_ALLOW_IPS: 172.28.0.10
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks: [backend, frontend]
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  web:
+    image: hotel-curator-web:local
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks:
+      frontend:
+        ipv4_address: 172.28.0.10
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+networks:
+  backend:
+    internal: true
+  frontend:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+
+volumes:
+  db-data: {}
