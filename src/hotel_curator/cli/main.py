@@ -8,8 +8,10 @@ are thin wrappers around these commands.
 import typer
 
 from hotel_curator.cli import data as data_cli
+from hotel_curator.cli import db as db_cli
 from hotel_curator.cli import label as label_cli
 from hotel_curator.cli import model as model_cli
+from hotel_curator.cli import score as score_cli
 from hotel_curator.config import get_settings
 from hotel_curator.logging import configure_logging
 
@@ -21,6 +23,9 @@ app = typer.Typer(
 app.add_typer(data_cli.app, name="data")
 app.add_typer(label_cli.app, name="label")
 app.add_typer(model_cli.app, name="model")
+app.add_typer(score_cli.app, name="score")
+app.add_typer(db_cli.app, name="db")
+app.command("serve")(db_cli.serve)
 
 
 @app.callback()

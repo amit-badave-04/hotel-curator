@@ -114,8 +114,11 @@ moved into the training labels.
 - No reviewer names or ids are present in the source.
 - `reviewer_nationality` is present; the product shows it only in aggregates,
   never next to a review's date, room type and nights.
-- Review text can name staff ("thanks to Maria at reception"). Displayed
-  excerpts are length-capped and person names are redacted before display.
+- Review text can name staff ("thanks to Maria at reception"). Parts that
+  probably name a person are not quoted (ADR 006, erratum E5); in the parts
+  that are, names found by spaCy NER are masked and excerpts are
+  length-capped. This is best effort: a name that matches neither check can
+  still appear in a quote.
 - No attempt is made to identify reviewers.
 
 ## 7. Intended and out-of-scope uses

@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from hotel_curator.config import get_settings
+from tests.helpers import POLICY_PATH
 
 
 @pytest.fixture
@@ -15,6 +16,7 @@ def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     monkeypatch.setenv(
         "CURATOR_DATABASE_URL", f"sqlite:///{tmp_path / 'var' / 'cli.db'}"
     )
+    monkeypatch.setenv("CURATOR_TIER_POLICY", str(POLICY_PATH))
     get_settings.cache_clear()
     yield tmp_path
     get_settings.cache_clear()

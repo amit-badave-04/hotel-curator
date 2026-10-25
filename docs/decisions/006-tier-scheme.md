@@ -28,7 +28,8 @@ Per hotel and attribute, over the data window (all reviews of the hotel,
 
 - **Eligible reviews**: the hotel's reviews minus (a) reviews used as
   classifier training data (their probabilities would be in-sample; they are
-  about 1% of train-hotel reviews and are excluded rather than cross-fitted),
+  about 1% of train-hotel reviews and are excluded rather than cross-fitted;
+  see erratum E4),
   and (b) near-duplicates: within a hotel, reviews whose normalised Liked +
   Disliked text of 10 or more words is identical to an earlier review.
   `n` = number of eligible reviews (placeholders included: a guest with
@@ -75,14 +76,15 @@ Extra conditions:
 - **Material** (for non-essential Weak grades): complaint rate `N / n >= 5%`
   ("at least 1 guest in 20 raised it"). Defined on complaint rate so that one
   more positive review can never make a hotel's tier worse (monotonicity is
-  property-tested).
+  property-tested; scope in erratum E2).
 
 Hand formulas: mean = (P + 0.5) / (M + 1); 90% interval =
 `BETA.INV(0.05, P+0.5, N+0.5)` to `BETA.INV(0.95, P+0.5, N+0.5)`.
 
 ## 3. Hotel tier
 
-Essentials E = cleanliness, room, staff (`taxonomy.CRITICAL_ATTRIBUTES`).
+Essentials E = cleanliness, room, staff (`essentials` in
+`config/tier_policy.yaml`).
 Weights are **lexicographic**: the essentials decide the tier; a material
 weak spot elsewhere can only hold a hotel back; strengths elsewhere never
 raise it (they are shown as highlights). A weighted average was rejected
@@ -143,7 +145,8 @@ For each attribute, the last 6 months of data vs the 18 months before, each
 window with at least 15 opinions. A change is flagged when the posterior
 probability of a shift of at least 10 points (two-sided) or 5 points of
 complaint rate (must-be) is at least 0.90. Alerts use hysteresis: a new state
-is announced only when it is confirmed and the old one has fallen below 0.50.
+is announced only when it is confirmed and the old one has fallen below 0.50
+(not built in v2; see erratum E3).
 
 ## 6. Parameters (`config/tier_policy.yaml`, stamped `params_version`)
 
@@ -154,7 +157,7 @@ is announced only when it is confirmed and the old one has fallen below 0.50.
 | Strong / Weak lines, must-be | 0.05 / 0.10 complaint rate | "1 in 20" / "1 in 10 guests complained" |
 | Confirmation level | 0.95 one-sided | conventional; both errors (false praise, false accusation) are costly |
 | Prior | Beta(0.5, 0.5) | Jeffreys reference prior; no corpus input |
-| Minimum opinions per graded attribute | 10 | derived: smallest count at which unanimous praise can be confirmed Strong (Beta(9.5, 0.5) 5th percentile = 0.813) |
+| Minimum opinions per graded attribute | 10 | derived: smallest count at which unanimous praise can be confirmed Strong (Beta(9.5, 0.5) 5th percentile = 0.813); see erratum below |
 | Minimum reviews per tier / per must-be grade | 30 | 3 complaining guests at the 10% line |
 | Minimum distinct complaining reviews for Weak | 3 | no warning rests on one or two guests |
 | Materiality | complaint rate >= 0.05 | "1 guest in 20 raised it" |
@@ -174,7 +177,7 @@ outcome, never used as a target.
 1. **Subset invariance**: demo-subset tiers equal full-run tiers (CI test,
    using the same stored probabilities).
 2. **Monotonicity**: one more praise never lowers a tier, one more complaint
-   never raises it (property tests).
+   never raises it (property tests; scope in erratum E2).
 3. **Truth tables**: every rule boundary, with a documented tolerance at
    exact boundary values.
 4. **Out-of-time**: grades from 2015-08 to 2016-12 vs the raw 2017 shares and
@@ -194,11 +197,68 @@ outcome, never used as a target.
 8. **Sensitivity** (reported only): tier mix at Strong lines 0.75 / 0.85 and
    materiality 2.5% / 10%.
 
+### Addendum: who the hotel suits (M3, display only)
+
+Plan section 8 promises segment insights ("families complain about room size
+more than couples here"). They are computed with **no new parameters**: for
+each segment (couples, families, groups and friends, solo travellers,
+business trips) versus the hotel's other guests, a difference is shown only
+when both groups clear the evidence floors of section 6 and the posterior
+probability of a shift of at least the trend size (10 points of praise share,
+5 points of complaint rate for noise and wifi) is at least 0.95. Segments
+never change a grade or a tier. Code: `scoring/segments.py`.
+
+### Erratum (found while implementing, M3)
+
+The derivation of the minimum-opinions value is off by one: 9 unanimous
+opinions already give Beta(9.5, 0.5) with a 5th percentile of 0.813 (8 give
+0.793), so 9 is the smallest count at which unanimous praise can be confirmed
+Strong. The pre-registered value **stays 10**; changing it after seeing data
+would defeat pre-registration. Effect: an attribute with exactly 9 opinions,
+all praise, shows "too few opinions" instead of Strong. Checked with
+`scipy.stats.beta.ppf(0.05, k + 0.5, 0.5)` for k = 6..11.
+
+### Errata and clarifications (independent review, M3, before any real hotel was scored)
+
+An independent reviewer compared this ADR with the code before the corpus
+was scored. None of these changes a parameter value.
+
+- **E1, rule 5 (Good).** The code also requires *no essential Weak* for
+  Good, as rule 6's description ("no essential Weak") assumes. The rule 5
+  cell omitted it. Without it, a hotel with two Strong essentials and a
+  third that is Weak on expected counts (but not on hard labels, so not
+  Caution by rule 2) would be Good. The stricter reading stands: such a
+  hotel is Fair and its "what would change it" names the weak essential.
+- **E2, monotonicity.** The guarantee and its property tests hold the
+  review count n and the month spread fixed and change P or N. A real
+  extra review also changes n (the denominator of materiality, N / n) and
+  the month spread (the Excellent gate), and either can move a tier in the
+  other direction at a boundary.
+- **E3, trend hysteresis** (section 5) is not implemented. v2 scores the
+  corpus once, so there is no previous announced state to hold; each trend
+  is computed from the two windows alone. Hysteresis needs the previous
+  run's states stored per hotel and attribute; it is listed as future work.
+- **E4, excluded training reviews.** With the second training sample
+  (plan section 3.2) both training sets are excluded: 8,006 of 356,035
+  train-hotel reviews (2.2%), not "about 1%".
+- **E5, quotes that name people** (added after the security review, before
+  the corpus was tiered; it changes which parts are quoted, never a grade or
+  tier). spaCy's small English model misses many staff names in this
+  punctuation-free text, so masking alone leaked names into quotes. Quote
+  selection now skips parts that probably name a person
+  (`scoring/names.py`: a person-introducing word followed by a word that
+  fewer than 0.05% of the review parts contain, 433 of 865,732, or a rare
+  capitalised word in a part about staff) and takes the next candidate;
+  NER masking stays as the second layer. It skips 6.1% of parts; 96 of
+  11,104 graded attributes have no quote. Section 4 of this ADR is
+  otherwise unchanged.
+
 ## Consequences
 
 - Tiers are conservative: Excellent requires three confirmed strengths, and
   hotels with little evidence say so instead of being ranked.
-- Every grade and tier can be recomputed by hand from the API's P, N and n.
+- Every grade and tier can be recomputed by hand from the API's P, N and n,
+  plus the hard counts (`positive_hard`, `negative_hard`) for rule 2.
 - Expected counts treat calibrated probabilities as observations, so
   intervals are somewhat too narrow; validation items 6 and 7 measure how
   much.

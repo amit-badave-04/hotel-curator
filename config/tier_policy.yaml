@@ -1,0 +1,44 @@
+# Tier policy (ADR 006). Every value here is pre-registered; changing one
+# needs a new ADR with a business reason, confirmed on held-out cities.
+# No value is fitted to the distribution of hotel scores or tiers.
+params_version: "2026-10-24.1"
+
+prior: {alpha: 0.5, beta: 0.5}       # Jeffreys reference prior; no corpus input
+confirmation: 0.95                     # one-sided posterior probability for a claim
+interval_level: 0.90                   # "likely range" shown to guests
+
+essentials: [cleanliness, room, staff] # decide the tier (lexicographic)
+must_be: [noise, wifi]                 # measured as complaint rate among all reviews
+
+two_sided: {strong: 0.80, weak: 0.50}  # share of opinions that are praise
+must_be_lines: {strong: 0.05, weak: 0.10}  # complaint rate among all reviews
+
+min_opinions: 10                       # per graded two-sided attribute
+min_reviews: 30                        # per tier and per must-be grade
+min_complaining_reviews: 3             # no warning rests on one or two guests
+complaining_review_probability: 0.5    # a review "complains" when neg_r >= this
+hard_label_probability: 0.5            # Caution must also hold with hard labels
+materiality: 0.05                      # non-essential Weak matters at >= 1 in 20
+
+excellent: {min_months: 6, max_month_share: 0.25}
+
+quotes:
+  min_probability: 0.8
+  min_probability_negative: 0.9
+  max_chars: 200
+  supporting: 2
+  counter: 1
+
+trends:
+  recent_months: 6
+  baseline_months: 18
+  min_opinions: 15
+  two_sided_shift: 0.10
+  must_be_shift: 0.05
+  probability: 0.90
+  draws: 4000
+
+compare: {probability: 0.95, draws: 20000}
+
+near_duplicate_min_words: 10
+seed: 20261024

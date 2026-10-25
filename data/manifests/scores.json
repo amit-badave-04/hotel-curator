@@ -1,0 +1,20 @@
+{
+  "code_commit": "6ca397340479aff0d8736751a28316e69a49c167-dirty",
+  "created_at": "2026-10-25T00:28:09+00:00",
+  "inputs": {
+    "model_package": "artifacts/models/roberta-base-ft-train2",
+    "model_weights": "int8"
+  },
+  "outputs": [
+    {
+      "path": "data/processed/part_scores.parquet",
+      "rows": 865732,
+      "sha256": "49530f00fc8d8d885bf0dc9208226e5f4868d3b210b0135c304ef13fa3d4ffb8",
+      "size_bytes": 13442919
+    }
+  ],
+  "stage": "scores",
+  "stats": {
+    "parts": 865732
+  }
+}

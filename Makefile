@@ -76,6 +76,28 @@ model-report: ## Write docs/model/ERRORS.md and the model card
 
 models: base-models baselines embeddings v1-eval encoders train2 package compare publish model-report ## Whole ladder, end to end
 
+# --- scoring ---------------------------------------------------------------
+.PHONY: score-parts score-hotels validate-tiers scores
+score-parts: ## Score every review part with the promoted model (~1-2 h on 4 CPUs)
+	$(RUN) curator score parts
+
+score-hotels: ## Tiers, explanations, quotes for every hotel; writes data/demo/
+	$(RUN) curator score hotels
+
+validate-tiers: ## ADR 006 validation; writes docs/model/TIERS.md
+	$(RUN) curator score validate
+
+scores: score-parts score-hotels validate-tiers ## Everything after the model
+
+# --- serving ---------------------------------------------------------------
+.PHONY: db serve
+db: ## Create/upgrade the local database and load the demo data
+	$(RUN) curator db upgrade
+	$(RUN) curator db seed
+
+serve: db ## Run the API on http://127.0.0.1:8000 (docs at /docs)
+	$(RUN) curator serve
+
 # --- quality ---------------------------------------------------------------
 .PHONY: lint format typecheck test test-fast cov check
 lint: ## Ruff lint + format check

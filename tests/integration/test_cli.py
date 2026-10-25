@@ -1,5 +1,6 @@
 """CLI integration tests on synthetic data in a temporary home directory."""
 
+import gzip
 import json
 import shutil
 from pathlib import Path
@@ -19,7 +20,18 @@ from hotel_curator.ml.experiment import (
     save_outcome,
 )
 from hotel_curator.taxonomy import LABELS
-from tests.helpers import invoke_cli, toy_label_set
+from tests.helpers import invoke_cli, synthetic_results, toy_label_set
+
+
+def test_db_upgrade_and_seed_are_idempotent(home: Path) -> None:
+    demo = home / "data" / "demo"
+    demo.mkdir(parents=True)
+    payload = [r.model_dump(mode="json") for r in synthetic_results()]
+    with gzip.open(demo / "hotel_results.json.gz", "wt") as handle:
+        json.dump(payload, handle)
+    invoke_cli("db", "upgrade")
+    assert "loaded 5 hotels" in invoke_cli("db", "seed")
+    assert "up to date" in invoke_cli("db", "seed")
 
 
 def _split(prefix: str, seed: int) -> LabeledParts:
