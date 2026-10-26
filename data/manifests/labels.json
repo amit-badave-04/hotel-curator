@@ -1,0 +1,122 @@
+{
+  "code_commit": "ccdd0b74fba591f364811fb65aeef049986ca644-dirty",
+  "created_at": "2026-10-24T20:43:58+00:00",
+  "inputs": {},
+  "outputs": [
+    {
+      "path": "data/labels/gold_test/labels.parquet",
+      "rows": 2060,
+      "sha256": "904c9f53f15189dac409b58d031065bde75ad3330ec049405a08a0f9530baa2e",
+      "size_bytes": 190513
+    },
+    {
+      "path": "data/labels/gold_dev/labels.parquet",
+      "rows": 1030,
+      "sha256": "e28888d0b357e95b31067804622cba4c819098cbe4ecdd06cfa7657f4123e85b",
+      "size_bytes": 99330
+    },
+    {
+      "path": "data/labels/train/labels.parquet",
+      "rows": 6944,
+      "sha256": "683bfd96bfffb8bb018f074761a6b9719695bb120956d59435f910e783d9c3e0",
+      "size_bytes": 608507
+    },
+    {
+      "path": "data/labels/train_2/labels.parquet",
+      "rows": 6901,
+      "sha256": "f5f0cd4c88131474bd9a01bcc9b5d3da07f4c4a3a9e7b56a8e35fc5876248a03",
+      "size_bytes": 616442
+    }
+  ],
+  "stage": "labels",
+  "stats": {
+    "gold_dev": {
+      "parts": 1030,
+      "positives": {
+        "cleanliness_negative": 44,
+        "cleanliness_positive": 108,
+        "food_negative": 62,
+        "food_positive": 129,
+        "location_negative": 53,
+        "location_positive": 307,
+        "noise_negative": 36,
+        "noise_positive": 29,
+        "room_negative": 238,
+        "room_positive": 253,
+        "staff_negative": 89,
+        "staff_positive": 270,
+        "value_negative": 96,
+        "value_positive": 33,
+        "wifi_negative": 58,
+        "wifi_positive": 25
+      },
+      "reviews": 594
+    },
+    "gold_test": {
+      "parts": 2060,
+      "positives": {
+        "cleanliness_negative": 84,
+        "cleanliness_positive": 227,
+        "food_negative": 121,
+        "food_positive": 279,
+        "location_negative": 118,
+        "location_positive": 587,
+        "noise_negative": 103,
+        "noise_positive": 67,
+        "room_negative": 455,
+        "room_positive": 512,
+        "staff_negative": 162,
+        "staff_positive": 559,
+        "value_negative": 145,
+        "value_positive": 63,
+        "wifi_negative": 105,
+        "wifi_positive": 75
+      },
+      "reviews": 1200
+    },
+    "train": {
+      "parts": 6944,
+      "positives": {
+        "cleanliness_negative": 265,
+        "cleanliness_positive": 680,
+        "food_negative": 447,
+        "food_positive": 916,
+        "location_negative": 407,
+        "location_positive": 2059,
+        "noise_negative": 353,
+        "noise_positive": 230,
+        "room_negative": 1458,
+        "room_positive": 1697,
+        "staff_negative": 593,
+        "staff_positive": 1848,
+        "value_negative": 562,
+        "value_positive": 253,
+        "wifi_negative": 313,
+        "wifi_positive": 203
+      },
+      "reviews": 4006
+    },
+    "train_2": {
+      "parts": 6901,
+      "positives": {
+        "cleanliness_negative": 285,
+        "cleanliness_positive": 631,
+        "food_negative": 421,
+        "food_positive": 905,
+        "location_negative": 386,
+        "location_positive": 2009,
+        "noise_negative": 375,
+        "noise_positive": 234,
+        "room_negative": 1467,
+        "room_positive": 1591,
+        "staff_negative": 592,
+        "staff_positive": 1866,
+        "value_negative": 558,
+        "value_positive": 207,
+        "wifi_negative": 351,
+        "wifi_positive": 195
+      },
+      "reviews": 4000
+    }
+  }
+}

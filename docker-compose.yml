@@ -1,0 +1,88 @@
+# One command: `docker compose up --build`, then open http://localhost:8080
+#
+# db   Postgres 16 with no network at all: it listens only on a Unix socket
+#      in the db-socket volume, which only db and api mount, so no password
+#      is needed in git. Over the socket only the API's role `curator` may
+#      connect, and it is not a superuser (docker/db-init). For an admin
+#      shell: `docker compose exec -u postgres db psql curator`. To use
+#      another database, override the api service's CURATOR_DATABASE_URL in
+#      a docker-compose.override.yml (keep any password out of git).
+# api  FastAPI + ONNX model; migrates and loads the committed demo data.
+# web  nginx serving the React app and proxying /api to the api service.
+name: hotel-curator
+
+services:
+  db:
+    image: postgres:16-alpine@sha256:f4610795587492cd4fb887c2dc3de301b813278bb6f616992061141b5f15ac36
+    command: ["postgres", "-c", "listen_addresses="]
+    network_mode: none
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: curator
+      # Applies only during first initialisation; docker/db-init then admits
+      # only the API's non-superuser role over the socket.
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - db-socket:/var/run/postgresql
+      - ./docker/db-init:/docker-entrypoint-initdb.d:ro
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U curator -d curator"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    image: hotel-curator-api:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      CURATOR_DATABASE_URL: postgresql+psycopg://curator@/curator?host=/var/run/postgresql
+      # Rate limits key on the client address; trust X-Forwarded-For only
+      # from the web proxy's fixed address below.
+      CURATOR_FORWARDED_ALLOW_IPS: 172.28.0.10
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks: [frontend]
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - db-socket:/var/run/postgresql
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  web:
+    image: hotel-curator-web:local
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks:
+      frontend:
+        ipv4_address: 172.28.0.10
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+networks:
+  frontend:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+
+volumes:
+  db-data: {}
+  db-socket: {}

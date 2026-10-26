@@ -1,0 +1,306 @@
+"""``docs/model/TIERS.md``: the tier mix and the ADR 006 validation results."""
+
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+
+import numpy as np
+import pandas as pd
+
+from hotel_curator.scoring.grades import Grade
+from hotel_curator.scoring.policy import TierPolicy
+from hotel_curator.scoring.tiers import RANKED_TIERS as RANKED
+from hotel_curator.scoring.tiers import Tier, TierResult
+from hotel_curator.scoring.validation import (
+    MIN_LATER_OPINIONS,
+    SIMULATION_MARGIN,
+    OutOfTimeRow,
+    SimulationRow,
+)
+
+TIER_ORDER = [t.value for t in Tier]
+MAX_FALSE_CLAIM_RATE = 0.05
+"""ADR 006 section 7, item 7."""
+
+
+def _table(frame: pd.DataFrame, float_format: str = "{:.3f}") -> list[str]:
+    head = "| " + " | ".join(str(c) for c in frame.columns) + " |"
+    rule = "|" + "---|" * len(frame.columns)
+    rows = []
+    for _, row in frame.iterrows():
+        cells = [
+            float_format.format(v) if isinstance(v, float) else str(v)
+            for v in row.tolist()
+        ]
+        rows.append("| " + " | ".join(cells) + " |")
+    return [head, rule, *rows]
+
+
+def volume_quartiles(sizes: pd.Series) -> pd.Series:
+    """Quartile label per hotel by review count (ties broken by order)."""
+    q = pd.qcut(sizes.rank(method="first"), 4, labels=False)
+    bounds = sizes.groupby(q).agg(["min", "max"])
+    names = {
+        k: f"Q{k + 1} ({lo}-{hi} reviews)"
+        for k, (lo, hi) in zip(
+            bounds.index.astype(int), bounds.to_numpy(), strict=True
+        )
+    }
+    return q.map(names)
+
+
+def _mix(results: Mapping[str, TierResult], sizes: pd.Series) -> pd.DataFrame:
+    tiers = pd.Series({h: r.tier.value for h, r in results.items()})
+    quartile = volume_quartiles(sizes.reindex(tiers.index))
+    mix = pd.crosstab(tiers, quartile).reindex(TIER_ORDER).fillna(0)
+    mix = mix.astype(int)
+    overall = tiers.value_counts().reindex(TIER_ORDER).fillna(0).astype(int)
+    mix.insert(0, "all hotels", overall)
+    return mix.reset_index(names="tier")
+
+
+@dataclass(frozen=True)
+class TierValidation:
+    """Everything ``docs/model/TIERS.md`` reports."""
+
+    policy: TierPolicy
+    results: Mapping[str, TierResult]
+    sizes: pd.Series
+    oot_rows: Sequence[OutOfTimeRow]
+    oot_table: pd.DataFrame
+    agreement: pd.DataFrame
+    stable: pd.DataFrame
+    simulation: Sequence[SimulationRow]
+    mention_rate: float
+    sensitivity: pd.DataFrame
+    replicates: int
+    seconds: float
+    test_hotels: int = 0
+    """Hotels in the test split (the out-of-time population)."""
+
+
+def essential_strengths(
+    results: Mapping[str, TierResult], policy: TierPolicy
+) -> str:
+    """Strong grades per essential, and how close the rarest one comes.
+
+    Excellent needs every essential Strong, so the essential with the fewest
+    Strong grades caps the top tier.
+    """
+    if not results:
+        raise ValueError("no tier results")
+    essentials = policy.essentials
+    strong = {
+        e: sum(r.grades[e].grade is Grade.STRONG for r in results.values())
+        for e in essentials
+    }
+    rarest = min(essentials, key=lambda e: strong[e])
+    others = [e for e in essentials if e is not rarest]
+    others_strong = sum(
+        all(r.grades[e].grade is Grade.STRONG for e in others)
+        for r in results.values()
+    )
+    closest = max(r.grades[rarest].prob_strong for r in results.values())
+    counts = ", ".join(f"{e.value} {n}" for e, n in strong.items())
+    return (
+        f"Strong essentials (Excellent needs all {len(essentials)}): "
+        f"{counts}. {others_strong} hotels have "
+        f"{' and '.join(e.value for e in others)} Strong; for "
+        f"{rarest.value}, the hotel closest to Strong is "
+        f"{closest:.3f} certain that at least "
+        f"{policy.two_sided.strong:.0%} of its opinions are praise "
+        f"(Strong needs {policy.confirmation:.2f})."
+    )
+
+
+def monotonicity_claim(policy: TierPolicy) -> str:
+    """What the property tests guarantee, with both exceptions (ADR 006, E6).
+
+    Both exceptions sit at the opinions floor: praise can grade a
+    non-essential as a material Weak (a new catch), or confirm an
+    essential's Weak grade on hard labels (rule 2, Caution).
+    """
+    floor = policy.min_opinions
+    return (
+        "with the review count and month spread held fixed, one more "
+        "complaint never raises a ranked tier, and one more praise never "
+        f"lowers one except in two cases, both at the {floor} opinions "
+        f"needed for a grade: it lifts a non-essential attribute to {floor} "
+        "opinions and the new grade is a material Weak, a new catch; or it "
+        "lifts an essential that is Weak on expected counts to "
+        f"{floor} opinions on hard labels, where it is Weak too, so Fair "
+        "falls to Caution by rule 2; ADR 006, errata E2 and E6"
+    )
+
+
+def _intro_and_mix(v: TierValidation) -> list[str]:
+    catches = pd.Series(
+        [a.value for r in v.results.values() for a in r.catches]
+    ).value_counts()
+    listed = ", ".join(f"{k} {n}" for k, n in catches.items()) or "none"
+    return [
+        "# Tiers: outcome and validation",
+        "",
+        "_Generated by `curator score validate` "
+        f"(policy `{v.policy.params_version}`, {v.seconds / 60:.1f} "
+        "minutes). Every value of the policy was fixed before any hotel was "
+        "scored (ADR 006); nothing below was used to tune it._",
+        "",
+        "## Tier mix (an outcome, never a target)",
+        "",
+        *_table(_mix(v.results, v.sizes)),
+        "",
+        f"Catches (material weak spots outside the essentials): {listed}.",
+        "",
+        essential_strengths(v.results, v.policy),
+        "",
+        "## 1-3. Subset invariance, monotonicity, truth tables",
+        "",
+        "Checked by tests, not by this report: "
+        "`tests/unit/test_demo_subset.py` recomputes the tiers of the "
+        "committed demo subset from its stored review signals and requires "
+        "them to equal the served tiers; `tests/unit/test_tiers.py` holds "
+        "the truth tables and the property tests "
+        f"({monotonicity_claim(v.policy)}); `tests/unit/test_grades.py` "
+        "holds the grade truth tables.",
+        "",
+    ]
+
+
+def _out_of_time(v: TierValidation) -> list[str]:
+    rows = pd.DataFrame(
+        [
+            {
+                "attribute": r.attribute.value,
+                "rho": r.rho,
+                "95% CI": f"[{r.low:.2f}, {r.high:.2f}]",
+                "hotels": r.hotels,
+            }
+            for r in v.oot_rows
+        ]
+    )
+    return [
+        "## 4. Out of time: does 2015-2016 predict 2017?",
+        "",
+        f"For the {v.test_hotels:,} test-split hotels (whose reviews never "
+        "trained, "
+        "calibrated or tuned the classifier), grades were computed from "
+        "reviews up to December 2016 and compared with what guests said in "
+        "2017. Spearman correlation between the early posterior mean and the "
+        "2017 raw share of praise (for noise and wifi: minus the complaint "
+        "rate), with 95% bootstrap intervals over hotels. A hotel counts "
+        f"for an attribute only with at least {MIN_LATER_OPINIONS} opinions "
+        "of it (reviews, for noise and wifi) in 2017:",
+        "",
+        *_table(rows),
+        "",
+        "Mean 2017 reviewer score (the site's 2.5-10 score, never read by the "
+        "tier rules) by the tier assigned from 2015-2016 data:",
+        "",
+        *_table(v.oot_table.reset_index(), "{:.2f}"),
+        "",
+        "## 5. Agreement with the site's own average score",
+        "",
+        "Spearman correlation with the site's Average_Score (95% bootstrap "
+        "CI). The v2 ordering covers hotels with a ranked tier; the two "
+        "alternatives show what simple orderings achieve on the same data.",
+        "",
+        *_table(v.agreement),
+        "",
+    ]
+
+
+def _stability(v: TierValidation) -> list[str]:
+    quartile = volume_quartiles(v.sizes.reindex(v.stable.index))
+    kept = v.stable.groupby(quartile)["kept"].mean()
+    ranked = v.stable[v.stable["tier"].isin([t.value for t in RANKED])]
+    return [
+        "## 6. Stability",
+        "",
+        f"{v.replicates} replicates: each hotel's eligible reviews resampled "
+        "with replacement and every label redrawn from its probability. "
+        "Share of replicates in which a hotel keeps its tier: mean "
+        f"{v.stable['kept'].mean():.3f} over all hotels, "
+        f"{ranked['kept'].mean():.3f} over hotels with a ranked tier.",
+        "",
+        *_table(
+            pd.DataFrame(
+                {
+                    "review-count quartile": list(kept.index),
+                    "mean share kept": kept.to_numpy(),
+                }
+            )
+        ),
+        "",
+    ]
+
+
+def _simulation(v: TierValidation) -> list[str]:
+    rows = pd.DataFrame(
+        [
+            {
+                "reviews": r.reviews,
+                "true share": r.true_share,
+                "false claim": f"false {r.claim.capitalize()}",
+                "rate": r.rate,
+                "hotels": r.hotels,
+            }
+            for r in v.simulation
+        ]
+    )
+    return [
+        "## 7. Simulation: how often is a claim false?",
+        "",
+        "Synthetic hotels whose true share of praise for an attribute is "
+        f"{100 * SIMULATION_MARGIN:.0f} points below the Strong line (or "
+        f"{100 * SIMULATION_MARGIN:.0f} points above the Weak line), "
+        f"with the attribute mentioned in {100 * v.mention_rate:.0f}% of "
+        "reviews (the room attribute's real rate). Each review's "
+        "probabilities are drawn from the served model's calibrated gold-dev "
+        "outputs for reviews with that gold label, so the classifier's real "
+        "errors flow into the grades. The rate below is the share of hotels "
+        "given the false claim; the target is at most "
+        f"{MAX_FALSE_CLAIM_RATE:.0%}.",
+        "",
+        *_table(rows),
+        "",
+    ]
+
+
+def _sensitivity_and_reading(v: TierValidation) -> list[str]:
+    table = v.sensitivity.reindex(TIER_ORDER).fillna(0).astype(int)
+    worst = max(r.rate for r in v.simulation) if v.simulation else np.nan
+    verdict = (
+        f"(within the {MAX_FALSE_CLAIM_RATE:.0%} target)."
+        if worst <= MAX_FALSE_CLAIM_RATE
+        else f"(above the {MAX_FALSE_CLAIM_RATE:.0%} target; per ADR 006 "
+        "section 7 the intervals are "
+        "to be widened by a design effect; the lines never move)."
+    )
+    return [
+        "## 8. Sensitivity (reported only)",
+        "",
+        "Tier counts if the Strong line or the materiality threshold had been "
+        "set differently. The registered values stay; this shows how much the "
+        "mix depends on them.",
+        "",
+        *_table(table.reset_index(names="tier")),
+        "",
+        "## Reading",
+        "",
+        f"- Highest simulated false-claim rate: {worst:.3f} {verdict}",
+        "- Expected counts treat calibrated probabilities as observations, so "
+        "intervals are somewhat narrow; items 6 and 7 measure the effect.",
+        "",
+    ]
+
+
+def tiers_markdown(validation: TierValidation) -> str:
+    """Render the report."""
+    sections = (
+        _intro_and_mix,
+        _out_of_time,
+        _stability,
+        _simulation,
+        _sensitivity_and_reading,
+    )
+    return "\n".join(line for make in sections for line in make(validation))

@@ -1,0 +1,29 @@
+{
+ "model": "tfidf-logreg",
+ "rows": [
+  {
+   "fraction": 0.25,
+   "train_reviews": 1002,
+   "dev_macro_f1_mean": 0.8034152453050464,
+   "dev_macro_f1_sd": 0.002881436774487415
+  },
+  {
+   "fraction": 0.5,
+   "train_reviews": 2003,
+   "dev_macro_f1_mean": 0.8322309116364971,
+   "dev_macro_f1_sd": 0.008058569767411929
+  },
+  {
+   "fraction": 0.75,
+   "train_reviews": 3004,
+   "dev_macro_f1_mean": 0.842875917342876,
+   "dev_macro_f1_sd": 0.001385696094565295
+  },
+  {
+   "fraction": 1.0,
+   "train_reviews": 4006,
+   "dev_macro_f1_mean": 0.852426700360431,
+   "dev_macro_f1_sd": 1.1102230246251565e-16
+  }
+ ]
+}

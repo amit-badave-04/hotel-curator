@@ -1,0 +1,18 @@
+{
+ "cleanliness_positive": 0.6294874488268107,
+ "cleanliness_negative": 0.6821662172362855,
+ "room_positive": 0.5283145465320566,
+ "room_negative": 0.6350150515305045,
+ "staff_positive": 0.5463905404387456,
+ "staff_negative": 0.6640020262057937,
+ "location_positive": 0.486758489524399,
+ "location_negative": 0.35011997597394573,
+ "noise_positive": 0.6830376154132758,
+ "noise_negative": 0.7737034394228198,
+ "wifi_positive": 0.6488443305578021,
+ "wifi_negative": 0.4420175269920526,
+ "value_positive": 0.8841098357272307,
+ "value_negative": 0.5032060313651697,
+ "food_positive": 0.457070044866497,
+ "food_negative": 0.6717903772894608
+}

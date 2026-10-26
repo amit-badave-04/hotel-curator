@@ -1,0 +1,258 @@
+[
+ {
+  "set": "gold_test",
+  "label": "cleanliness_positive",
+  "fleiss_kappa": 0.9884331550802143,
+  "mean_pairwise_cohen_kappa": 0.988435275899901,
+  "unanimous_rate": 0.9966019417475728,
+  "positives_majority": 227
+ },
+ {
+  "set": "gold_test",
+  "label": "cleanliness_negative",
+  "fleiss_kappa": 0.9711509798730413,
+  "mean_pairwise_cohen_kappa": 0.9711561692973314,
+  "unanimous_rate": 0.9966019417475728,
+  "positives_majority": 84
+ },
+ {
+  "set": "gold_test",
+  "label": "room_positive",
+  "fleiss_kappa": 0.9732239107486056,
+  "mean_pairwise_cohen_kappa": 0.9732314263291059,
+  "unanimous_rate": 0.9849514563106796,
+  "positives_majority": 512
+ },
+ {
+  "set": "gold_test",
+  "label": "room_negative",
+  "fleiss_kappa": 0.9784074171296905,
+  "mean_pairwise_cohen_kappa": 0.9784074112784182,
+  "unanimous_rate": 0.9888349514563107,
+  "positives_majority": 455
+ },
+ {
+  "set": "gold_test",
+  "label": "staff_positive",
+  "fleiss_kappa": 0.9885341328871738,
+  "mean_pairwise_cohen_kappa": 0.9885275957591109,
+  "unanimous_rate": 0.9932038834951457,
+  "positives_majority": 559
+ },
+ {
+  "set": "gold_test",
+  "label": "staff_negative",
+  "fleiss_kappa": 0.9665643639600634,
+  "mean_pairwise_cohen_kappa": 0.9665373490057475,
+  "unanimous_rate": 0.9927184466019418,
+  "positives_majority": 162
+ },
+ {
+  "set": "gold_test",
+  "label": "location_positive",
+  "fleiss_kappa": 0.9880836075689017,
+  "mean_pairwise_cohen_kappa": 0.9880803623446166,
+  "unanimous_rate": 0.9927184466019418,
+  "positives_majority": 587
+ },
+ {
+  "set": "gold_test",
+  "label": "location_negative",
+  "fleiss_kappa": 0.9729597152262276,
+  "mean_pairwise_cohen_kappa": 0.9728727549014057,
+  "unanimous_rate": 0.9956310679611651,
+  "positives_majority": 118
+ },
+ {
+  "set": "gold_test",
+  "label": "noise_positive",
+  "fleiss_kappa": 0.9948822249237311,
+  "mean_pairwise_cohen_kappa": 0.9948944438661451,
+  "unanimous_rate": 0.9995145631067961,
+  "positives_majority": 67
+ },
+ {
+  "set": "gold_test",
+  "label": "noise_negative",
+  "fleiss_kappa": 0.9862043948378085,
+  "mean_pairwise_cohen_kappa": 0.9861826334840895,
+  "unanimous_rate": 0.9980582524271845,
+  "positives_majority": 103
+ },
+ {
+  "set": "gold_test",
+  "label": "wifi_positive",
+  "fleiss_kappa": 0.981550517772182,
+  "mean_pairwise_cohen_kappa": 0.9815206115784406,
+  "unanimous_rate": 0.9980582524271845,
+  "positives_majority": 75
+ },
+ {
+  "set": "gold_test",
+  "label": "wifi_negative",
+  "fleiss_kappa": 0.9933097876831881,
+  "mean_pairwise_cohen_kappa": 0.9933097360537749,
+  "unanimous_rate": 0.9990291262135922,
+  "positives_majority": 105
+ },
+ {
+  "set": "gold_test",
+  "label": "value_positive",
+  "fleiss_kappa": 0.9554223113856126,
+  "mean_pairwise_cohen_kappa": 0.9549023933648981,
+  "unanimous_rate": 0.996116504854369,
+  "positives_majority": 63
+ },
+ {
+  "set": "gold_test",
+  "label": "value_negative",
+  "fleiss_kappa": 0.9673660847750648,
+  "mean_pairwise_cohen_kappa": 0.9670989765710725,
+  "unanimous_rate": 0.9936893203883496,
+  "positives_majority": 145
+ },
+ {
+  "set": "gold_test",
+  "label": "food_positive",
+  "fleiss_kappa": 0.9819074428555338,
+  "mean_pairwise_cohen_kappa": 0.9818810757632125,
+  "unanimous_rate": 0.9936893203883496,
+  "positives_majority": 279
+ },
+ {
+  "set": "gold_test",
+  "label": "food_negative",
+  "fleiss_kappa": 0.9559853303426782,
+  "mean_pairwise_cohen_kappa": 0.9559380113102897,
+  "unanimous_rate": 0.9927184466019418,
+  "positives_majority": 121
+ },
+ {
+  "set": "gold_dev",
+  "label": "cleanliness_positive",
+  "fleiss_kappa": 0.9965614132702735,
+  "mean_pairwise_cohen_kappa": 0.9965660829007598,
+  "unanimous_rate": 0.9990291262135922,
+  "positives_majority": 108
+ },
+ {
+  "set": "gold_dev",
+  "label": "cleanliness_negative",
+  "fleiss_kappa": 0.9683447046530201,
+  "mean_pairwise_cohen_kappa": 0.968344704653021,
+  "unanimous_rate": 0.996116504854369,
+  "positives_majority": 44
+ },
+ {
+  "set": "gold_dev",
+  "label": "room_positive",
+  "fleiss_kappa": 0.9667271935909469,
+  "mean_pairwise_cohen_kappa": 0.9667395573873234,
+  "unanimous_rate": 0.9815533980582525,
+  "positives_majority": 253
+ },
+ {
+  "set": "gold_dev",
+  "label": "room_negative",
+  "fleiss_kappa": 0.9723788348576125,
+  "mean_pairwise_cohen_kappa": 0.9723705356894531,
+  "unanimous_rate": 0.9854368932038835,
+  "positives_majority": 238
+ },
+ {
+  "set": "gold_dev",
+  "label": "staff_positive",
+  "fleiss_kappa": 0.9899927887625604,
+  "mean_pairwise_cohen_kappa": 0.9899947928466508,
+  "unanimous_rate": 0.9941747572815534,
+  "positives_majority": 270
+ },
+ {
+  "set": "gold_dev",
+  "label": "staff_negative",
+  "fleiss_kappa": 0.9504691935214559,
+  "mean_pairwise_cohen_kappa": 0.9503799903931954,
+  "unanimous_rate": 0.9883495145631068,
+  "positives_majority": 89
+ },
+ {
+  "set": "gold_dev",
+  "label": "location_positive",
+  "fleiss_kappa": 0.9907190902906368,
+  "mean_pairwise_cohen_kappa": 0.9907176492678005,
+  "unanimous_rate": 0.9941747572815534,
+  "positives_majority": 307
+ },
+ {
+  "set": "gold_dev",
+  "label": "location_negative",
+  "fleiss_kappa": 0.9662445598028424,
+  "mean_pairwise_cohen_kappa": 0.9659315514517656,
+  "unanimous_rate": 0.9951456310679612,
+  "positives_majority": 53
+ },
+ {
+  "set": "gold_dev",
+  "label": "noise_positive",
+  "fleiss_kappa": 0.9641176106276905,
+  "mean_pairwise_cohen_kappa": 0.9641154764761374,
+  "unanimous_rate": 0.9970873786407767,
+  "positives_majority": 29
+ },
+ {
+  "set": "gold_dev",
+  "label": "noise_negative",
+  "fleiss_kappa": 0.9808107906699475,
+  "mean_pairwise_cohen_kappa": 0.9808107906699456,
+  "unanimous_rate": 0.9980582524271845,
+  "positives_majority": 36
+ },
+ {
+  "set": "gold_dev",
+  "label": "wifi_positive",
+  "fleiss_kappa": 0.960542445602207,
+  "mean_pairwise_cohen_kappa": 0.9607801847983638,
+  "unanimous_rate": 0.9970873786407767,
+  "positives_majority": 25
+ },
+ {
+  "set": "gold_dev",
+  "label": "wifi_negative",
+  "fleiss_kappa": 0.9938768352155306,
+  "mean_pairwise_cohen_kappa": 0.9938601667888672,
+  "unanimous_rate": 0.9990291262135922,
+  "positives_majority": 58
+ },
+ {
+  "set": "gold_dev",
+  "label": "value_positive",
+  "fleiss_kappa": 0.9683850813052498,
+  "mean_pairwise_cohen_kappa": 0.9682225646552233,
+  "unanimous_rate": 0.9970873786407767,
+  "positives_majority": 33
+ },
+ {
+  "set": "gold_dev",
+  "label": "value_negative",
+  "fleiss_kappa": 0.9572119675571299,
+  "mean_pairwise_cohen_kappa": 0.9571867231268786,
+  "unanimous_rate": 0.9893203883495145,
+  "positives_majority": 96
+ },
+ {
+  "set": "gold_dev",
+  "label": "food_positive",
+  "fleiss_kappa": 0.9792765275776443,
+  "mean_pairwise_cohen_kappa": 0.9792829087629836,
+  "unanimous_rate": 0.9932038834951457,
+  "positives_majority": 129
+ },
+ {
+  "set": "gold_dev",
+  "label": "food_negative",
+  "fleiss_kappa": 0.9433626112585605,
+  "mean_pairwise_cohen_kappa": 0.9433401607351639,
+  "unanimous_rate": 0.9902912621359223,
+  "positives_majority": 62
+ }
+]

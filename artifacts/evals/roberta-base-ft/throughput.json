@@ -1,0 +1,9 @@
+{
+ "sample_parts": 20000.0,
+ "threads": 4.0,
+ "repeats": 3.0,
+ "seconds": 287.05030866499874,
+ "parts_per_second": 69.6741978540805,
+ "corpus_parts": 865732.0,
+ "corpus_hours": 3.4515088586273146
+}

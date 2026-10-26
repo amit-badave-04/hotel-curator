@@ -1,0 +1,447 @@
+{
+ "n_panel_reviews": 442,
+ "explicit_human_fleiss_kappa": {
+  "cleanliness_positive": 0.8279654359780044,
+  "cleanliness_negative": 0.7217785843920141,
+  "room_positive": 0.6164303586321935,
+  "room_negative": 0.671664167916042,
+  "staff_positive": 0.838792786161207,
+  "staff_negative": 0.6923371647509576,
+  "location_positive": 0.7910305343511448,
+  "location_negative": 0.5093353248693056,
+  "value_positive": 0.7360867659947418,
+  "value_negative": 0.5106145251396643,
+  "food_positive": 0.6995610023779035,
+  "food_negative": 0.7619565217391302
+ },
+ "explicit_triple_kappa": [
+  {
+   "label": "cleanliness_positive",
+   "n_reviews": 73.0,
+   "human_positives_mean": 22.333333333333332,
+   "panel_positives": 27.0,
+   "human_human_kappa": 0.8277704867461444,
+   "panel_human_kappa": 0.8567242675309501
+  },
+  {
+   "label": "cleanliness_negative",
+   "n_reviews": 73.0,
+   "human_positives_mean": 9.666666666666666,
+   "panel_positives": 14.0,
+   "human_human_kappa": 0.7173101136030363,
+   "panel_human_kappa": 0.7680639302565567
+  },
+  {
+   "label": "room_positive",
+   "n_reviews": 73.0,
+   "human_positives_mean": 36.666666666666664,
+   "panel_positives": 48.0,
+   "human_human_kappa": 0.6168929094781908,
+   "panel_human_kappa": 0.6336703389701918
+  },
+  {
+   "label": "room_negative",
+   "n_reviews": 73.0,
+   "human_positives_mean": 19.333333333333332,
+   "panel_positives": 32.0,
+   "human_human_kappa": 0.6711030726035095,
+   "panel_human_kappa": 0.5337595243986516
+  },
+  {
+   "label": "staff_positive",
+   "n_reviews": 73.0,
+   "human_positives_mean": 47.666666666666664,
+   "panel_positives": 53.0,
+   "human_human_kappa": 0.8393055795929287,
+   "panel_human_kappa": 0.7882029638052853
+  },
+  {
+   "label": "staff_negative",
+   "n_reviews": 73.0,
+   "human_positives_mean": 15.0,
+   "panel_positives": 24.0,
+   "human_human_kappa": 0.6856442425691736,
+   "panel_human_kappa": 0.6825020641796941
+  },
+  {
+   "label": "location_positive",
+   "n_reviews": 73.0,
+   "human_positives_mean": 29.333333333333332,
+   "panel_positives": 40.0,
+   "human_human_kappa": 0.7925684296975621,
+   "panel_human_kappa": 0.6780208834108574
+  },
+  {
+   "label": "location_negative",
+   "n_reviews": 73.0,
+   "human_positives_mean": 4.333333333333333,
+   "panel_positives": 9.0,
+   "human_human_kappa": 0.560750087070474,
+   "panel_human_kappa": 0.4450351167398357
+  },
+  {
+   "label": "value_positive",
+   "n_reviews": 73.0,
+   "human_positives_mean": 18.666666666666668,
+   "panel_positives": 22.0,
+   "human_human_kappa": 0.7346034415804357,
+   "panel_human_kappa": 0.7953127059101007
+  },
+  {
+   "label": "value_negative",
+   "n_reviews": 73.0,
+   "human_positives_mean": 13.333333333333334,
+   "panel_positives": 22.0,
+   "human_human_kappa": 0.5155440205388299,
+   "panel_human_kappa": 0.6262035121751118
+  },
+  {
+   "label": "food_positive",
+   "n_reviews": 73.0,
+   "human_positives_mean": 25.666666666666668,
+   "panel_positives": 29.0,
+   "human_human_kappa": 0.6993523636013705,
+   "panel_human_kappa": 0.8049062304536013
+  },
+  {
+   "label": "food_negative",
+   "n_reviews": 73.0,
+   "human_positives_mean": 11.666666666666666,
+   "panel_positives": 17.0,
+   "human_human_kappa": 0.7764956957617858,
+   "panel_human_kappa": 0.6476421583526769
+  }
+ ],
+ "explicit_panel_vs_human": [
+  {
+   "label": "cleanliness_positive",
+   "n_reviews": 442,
+   "support": 153,
+   "precision": 0.8830409356725146,
+   "recall": 0.9869281045751634,
+   "f1": 0.9320987654320988,
+   "cohen_kappa": 0.8930041152263375
+  },
+  {
+   "label": "cleanliness_negative",
+   "n_reviews": 442,
+   "support": 34,
+   "precision": 0.6078431372549019,
+   "recall": 0.9117647058823529,
+   "f1": 0.7294117647058823,
+   "cohen_kappa": 0.7018943170488534
+  },
+  {
+   "label": "room_positive",
+   "n_reviews": 442,
+   "support": 252,
+   "precision": 0.8033333333333333,
+   "recall": 0.9563492063492064,
+   "f1": 0.8731884057971014,
+   "cohen_kappa": 0.6665373340231074
+  },
+  {
+   "label": "room_negative",
+   "n_reviews": 442,
+   "support": 102,
+   "precision": 0.4918032786885246,
+   "recall": 0.8823529411764706,
+   "f1": 0.631578947368421,
+   "cohen_kappa": 0.476409666283084
+  },
+  {
+   "label": "staff_positive",
+   "n_reviews": 442,
+   "support": 293,
+   "precision": 0.891640866873065,
+   "recall": 0.9829351535836177,
+   "f1": 0.935064935064935,
+   "cohen_kappa": 0.7869725522326916
+  },
+  {
+   "label": "staff_negative",
+   "n_reviews": 442,
+   "support": 73,
+   "precision": 0.5950413223140496,
+   "recall": 0.9863013698630136,
+   "f1": 0.7422680412371134,
+   "cohen_kappa": 0.6753914397344378
+  },
+  {
+   "label": "location_positive",
+   "n_reviews": 442,
+   "support": 212,
+   "precision": 0.77431906614786,
+   "recall": 0.9386792452830188,
+   "f1": 0.8486140724946695,
+   "cohen_kappa": 0.6808501983118072
+  },
+  {
+   "label": "location_negative",
+   "n_reviews": 442,
+   "support": 14,
+   "precision": 0.29545454545454547,
+   "recall": 0.9285714285714286,
+   "f1": 0.4482758620689655,
+   "cohen_kappa": 0.42042288149483686
+  },
+  {
+   "label": "value_positive",
+   "n_reviews": 442,
+   "support": 123,
+   "precision": 0.7913669064748201,
+   "recall": 0.8943089430894309,
+   "f1": 0.8396946564885496,
+   "cohen_kappa": 0.7725278764857249
+  },
+  {
+   "label": "value_negative",
+   "n_reviews": 442,
+   "support": 49,
+   "precision": 0.43119266055045874,
+   "recall": 0.9591836734693877,
+   "f1": 0.5949367088607594,
+   "cohen_kappa": 0.5217905805186462
+  },
+  {
+   "label": "food_positive",
+   "n_reviews": 442,
+   "support": 163,
+   "precision": 0.8277777777777777,
+   "recall": 0.9141104294478528,
+   "f1": 0.8688046647230321,
+   "cohen_kappa": 0.7859587198415944
+  },
+  {
+   "label": "food_negative",
+   "n_reviews": 442,
+   "support": 50,
+   "precision": 0.6,
+   "recall": 0.9,
+   "f1": 0.72,
+   "cohen_kappa": 0.676020942408377
+  }
+ ],
+ "explicit_implicit_human_fleiss_kappa": {
+  "cleanliness_positive": 0.8293728087261392,
+  "cleanliness_negative": 0.7745367192862046,
+  "room_positive": 0.6513323278029158,
+  "room_negative": 0.7739726027397258,
+  "staff_positive": 0.8767123287671232,
+  "staff_negative": 0.765474405654316,
+  "location_positive": 0.8173173173173172,
+  "location_negative": 0.6148241206030159,
+  "value_positive": 0.7448093220338986,
+  "value_negative": 0.46637426900584783,
+  "food_positive": 0.7439748201438847,
+  "food_negative": 0.7192307692307693
+ },
+ "explicit_implicit_triple_kappa": [
+  {
+   "label": "cleanliness_positive",
+   "n_reviews": 73.0,
+   "human_positives_mean": 22.666666666666668,
+   "panel_positives": 27.0,
+   "human_human_kappa": 0.828644830088674,
+   "panel_human_kappa": 0.8672313118606505
+  },
+  {
+   "label": "cleanliness_negative",
+   "n_reviews": 73.0,
+   "human_positives_mean": 10.333333333333334,
+   "panel_positives": 14.0,
+   "human_human_kappa": 0.7723871116296722,
+   "panel_human_kappa": 0.8130907306789115
+  },
+  {
+   "label": "room_positive",
+   "n_reviews": 73.0,
+   "human_positives_mean": 39.0,
+   "panel_positives": 48.0,
+   "human_human_kappa": 0.6518388809942685,
+   "panel_human_kappa": 0.6741734273607299
+  },
+  {
+   "label": "room_negative",
+   "n_reviews": 73.0,
+   "human_positives_mean": 24.333333333333332,
+   "panel_positives": 32.0,
+   "human_human_kappa": 0.7744387436538339,
+   "panel_human_kappa": 0.6093923030847027
+  },
+  {
+   "label": "staff_positive",
+   "n_reviews": 73.0,
+   "human_positives_mean": 48.666666666666664,
+   "panel_positives": 53.0,
+   "human_human_kappa": 0.8776613862894435,
+   "panel_human_kappa": 0.8173539039368108
+  },
+  {
+   "label": "staff_negative",
+   "n_reviews": 73.0,
+   "human_positives_mean": 19.333333333333332,
+   "panel_positives": 24.0,
+   "human_human_kappa": 0.7647096136865134,
+   "panel_human_kappa": 0.803730898570436
+  },
+  {
+   "label": "location_positive",
+   "n_reviews": 73.0,
+   "human_positives_mean": 36.0,
+   "panel_positives": 40.0,
+   "human_human_kappa": 0.8173446982624927,
+   "panel_human_kappa": 0.8358791892691543
+  },
+  {
+   "label": "location_negative",
+   "n_reviews": 73.0,
+   "human_positives_mean": 6.666666666666667,
+   "panel_positives": 9.0,
+   "human_human_kappa": 0.6349640358656025,
+   "panel_human_kappa": 0.6500089487526861
+  },
+  {
+   "label": "value_positive",
+   "n_reviews": 73.0,
+   "human_positives_mean": 19.666666666666668,
+   "panel_positives": 22.0,
+   "human_human_kappa": 0.744126045332774,
+   "panel_human_kappa": 0.8089178345767506
+  },
+  {
+   "label": "value_negative",
+   "n_reviews": 73.0,
+   "human_positives_mean": 16.0,
+   "panel_positives": 22.0,
+   "human_human_kappa": 0.4682283526585492,
+   "panel_human_kappa": 0.6619480970807957
+  },
+  {
+   "label": "food_positive",
+   "n_reviews": 73.0,
+   "human_positives_mean": 26.666666666666668,
+   "panel_positives": 29.0,
+   "human_human_kappa": 0.7437663024547673,
+   "panel_human_kappa": 0.7966208251377073
+  },
+  {
+   "label": "food_negative",
+   "n_reviews": 73.0,
+   "human_positives_mean": 13.0,
+   "panel_positives": 17.0,
+   "human_human_kappa": 0.7246492352538324,
+   "panel_human_kappa": 0.6866041027189319
+  }
+ ],
+ "explicit_implicit_panel_vs_human": [
+  {
+   "label": "cleanliness_positive",
+   "n_reviews": 442,
+   "support": 158,
+   "precision": 0.9064327485380117,
+   "recall": 0.9810126582278481,
+   "f1": 0.9422492401215805,
+   "cohen_kappa": 0.90810006346983
+  },
+  {
+   "label": "cleanliness_negative",
+   "n_reviews": 442,
+   "support": 40,
+   "precision": 0.7058823529411765,
+   "recall": 0.9,
+   "f1": 0.7912087912087912,
+   "cohen_kappa": 0.7676387582314206
+  },
+  {
+   "label": "room_positive",
+   "n_reviews": 442,
+   "support": 272,
+   "precision": 0.8466666666666667,
+   "recall": 0.9338235294117647,
+   "f1": 0.8881118881118881,
+   "cohen_kappa": 0.6843702579666161
+  },
+  {
+   "label": "room_negative",
+   "n_reviews": 442,
+   "support": 130,
+   "precision": 0.5846994535519126,
+   "recall": 0.823076923076923,
+   "f1": 0.6837060702875399,
+   "cohen_kappa": 0.5179031796046978
+  },
+  {
+   "label": "staff_positive",
+   "n_reviews": 442,
+   "support": 304,
+   "precision": 0.9195046439628483,
+   "recall": 0.9769736842105263,
+   "f1": 0.9473684210526315,
+   "cohen_kappa": 0.8193684210526315
+  },
+  {
+   "label": "staff_negative",
+   "n_reviews": 442,
+   "support": 101,
+   "precision": 0.768595041322314,
+   "recall": 0.9207920792079208,
+   "f1": 0.8378378378378378,
+   "cohen_kappa": 0.7840449499199261
+  },
+  {
+   "label": "location_positive",
+   "n_reviews": 442,
+   "support": 260,
+   "precision": 0.9221789883268483,
+   "recall": 0.9115384615384615,
+   "f1": 0.9168278529980658,
+   "cohen_kappa": 0.7996711427788435
+  },
+  {
+   "label": "location_negative",
+   "n_reviews": 442,
+   "support": 32,
+   "precision": 0.5909090909090909,
+   "recall": 0.8125,
+   "f1": 0.6842105263157895,
+   "cohen_kappa": 0.6553158305172861
+  },
+  {
+   "label": "value_positive",
+   "n_reviews": 442,
+   "support": 133,
+   "precision": 0.8201438848920863,
+   "recall": 0.8571428571428571,
+   "f1": 0.8382352941176471,
+   "cohen_kappa": 0.7663903903903904
+  },
+  {
+   "label": "value_negative",
+   "n_reviews": 442,
+   "support": 64,
+   "precision": 0.5688073394495413,
+   "recall": 0.96875,
+   "f1": 0.7167630057803468,
+   "cohen_kappa": 0.653549604888505
+  },
+  {
+   "label": "food_positive",
+   "n_reviews": 442,
+   "support": 171,
+   "precision": 0.8555555555555555,
+   "recall": 0.9005847953216374,
+   "f1": 0.8774928774928775,
+   "cohen_kappa": 0.7969053877882499
+  },
+  {
+   "label": "food_negative",
+   "n_reviews": 442,
+   "support": 58,
+   "precision": 0.68,
+   "recall": 0.8793103448275862,
+   "f1": 0.7669172932330827,
+   "cohen_kappa": 0.726430539472108
+  }
+ ]
+}

@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hotel-curator architecture</title>
+<style>
+  :root {
+    --bg: #fcfcfb; --fg: #0b0b0b; --muted: #52514e; --line: #77766f;
+    --box: #ffffff; --edge: #c9c8c3; --accent: #2a78d6; --warm: #c4521f;
+    --soft: #eef4fc; --softwarm: #fdf0ea; --zone: #f4f3ef;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141414; --fg: #f1f0ec; --muted: #b3b2ad; --line: #9a9994;
+      --box: #1e1e1e; --edge: #45453f; --accent: #6ea8f0; --warm: #f29466;
+      --soft: #1a2533; --softwarm: #33231b; --zone: #1a1a19;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.8rem; margin: 0 0 4px; }
+  h2 { font-size: 1.25rem; margin: 48px 0 8px; }
+  p, li { color: var(--muted); max-width: 76ch; }
+  a { color: var(--accent); }
+  nav { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 12px; }
+  code { font-size: 0.9em; }
+  figure { margin: 16px 0 0; overflow-x: auto; }
+  svg { width: 100%; min-width: 720px; height: auto; display: block; }
+  svg text { fill: var(--fg); font: 13px system-ui, sans-serif; }
+  svg .small { fill: var(--muted); font-size: 11px; }
+  svg .label { fill: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.02em; }
+  svg .box { fill: var(--box); stroke: var(--edge); stroke-width: 1.5; }
+  svg .accent { fill: var(--soft); stroke: var(--accent); stroke-width: 1.5; }
+  svg .external { fill: var(--zone); stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 2 3; }
+  svg .file { fill: var(--softwarm); stroke: var(--warm); stroke-width: 1.5; }
+  svg .zone { fill: var(--zone); stroke: var(--edge); stroke-width: 1.2; }
+  svg .boundary { fill: none; stroke: var(--warm); stroke-width: 1.5; stroke-dasharray: 6 4; }
+  svg .arrow { stroke: var(--line); stroke-width: 1.5; fill: none; marker-end: url(#tip); }
+  svg .dashed { stroke-dasharray: 4 4; }
+  svg .lifeline { stroke: var(--edge); stroke-dasharray: 3 4; }
+  svg .tip { fill: var(--line); }
+  figcaption { color: var(--muted); font-size: 0.9rem; margin-top: 8px; max-width: 76ch; }
+  .key { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 0.9rem; }
+  .key span { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; border: 1.5px solid; }
+  .k-box { background: var(--box); border-color: var(--edge) !important; }
+  .k-accent { background: var(--soft); border-color: var(--accent) !important; }
+  .k-file { background: var(--softwarm); border-color: var(--warm) !important; }
+  .k-boundary { border-style: dashed !important; border-color: var(--warm) !important; }
+  .k-external { background: var(--zone); border-style: dotted !important; border-color: var(--muted) !important; }
+</style>
+</head>
+<body>
+<main>
+<h1>hotel-curator architecture</h1>
+<p>An offline pipeline makes labels, models and hotel results; an online
+stack serves them. The two halves meet only at a handful of committed files. The
+Mermaid versions of these views, with tables, are in
+<a href="README.md">README.md</a>, <a href="offline.md">offline.md</a> and
+<a href="online.md">online.md</a>.</p>
+<ul class="key" aria-label="Key">
+  <li><span class="k-box"></span>step or service</li>
+  <li><span class="k-accent"></span>decision or what users reach</li>
+  <li><span class="k-file"></span>committed hand-off file</li>
+  <li><span class="k-external"></span>outside the CLI (LLM annotator panel)</li>
+  <li><span class="k-boundary"></span>trust boundary</li>
+</ul>
+<nav aria-label="Views">
+  <a href="#overview">1. Offline and online</a>
+  <a href="#offline">2. Offline pipeline</a>
+  <a href="#online">3. Online deployment</a>
+  <a href="#request">4. Request flow</a>
+</nav>
+
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+  <defs>
+    <marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="tip" d="M0,0 L10,5 L0,10 z"/>
+    </marker>
+  </defs>
+</svg>
+
+<h2 id="overview">1. Offline and online</h2>
+<p>The offline half runs by hand with the <code>curator</code> CLI. Its
+outputs that the online half needs are committed; the API image copies them
+at build time, and the API reads them at start-up (and <code>promotion.json</code>
+again for <code>GET /v1/meta</code>). Nothing online trains, reads the raw dataset or
+calls an LLM.</p>
+<figure>
+<svg viewBox="0 0 1040 330" role="img" aria-labelledby="o-title o-desc">
+  <title id="o-title">Offline and online halves</title>
+  <desc id="o-desc">Left, the offline curator CLI: data, labels, models (ladder, package, compare, publish), scores. Middle, the committed hand-off files: the model package, promotion.json, hotel_results.json.gz and tier_policy.yaml. Right, the online stack: web, API and Postgres. The API loads the package, promotion decision and policy at start-up; the seed step loads the hotel results into Postgres.</desc>
+  <rect class="zone" x="10" y="20" width="300" height="290" rx="12"/>
+  <text class="label" x="28" y="44">OFFLINE: curator CLI, by hand</text>
+  <rect class="box" x="40" y="62" width="240" height="44" rx="8"/><text x="160" y="89" text-anchor="middle">data: download, build, split</text>
+  <rect class="box" x="40" y="122" width="240" height="44" rx="8"/><text x="160" y="149" text-anchor="middle">labels: sample, panel, merge</text>
+  <rect class="box" x="40" y="182" width="240" height="44" rx="8"/><text x="160" y="201" text-anchor="middle">models: ladder, package,</text><text x="160" y="217" text-anchor="middle">compare, publish</text>
+  <rect class="box" x="40" y="242" width="240" height="44" rx="8"/><text x="160" y="269" text-anchor="middle">scores: parts, hotels, validate</text>
+  <path class="arrow" d="M160 106 V118"/><path class="arrow" d="M160 166 V178"/><path class="arrow" d="M160 226 V238"/>
+
+  <text class="label" x="380" y="44">COMMITTED HAND-OFF</text>
+  <rect class="file" x="370" y="62" width="280" height="44" rx="8"/><text x="510" y="82" text-anchor="middle">artifacts/models/&lt;winner&gt;/</text><text class="small" x="510" y="98" text-anchor="middle">ONNX, tokenizer, metadata</text>
+  <rect class="file" x="370" y="122" width="280" height="44" rx="8"/><text x="510" y="149" text-anchor="middle">artifacts/evals/promotion.json</text>
+  <rect class="file" x="370" y="182" width="280" height="44" rx="8"/><text x="510" y="209" text-anchor="middle">config/tier_policy.yaml</text>
+  <rect class="file" x="370" y="242" width="280" height="44" rx="8"/><text x="510" y="262" text-anchor="middle">data/demo/hotel_results.json.gz</text><text class="small" x="510" y="278" text-anchor="middle">every hotel's tier, grades, quotes</text>
+  <path class="arrow" d="M280 196 C 320 196, 330 92, 366 88"/>
+  <path class="arrow" d="M280 204 C 325 204, 330 144, 366 144"/>
+  <path class="arrow" d="M280 264 H366"/>
+  <path class="arrow dashed" d="M370 212 C 330 220, 320 250, 284 256"/>
+  <text class="small" x="300" y="238">policy</text>
+
+  <rect class="zone" x="720" y="20" width="310" height="290" rx="12"/>
+  <text class="label" x="738" y="44">ONLINE: docker compose</text>
+  <rect class="accent" x="760" y="62" width="230" height="52" rx="8"/><text x="875" y="85" text-anchor="middle">web</text><text class="small" x="875" y="102" text-anchor="middle">nginx + React app</text>
+  <rect class="accent" x="760" y="146" width="230" height="52" rx="8"/><text x="875" y="169" text-anchor="middle">api</text><text class="small" x="875" y="186" text-anchor="middle">FastAPI + ONNX Runtime</text>
+  <rect class="box" x="760" y="232" width="230" height="52" rx="8"/><text x="875" y="255" text-anchor="middle">db</text><text class="small" x="875" y="272" text-anchor="middle">Postgres, socket only</text>
+  <path class="arrow" d="M875 114 V142"/><path class="arrow" d="M875 198 V228"/>
+  <path class="arrow" d="M650 84 C 700 84, 710 166, 756 168"/>
+  <path class="arrow" d="M650 144 C 700 144, 710 172, 756 172"/>
+  <path class="arrow" d="M650 204 C 700 204, 710 178, 756 176"/>
+  <path class="arrow" d="M650 264 H756"/>
+  <text class="small" x="668" y="256">db seed</text>
+  <text class="small" x="668" y="122">loaded at start</text>
+</svg>
+<figcaption><code>model.onnx</code> is not in git yet (Git LFS was blocked in the build environment, <code>docs/BLOCKERS.md</code> B8). Until it is added, <code>POST /v1/analyze</code> answers 503; everything else works from the committed results.</figcaption>
+</figure>
+
+<h2 id="offline">2. Offline pipeline</h2>
+<p>Every stage except the LLM annotator panel is a <code>curator</code>
+command. Inputs are pinned by SHA-256. The data, label and scoring stages
+write manifests under <code>data/manifests/</code> with the SHA-256 of each
+output (the data manifest also hashes each input chunk); the model stages
+write reports under <code>artifacts/evals/</code>, and the package files are
+tied to the promotion decision by their hashes. The promotion rule and the
+tier scheme were committed before any model ran.</p>
+<figure>
+<svg viewBox="0 0 1040 430" role="img" aria-labelledby="l-title l-desc">
+  <title id="l-title">Offline pipeline</title>
+  <desc id="l-desc">Row one: pinned CSV chunks, data build with contracts and a hotel-disjoint split, label samples of 9,800 reviews, the LLM annotator panel, label merge into gold and training sets. Row two, right to left: the model ladder, one evaluation harness, ONNX packaging of every fine-tuned encoder, the promotion rule, and publishing the winner to artifacts/models. Row three: score 865,732 review parts, score hotels with the tier policy, hotel results file, validation into TIERS.md.</desc>
+  <text class="label" x="20" y="24">DATA AND LABELS</text>
+  <rect class="box" x="20" y="36" width="170" height="64" rx="8"/><text x="105" y="64" text-anchor="middle">11 CSV chunks</text><text class="small" x="105" y="82" text-anchor="middle">SHA-256 pinned</text>
+  <rect class="box" x="225" y="36" width="170" height="64" rx="8"/><text x="310" y="64" text-anchor="middle">data build</text><text class="small" x="310" y="82" text-anchor="middle">contracts, hotel split</text>
+  <rect class="box" x="430" y="36" width="170" height="64" rx="8"/><text x="515" y="64" text-anchor="middle">label sample</text><text class="small" x="515" y="82" text-anchor="middle">9,800 reviews</text>
+  <rect class="external" x="635" y="36" width="170" height="64" rx="8"/><text x="720" y="64" text-anchor="middle">LLM annotator panel</text><text class="small" x="720" y="82" text-anchor="middle">3 on gold, 1 on train</text>
+  <rect class="box" x="840" y="36" width="180" height="64" rx="8"/><text x="930" y="64" text-anchor="middle">label merge</text><text class="small" x="930" y="82" text-anchor="middle">gold sets, train, train_2</text>
+  <path class="arrow" d="M190 68 H221"/><path class="arrow" d="M395 68 H426"/><path class="arrow" d="M600 68 H631"/><path class="arrow" d="M805 68 H836"/>
+  <path class="arrow" d="M930 100 V170"/>
+
+  <text class="label" x="20" y="160">MODELS</text>
+  <rect class="file" x="20" y="174" width="170" height="64" rx="8"/><text x="105" y="202" text-anchor="middle">artifacts/models/</text><text class="small" x="105" y="220" text-anchor="middle">winner, hashes checked</text>
+  <rect class="accent" x="225" y="174" width="170" height="64" rx="8"/><text x="310" y="202" text-anchor="middle">promotion rule</text><text class="small" x="310" y="220" text-anchor="middle">promotion.json</text>
+  <rect class="box" x="430" y="174" width="170" height="64" rx="8"/><text x="515" y="202" text-anchor="middle">package</text><text class="small" x="515" y="220" text-anchor="middle">fine-tuned encoders, fp32/int8</text>
+  <rect class="box" x="635" y="174" width="170" height="64" rx="8"/><text x="720" y="202" text-anchor="middle">one harness</text><text class="small" x="720" y="220" text-anchor="middle">vs v1, bootstrap CIs</text>
+  <rect class="box" x="840" y="174" width="180" height="64" rx="8"/><text x="930" y="202" text-anchor="middle">model ladder</text><text class="small" x="930" y="220" text-anchor="middle">TF-IDF, embeddings, encoders</text>
+  <path class="arrow" d="M840 206 H809"/><path class="arrow" d="M635 206 H604"/><path class="arrow" d="M430 206 H399"/><path class="arrow" d="M225 206 H194"/>
+  <path class="arrow" d="M105 238 V308"/>
+
+  <text class="label" x="20" y="298">SCORES</text>
+  <rect class="box" x="20" y="312" width="170" height="64" rx="8"/><text x="105" y="340" text-anchor="middle">score parts</text><text class="small" x="105" y="358" text-anchor="middle">865,732 review parts</text>
+  <rect class="box" x="225" y="312" width="170" height="64" rx="8"/><text x="310" y="340" text-anchor="middle">score hotels</text><text class="small" x="310" y="358" text-anchor="middle">tiers, grades, quotes</text>
+  <rect class="file" x="430" y="312" width="170" height="64" rx="8"/><text x="515" y="340" text-anchor="middle">hotel_results</text><text class="small" x="515" y="358" text-anchor="middle">data/demo/, committed</text>
+  <rect class="box" x="635" y="312" width="170" height="64" rx="8"/><text x="720" y="340" text-anchor="middle">validate</text><text class="small" x="720" y="358" text-anchor="middle">docs/model/TIERS.md</text>
+  <rect class="file" x="840" y="312" width="180" height="64" rx="8"/><text x="930" y="340" text-anchor="middle">tier_policy.yaml</text><text class="small" x="930" y="358" text-anchor="middle">values from ADR 006</text>
+  <path class="arrow" d="M190 344 H221"/><path class="arrow" d="M395 344 H426"/>
+  <path class="arrow" d="M105 376 C 105 412, 720 412, 720 380"/>
+  <path class="arrow" d="M840 330 C 700 290, 420 290, 330 308"/>
+  <path class="arrow" d="M860 376 C 860 400, 760 404, 750 380"/>
+</svg>
+<figcaption>Large or re-downloadable files (raw CSVs, processed tables, base weights, training runs, packages, part scores) stay local and git-ignored; labels, evaluations, manifests, the package metadata and the hotel results are committed.</figcaption>
+</figure>
+
+<h2 id="online">3. Online deployment and trust boundaries</h2>
+<p>The web container serves the app; the API is also published on
+127.0.0.1:8000 (docs and direct API) for local use. Postgres has no
+network: it listens only on a Unix socket in a volume that only the db and
+API containers mount. Over that socket the API's role, which is not a
+superuser, connects; the superuser only by peer authentication, from inside
+the db container.</p>
+<figure>
+<svg viewBox="0 0 1040 400" role="img" aria-labelledby="c-title c-desc">
+  <title id="c-title">Online deployment with trust boundaries</title>
+  <desc id="c-desc">The browser reaches nginx on 127.0.0.1 port 8080. On the frontend network, nginx at 172.28.0.10 proxies /api to the API on port 8000. The API reaches Postgres as the non-superuser role curator through a Unix socket in the db-socket volume; the superuser connects only by peer authentication from inside the db container; Postgres has no network. Dashed orange lines mark trust boundaries, each listing its controls.</desc>
+  <rect class="box" x="20" y="150" width="120" height="60" rx="8"/><text x="80" y="185" text-anchor="middle">Browser</text>
+  <rect class="boundary" x="170" y="20" width="850" height="360" rx="14"/>
+  <text class="label" x="186" y="42">DOCKER HOST: ports on 127.0.0.1 only; no-new-privileges on every container</text>
+
+  <rect class="zone" x="190" y="60" width="480" height="230" rx="10"/>
+  <text class="small" x="204" y="80">frontend network 172.28.0.0/24</text>
+  <rect class="accent" x="210" y="120" width="200" height="120" rx="8"/>
+  <text x="310" y="146" text-anchor="middle">web  :8080</text>
+  <text class="small" x="310" y="166" text-anchor="middle">nginx-unprivileged, 172.28.0.10</text>
+  <text class="small" x="310" y="184" text-anchor="middle">static app, CSP, security headers</text>
+  <text class="small" x="310" y="202" text-anchor="middle">64 KB body cap</text>
+  <text class="small" x="310" y="220" text-anchor="middle">/api/ proxied to api:8000</text>
+  <rect class="accent" x="450" y="120" width="200" height="120" rx="8"/>
+  <text x="550" y="146" text-anchor="middle">api  :8000</text>
+  <text class="small" x="550" y="166" text-anchor="middle">FastAPI, uid 10001, read-only FS</text>
+  <text class="small" x="550" y="184" text-anchor="middle">rate limits, request ids</text>
+  <text class="small" x="550" y="202" text-anchor="middle">strict input patterns</text>
+  <text class="small" x="550" y="220" text-anchor="middle">ONNX model in process</text>
+
+  <rect class="boundary" x="720" y="60" width="280" height="150" rx="10"/>
+  <text class="small" x="734" y="80">no network (listen_addresses empty)</text>
+  <rect class="box" x="760" y="96" width="200" height="90" rx="8"/>
+  <text x="860" y="124" text-anchor="middle">db</text>
+  <text class="small" x="860" y="144" text-anchor="middle">Postgres 16</text>
+  <text class="small" x="860" y="162" text-anchor="middle">socket: role curator; superuser</text>
+  <text class="small" x="860" y="178" text-anchor="middle">only by peer, inside db</text>
+
+  <rect class="box" x="720" y="240" width="280" height="54" rx="8"/>
+  <text x="860" y="263" text-anchor="middle">db-socket volume</text>
+  <text class="small" x="860" y="281" text-anchor="middle">mounted by db and api only</text>
+  <rect class="file" x="190" y="310" width="480" height="54" rx="8"/>
+  <text x="430" y="333" text-anchor="middle">baked into the api image</text>
+  <text class="small" x="430" y="351" text-anchor="middle">model package, promotion.json, hotel results, tier policy</text>
+
+  <path class="arrow" d="M140 180 H206"/>
+  <text class="small" x="173" y="170" text-anchor="middle">:8080</text>
+  <path class="arrow" d="M410 180 H446"/>
+  <text class="small" x="428" y="170" text-anchor="middle">/api</text>
+  <path class="arrow" d="M650 200 C 690 210, 690 262, 716 266"/>
+  <text class="small" x="712" y="286" text-anchor="end">SQL as role</text>
+  <text class="small" x="712" y="300" text-anchor="end">curator</text>
+  <path class="arrow" d="M860 240 V190"/>
+  <path class="arrow dashed" d="M550 306 V244"/>
+</svg>
+<figcaption>Only the API's root filesystem is read-only; the API (uid 10001) and web (uid 101) run as non-root, and Postgres drops to its own user after its entrypoint. Rate limits key on the client address; the API trusts <code>X-Forwarded-For</code> only from the web container. In laptop compose the Docker gateway rewrites client addresses, so every client on the host shares one bucket (an accepted risk in the security review). The role rules apply to a data volume initialised with <code>docker/db-init</code>.</figcaption>
+</figure>
+
+<h2 id="request">4. Request flow: a hotel page</h2>
+<p>Hotel results are computed offline; the hotel itself is one primary-key
+lookup of the stored detail and a schema-validated JSON response (the app
+shell also fetches <code>/v1/meta</code> and <code>/v1/cities</code>). Live inference
+happens only for <code>POST /v1/analyze</code>, which stores nothing and does not
+echo text.</p>
+<figure>
+<svg viewBox="0 0 1040 360" role="img" aria-labelledby="r-title r-desc">
+  <title id="r-title">Hotel page request sequence</title>
+  <desc id="r-desc">The browser loads the single-page app from nginx, then requests /api/v1/hotels/id; nginx forwards to the API, which assigns a request id, applies the rate limit and checks the id pattern, reads the stored hotel detail from Postgres by primary key with a bound parameter, and returns validated JSON.</desc>
+  <rect class="box" x="40" y="20" width="140" height="40" rx="6"/><text x="110" y="45" text-anchor="middle">Browser</text>
+  <rect class="accent" x="310" y="20" width="140" height="40" rx="6"/><text x="380" y="45" text-anchor="middle">web (nginx)</text>
+  <rect class="accent" x="580" y="20" width="140" height="40" rx="6"/><text x="650" y="45" text-anchor="middle">API</text>
+  <rect class="box" x="850" y="20" width="140" height="40" rx="6"/><text x="920" y="45" text-anchor="middle">Postgres</text>
+  <line class="lifeline" x1="110" y1="60" x2="110" y2="340"/><line class="lifeline" x1="380" y1="60" x2="380" y2="340"/>
+  <line class="lifeline" x1="650" y1="60" x2="650" y2="340"/><line class="lifeline" x1="920" y1="60" x2="920" y2="340"/>
+  <path class="arrow" d="M110 95 H375"/><text x="245" y="88" text-anchor="middle" class="small">GET /hotels/h_0a1b2c3d4e</text>
+  <path class="arrow dashed" d="M380 125 H115"/><text x="247" y="118" text-anchor="middle" class="small">index.html + JS</text>
+  <path class="arrow" d="M110 165 H375"/><text x="245" y="158" text-anchor="middle" class="small">GET /api/v1/hotels/h_0a1b2c3d4e</text>
+  <path class="arrow" d="M380 195 H645"/><text x="513" y="188" text-anchor="middle" class="small">GET /v1/hotels/h_0a1b2c3d4e</text>
+  <text x="660" y="222" class="small">request id, rate limit, id pattern</text>
+  <path class="arrow" d="M650 250 H915"/><text x="783" y="243" text-anchor="middle" class="small">SELECT ... WHERE hotel_id = :id (primary key)</text>
+  <path class="arrow dashed" d="M920 280 H655"/><text x="787" y="273" text-anchor="middle" class="small">stored HotelDetail</text>
+  <path class="arrow dashed" d="M650 310 H115"/><text x="382" y="303" text-anchor="middle" class="small">200: tier, grades, why, quotes, trends, segments</text>
+</svg>
+<figcaption>Every API error uses one shape, {"error": {"code", "message", "request_id"}}, with "fields" added on validation errors; errors nginx generates itself (a body over 64 KB, the API unreachable) are nginx pages.</figcaption>
+</figure>
+</main>
+</body>
+</html>

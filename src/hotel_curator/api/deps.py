@@ -1,35 +1,27 @@
-"""FastAPI dependency injection: singleton model + DB session."""
+"""FastAPI dependencies: state, database session."""
 
-import logging
-from functools import lru_cache
-from pathlib import Path
+from collections.abc import Iterator
+from typing import Annotated
 
-import torch
+from fastapi import Depends, Request
+from sqlalchemy.orm import Session
 
-from hotel_curator.core.classifier import (
-    ModelBundle,
-    load_model_bundle,
-)
-from hotel_curator.settings import settings
-
-logger = logging.getLogger(__name__)
+from hotel_curator.api.state import AppState
 
 
-@lru_cache(maxsize=1)
-def get_model_bundle() -> ModelBundle:
-    """Load model once at startup; cached for all requests."""
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    logger.info(
-        "Loading model from %s (device=%s, thresholds=%s)",
-        settings.model_dir, device, settings.threshold_set,
-    )
-    return load_model_bundle(
-        settings.model_dir,
-        device=device,
-        threshold_set=settings.threshold_set,
-    )
+def get_state(request: Request) -> AppState:
+    """The application state created in the lifespan."""
+    state: AppState = request.app.state.curator
+    return state
 
 
-def get_device() -> str:
-    """Resolve device string."""
-    return "cuda" if torch.cuda.is_available() else "cpu"
+def get_session(
+    state: Annotated[AppState, Depends(get_state)],
+) -> Iterator[Session]:
+    """A read-only session per request."""
+    with state.sessions() as session:
+        yield session
+
+
+StateDep = Annotated[AppState, Depends(get_state)]
+SessionDep = Annotated[Session, Depends(get_session)]

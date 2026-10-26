@@ -5,25 +5,58 @@ __pycache__/
 dist/
 build/
 .eggs/
-
-# Credentials
-.env
-
-# Environments
 .venv/
 venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 
-# IDE
+# Credentials (never commit; see .env.example)
+.env
+.env.*
+# Local compose overrides (may hold a database URL with a password)
+docker-compose.override.yml
+!.env.example
+
+# Data that is rebuilt by `make data` (manifests in data/manifests are committed)
+data/raw/
+data/processed/
+# Evaluation-only external data with unverified licences (never committed)
+data/external/
+*.part
+
+# Runtime state
+var/
+*.db
+*.db-journal
+mlruns/
+mlflow.db
+
+# Model training scratch (the promoted package lives in artifacts/models/<rung>/)
+checkpoints/
+artifacts/models/*/checkpoint/
+# The promoted model's weights go through Git LFS, which this build
+# environment cannot reach (docs/BLOCKERS.md B8); add with `git add -f`.
+artifacts/models/*/model.onnx
+
+# Frontend
+node_modules/
+web/dist/
+web/playwright-report/
+web/test-results/
+web/coverage/
+
+# IDE / OS
 .idea/
 .vscode/
 *.swp
-
-# OS
 .DS_Store
 Thumbs.db
-
-# Jupyter
 .ipynb_checkpoints/
 
-# SQLite runtime DB
-*.db
+# Panel prompts are rebuilt from the committed samples (`curator label prompts`)
+data/labels/*/prompts/

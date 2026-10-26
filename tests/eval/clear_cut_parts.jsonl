@@ -1,0 +1,32 @@
+{"part": "liked", "text": "The room was spotless and the bathroom sparkling clean", "labels": ["cleanliness_positive"]}
+{"part": "liked", "text": "Everything was very clean and well kept", "labels": ["cleanliness_positive"]}
+{"part": "disliked", "text": "The bathroom was dirty with hair in the shower", "labels": ["cleanliness_negative"]}
+{"part": "disliked", "text": "Dusty carpet and stained sheets", "labels": ["cleanliness_negative"]}
+{"part": "liked", "text": "Spacious room with a very comfortable bed", "labels": ["room_positive"]}
+{"part": "liked", "text": "Lovely big room and a great comfy bed", "labels": ["room_positive"]}
+{"part": "disliked", "text": "The room was tiny and the bed was uncomfortable", "labels": ["room_negative"]}
+{"part": "disliked", "text": "Very small room with a broken shower", "labels": ["room_negative"]}
+{"part": "liked", "text": "The staff were friendly and very helpful", "labels": ["staff_positive"]}
+{"part": "liked", "text": "Reception staff went out of their way to help us", "labels": ["staff_positive"]}
+{"part": "disliked", "text": "The receptionist was rude and unhelpful", "labels": ["staff_negative"]}
+{"part": "disliked", "text": "Staff were unfriendly and ignored our requests", "labels": ["staff_negative"]}
+{"part": "liked", "text": "Great location close to the metro and the main sights", "labels": ["location_positive"]}
+{"part": "liked", "text": "Perfect location in the centre within walking distance of everything", "labels": ["location_positive"]}
+{"part": "disliked", "text": "The location is far from everything and the area felt unsafe at night", "labels": ["location_negative"]}
+{"part": "disliked", "text": "Bad location a long way from the centre", "labels": ["location_negative"]}
+{"part": "liked", "text": "The room was very quiet and we slept well", "labels": ["noise_positive"]}
+{"part": "liked", "text": "Nice and quiet despite being central", "labels": ["noise_positive"]}
+{"part": "disliked", "text": "Very noisy at night from the street and the bar downstairs", "labels": ["noise_negative"]}
+{"part": "disliked", "text": "Thin walls we could hear the neighbours all night", "labels": ["noise_negative"]}
+{"part": "liked", "text": "Fast free wifi throughout the hotel", "labels": ["wifi_positive"]}
+{"part": "liked", "text": "The wifi was excellent and reliable", "labels": ["wifi_positive"]}
+{"part": "disliked", "text": "The wifi kept dropping and was very slow", "labels": ["wifi_negative"]}
+{"part": "disliked", "text": "No internet connection in the room", "labels": ["wifi_negative"]}
+{"part": "liked", "text": "Great value for money", "labels": ["value_positive"]}
+{"part": "liked", "text": "Very reasonable price for such a good hotel", "labels": ["value_positive"]}
+{"part": "disliked", "text": "Far too expensive for what you get", "labels": ["value_negative"]}
+{"part": "disliked", "text": "Overpriced and not worth the money", "labels": ["value_negative"]}
+{"part": "liked", "text": "Delicious breakfast with lots of choice", "labels": ["food_positive"]}
+{"part": "liked", "text": "The restaurant food was excellent", "labels": ["food_positive"]}
+{"part": "disliked", "text": "Breakfast was poor with cold food and little choice", "labels": ["food_negative"]}
+{"part": "disliked", "text": "The food in the restaurant was bland and overpriced", "labels": ["food_negative", "value_negative"]}

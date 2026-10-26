@@ -1,0 +1,901 @@
+{
+ "summary": {
+  "name": "bge-small-logreg",
+  "family": "embedding",
+  "level": "part",
+  "dev_review_macro_f1": 0.8573887136913505,
+  "test_review_macro_f1": 0.8114910658648985,
+  "test_review_macro_f1_low": 0.7968187860333249,
+  "test_review_macro_f1_high": 0.8234628305978513,
+  "test_review_micro_f1": 0.8553320473959769,
+  "test_part_macro_f1": 0.8053301344458028,
+  "test_mean_review_ece": 0.018850372411886543,
+  "test_review_brier": 0.038952972382211945,
+  "test_cross_polarity_f1": 0.3343465045592705,
+  "seconds_embed_all_sets": 47.04101057900061,
+  "seconds_train": 12.366568613999334
+ },
+ "params": {
+  "base": "bge-small",
+  "C": 4.0,
+  "seed": 20261024
+ },
+ "dev": {
+  "model": "bge-small-logreg",
+  "n_parts": 1030,
+  "n_reviews": 594,
+  "n_hotels": 142,
+  "review_macro_f1": {
+   "point": 0.8573887136913505,
+   "low": 0.8365819126866687,
+   "high": 0.874472168578285
+  },
+  "review_micro_f1": 0.884256719692814,
+  "part_macro_f1": {
+   "point": 0.8513516775958931,
+   "low": 0.829712483546037,
+   "high": 0.8686684270033347
+  },
+  "part_micro_f1": 0.8761853156326199,
+  "per_label": [
+   {
+    "label": "cleanliness_positive",
+    "support": 108,
+    "tp": 100,
+    "fp": 2,
+    "fn": 8,
+    "precision": 0.9803921568627451,
+    "recall": 0.9259259259259259,
+    "f1": 0.9523809523809523
+   },
+   {
+    "label": "cleanliness_negative",
+    "support": 44,
+    "tp": 37,
+    "fp": 22,
+    "fn": 7,
+    "precision": 0.6271186440677966,
+    "recall": 0.8409090909090909,
+    "f1": 0.7184466019417476
+   },
+   {
+    "label": "room_positive",
+    "support": 251,
+    "tp": 234,
+    "fp": 45,
+    "fn": 17,
+    "precision": 0.8387096774193549,
+    "recall": 0.9322709163346613,
+    "f1": 0.8830188679245283
+   },
+   {
+    "label": "room_negative",
+    "support": 227,
+    "tp": 205,
+    "fp": 43,
+    "fn": 22,
+    "precision": 0.8266129032258065,
+    "recall": 0.9030837004405287,
+    "f1": 0.8631578947368421
+   },
+   {
+    "label": "staff_positive",
+    "support": 265,
+    "tp": 248,
+    "fp": 13,
+    "fn": 17,
+    "precision": 0.9501915708812261,
+    "recall": 0.9358490566037736,
+    "f1": 0.9429657794676806
+   },
+   {
+    "label": "staff_negative",
+    "support": 88,
+    "tp": 66,
+    "fp": 10,
+    "fn": 22,
+    "precision": 0.868421052631579,
+    "recall": 0.75,
+    "f1": 0.8048780487804879
+   },
+   {
+    "label": "location_positive",
+    "support": 300,
+    "tp": 282,
+    "fp": 11,
+    "fn": 18,
+    "precision": 0.962457337883959,
+    "recall": 0.94,
+    "f1": 0.9510961214165261
+   },
+   {
+    "label": "location_negative",
+    "support": 53,
+    "tp": 40,
+    "fp": 17,
+    "fn": 13,
+    "precision": 0.7017543859649122,
+    "recall": 0.7547169811320755,
+    "f1": 0.7272727272727273
+   },
+   {
+    "label": "noise_positive",
+    "support": 28,
+    "tp": 26,
+    "fp": 8,
+    "fn": 2,
+    "precision": 0.7647058823529411,
+    "recall": 0.9285714285714286,
+    "f1": 0.8387096774193549
+   },
+   {
+    "label": "noise_negative",
+    "support": 36,
+    "tp": 29,
+    "fp": 0,
+    "fn": 7,
+    "precision": 1.0,
+    "recall": 0.8055555555555556,
+    "f1": 0.8923076923076924
+   },
+   {
+    "label": "wifi_positive",
+    "support": 25,
+    "tp": 21,
+    "fp": 1,
+    "fn": 4,
+    "precision": 0.9545454545454546,
+    "recall": 0.84,
+    "f1": 0.8936170212765957
+   },
+   {
+    "label": "wifi_negative",
+    "support": 58,
+    "tp": 57,
+    "fp": 3,
+    "fn": 1,
+    "precision": 0.95,
+    "recall": 0.9827586206896551,
+    "f1": 0.9661016949152542
+   },
+   {
+    "label": "value_positive",
+    "support": 32,
+    "tp": 24,
+    "fp": 2,
+    "fn": 8,
+    "precision": 0.9230769230769231,
+    "recall": 0.75,
+    "f1": 0.8275862068965517
+   },
+   {
+    "label": "value_negative",
+    "support": 94,
+    "tp": 78,
+    "fp": 17,
+    "fn": 16,
+    "precision": 0.8210526315789474,
+    "recall": 0.8297872340425532,
+    "f1": 0.8253968253968254
+   },
+   {
+    "label": "food_positive",
+    "support": 128,
+    "tp": 115,
+    "fp": 22,
+    "fn": 13,
+    "precision": 0.8394160583941606,
+    "recall": 0.8984375,
+    "f1": 0.8679245283018868
+   },
+   {
+    "label": "food_negative",
+    "support": 62,
+    "tp": 50,
+    "fp": 19,
+    "fn": 12,
+    "precision": 0.7246376811594203,
+    "recall": 0.8064516129032258,
+    "f1": 0.7633587786259542
+   }
+  ],
+  "ece": {
+   "cleanliness_positive": 0.0024074155604105188,
+   "cleanliness_negative": 0.003962840620899982,
+   "room_positive": 0.004050698462493844,
+   "room_negative": 0.010598954859128285,
+   "staff_positive": 0.005467028188657289,
+   "staff_negative": 0.0034038114199598643,
+   "location_positive": 0.0092354654554168,
+   "location_negative": 0.00981368012132153,
+   "noise_positive": 0.0033846600004405506,
+   "noise_negative": 0.0021728717991896284,
+   "wifi_positive": 0.0018008507818890608,
+   "wifi_negative": 0.0005267631508319464,
+   "value_positive": 0.002032903583517724,
+   "value_negative": 0.008912377738169035,
+   "food_positive": 0.0034925046560082586,
+   "food_negative": 0.004049845081453726
+  },
+  "review_ece": {
+   "cleanliness_positive": 0.004342814107763376,
+   "cleanliness_negative": 0.006874967395392271,
+   "room_positive": 0.013293013772739951,
+   "room_negative": 0.023088427185625062,
+   "staff_positive": 0.011105944253173525,
+   "staff_negative": 0.007174235865164451,
+   "location_positive": 0.011548352278465233,
+   "location_negative": 0.01989450748684034,
+   "noise_positive": 0.0075154111731534365,
+   "noise_negative": 0.00416889292092715,
+   "wifi_positive": 0.003133293362440313,
+   "wifi_negative": 0.0009686994233048501,
+   "value_positive": 0.0035684134269007976,
+   "value_negative": 0.01726995811415289,
+   "food_positive": 0.006758642009667527,
+   "food_negative": 0.00683312294628845
+  },
+  "review_brier": 0.03268084005124019,
+  "calibration_in_the_large": {
+   "cleanliness_positive": [
+    0.17629362178406138,
+    0.17676538072940023
+   ],
+   "cleanliness_negative": [
+    0.06223620187558673,
+    0.06223741967165066
+   ],
+   "room_positive": [
+    0.403190914416488,
+    0.40566946706771756
+   ],
+   "room_negative": [
+    0.3996446378701184,
+    0.39572258878216576
+   ],
+   "staff_positive": [
+    0.44668821666045855,
+    0.44659579808061095
+   ],
+   "staff_negative": [
+    0.1416437806072738,
+    0.13991395378124488
+   ],
+   "location_positive": [
+    0.4976266974608947,
+    0.4956466808019393
+   ],
+   "location_negative": [
+    0.03790557464866996,
+    0.038370081970908444
+   ],
+   "noise_positive": [
+    0.054626367966811404,
+    0.05251834459369413
+   ],
+   "noise_negative": [
+    0.0558273059427045,
+    0.055833970688878035
+   ],
+   "wifi_positive": [
+    0.0151822279526865,
+    0.015186054809307079
+   ],
+   "wifi_negative": [
+    0.035214547792380826,
+    0.03523164715759242
+   ],
+   "value_positive": [
+    0.05384038205584747,
+    0.053404201919388904
+   ],
+   "value_negative": [
+    0.12905982770969757,
+    0.12811949249753501
+   ],
+   "food_positive": [
+    0.21510781014852692,
+    0.21670463056514436
+   ],
+   "food_negative": [
+    0.09925108671005317,
+    0.09941787367885581
+   ]
+  },
+  "cross_polarity": {
+   "support": 80.0,
+   "precision": 0.45901639344262296,
+   "recall": 0.35,
+   "f1": 0.3971631205673759
+  },
+  "slices": [
+   {
+    "name": "part=liked",
+    "level": "part",
+    "n_items": 552,
+    "macro_f1": {
+     "point": 0.6326430160137754,
+     "low": 0.5621732387604358,
+     "high": 0.7501731610744548
+    }
+   },
+   {
+    "name": "part=disliked",
+    "level": "part",
+    "n_items": 478,
+    "macro_f1": {
+     "point": 0.5487366195711649,
+     "low": 0.4938072338220178,
+     "high": 0.6400288541645016
+    }
+   },
+   {
+    "name": "stratum=enriched",
+    "level": "review",
+    "n_items": 180,
+    "macro_f1": {
+     "point": 0.8368034160763129,
+     "low": 0.7894947729768379,
+     "high": 0.8622579301470206
+    }
+   },
+   {
+    "name": "stratum=uniform",
+    "level": "review",
+    "n_items": 414,
+    "macro_f1": {
+     "point": 0.8286293872346214,
+     "low": 0.7899584040834386,
+     "high": 0.8602924465525057
+    }
+   },
+   {
+    "name": "city=Amsterdam",
+    "level": "review",
+    "n_items": 51,
+    "macro_f1": {
+     "point": 0.8796397418506187,
+     "low": 0.761055054198867,
+     "high": 0.9337145146072249
+    }
+   },
+   {
+    "name": "city=Barcelona",
+    "level": "review",
+    "n_items": 70,
+    "macro_f1": {
+     "point": 0.8800997973221888,
+     "low": 0.7966470889214992,
+     "high": 0.9158787974375382
+    }
+   },
+   {
+    "name": "city=London",
+    "level": "review",
+    "n_items": 337,
+    "macro_f1": {
+     "point": 0.8406628897673762,
+     "low": 0.7989211324294097,
+     "high": 0.8659080372804745
+    }
+   },
+   {
+    "name": "city=Milan",
+    "level": "review",
+    "n_items": 43,
+    "macro_f1": {
+     "point": 0.777766225809754,
+     "low": 0.6897537816589541,
+     "high": 0.8660820114872815
+    }
+   },
+   {
+    "name": "city=Paris",
+    "level": "review",
+    "n_items": 51,
+    "macro_f1": {
+     "point": 0.8233347617571629,
+     "low": 0.7022743669418338,
+     "high": 0.8979591378699371
+    }
+   },
+   {
+    "name": "city=Vienna",
+    "level": "review",
+    "n_items": 42,
+    "macro_f1": {
+     "point": 0.8627900579624718,
+     "low": 0.7774037850089869,
+     "high": 0.8855107128980674
+    }
+   },
+   {
+    "name": "words<10",
+    "level": "review",
+    "n_items": 114,
+    "macro_f1": {
+     "point": 0.869416591320616,
+     "low": 0.7671861954206795,
+     "high": 0.9253569919301103
+    }
+   },
+   {
+    "name": "words10-39",
+    "level": "review",
+    "n_items": 291,
+    "macro_f1": {
+     "point": 0.873166480868104,
+     "low": 0.8347323494031216,
+     "high": 0.8980358083870759
+    }
+   },
+   {
+    "name": "words40+",
+    "level": "review",
+    "n_items": 189,
+    "macro_f1": {
+     "point": 0.8301333649629759,
+     "low": 0.7930297894334464,
+     "high": 0.8552491908598352
+    }
+   }
+  ],
+  "thresholds": {
+   "cleanliness_positive": 0.7966537971870079,
+   "cleanliness_negative": 0.7128988641519363,
+   "room_positive": 0.5687633016892235,
+   "room_negative": 0.5806875546115158,
+   "staff_positive": 0.6205920168103795,
+   "staff_negative": 0.8688188816236376,
+   "location_positive": 0.7633372163407043,
+   "location_negative": 0.7462264201686133,
+   "noise_positive": 0.7321277773120874,
+   "noise_negative": 0.8939162982617793,
+   "wifi_positive": 0.8664849380516223,
+   "wifi_negative": 0.8498736446502182,
+   "value_positive": 0.8765391528531455,
+   "value_negative": 0.8734677745062311,
+   "food_positive": 0.695874188127627,
+   "food_negative": 0.8599896242996199
+  }
+ },
+ "test": {
+  "model": "bge-small-logreg",
+  "n_parts": 2060,
+  "n_reviews": 1200,
+  "n_hotels": 182,
+  "review_macro_f1": {
+   "point": 0.8114910658648985,
+   "low": 0.7968187860333249,
+   "high": 0.8234628305978513
+  },
+  "review_micro_f1": 0.8553320473959769,
+  "part_macro_f1": {
+   "point": 0.8053301344458028,
+   "low": 0.7904855822454802,
+   "high": 0.8177899103880243
+  },
+  "part_micro_f1": 0.8469692851318293,
+  "per_label": [
+   {
+    "label": "cleanliness_positive",
+    "support": 225,
+    "tp": 192,
+    "fp": 11,
+    "fn": 33,
+    "precision": 0.9458128078817734,
+    "recall": 0.8533333333333334,
+    "f1": 0.897196261682243
+   },
+   {
+    "label": "cleanliness_negative",
+    "support": 84,
+    "tp": 67,
+    "fp": 61,
+    "fn": 17,
+    "precision": 0.5234375,
+    "recall": 0.7976190476190477,
+    "f1": 0.6320754716981132
+   },
+   {
+    "label": "room_positive",
+    "support": 506,
+    "tp": 454,
+    "fp": 98,
+    "fn": 52,
+    "precision": 0.822463768115942,
+    "recall": 0.8972332015810277,
+    "f1": 0.8582230623818525
+   },
+   {
+    "label": "room_negative",
+    "support": 438,
+    "tp": 404,
+    "fp": 105,
+    "fn": 34,
+    "precision": 0.793713163064833,
+    "recall": 0.9223744292237442,
+    "f1": 0.853220696937698
+   },
+   {
+    "label": "staff_positive",
+    "support": 551,
+    "tp": 515,
+    "fp": 34,
+    "fn": 36,
+    "precision": 0.9380692167577414,
+    "recall": 0.9346642468239564,
+    "f1": 0.9363636363636364
+   },
+   {
+    "label": "staff_negative",
+    "support": 158,
+    "tp": 113,
+    "fp": 23,
+    "fn": 45,
+    "precision": 0.8308823529411765,
+    "recall": 0.7151898734177216,
+    "f1": 0.7687074829931972
+   },
+   {
+    "label": "location_positive",
+    "support": 578,
+    "tp": 511,
+    "fp": 30,
+    "fn": 67,
+    "precision": 0.944547134935305,
+    "recall": 0.884083044982699,
+    "f1": 0.9133154602323503
+   },
+   {
+    "label": "location_negative",
+    "support": 115,
+    "tp": 84,
+    "fp": 38,
+    "fn": 31,
+    "precision": 0.6885245901639344,
+    "recall": 0.7304347826086957,
+    "f1": 0.7088607594936709
+   },
+   {
+    "label": "noise_positive",
+    "support": 66,
+    "tp": 52,
+    "fp": 20,
+    "fn": 14,
+    "precision": 0.7222222222222222,
+    "recall": 0.7878787878787878,
+    "f1": 0.7536231884057971
+   },
+   {
+    "label": "noise_negative",
+    "support": 102,
+    "tp": 79,
+    "fp": 3,
+    "fn": 23,
+    "precision": 0.9634146341463414,
+    "recall": 0.7745098039215687,
+    "f1": 0.8586956521739131
+   },
+   {
+    "label": "wifi_positive",
+    "support": 75,
+    "tp": 53,
+    "fp": 1,
+    "fn": 22,
+    "precision": 0.9814814814814815,
+    "recall": 0.7066666666666667,
+    "f1": 0.8217054263565892
+   },
+   {
+    "label": "wifi_negative",
+    "support": 105,
+    "tp": 96,
+    "fp": 6,
+    "fn": 9,
+    "precision": 0.9411764705882353,
+    "recall": 0.9142857142857143,
+    "f1": 0.927536231884058
+   },
+   {
+    "label": "value_positive",
+    "support": 61,
+    "tp": 40,
+    "fp": 15,
+    "fn": 21,
+    "precision": 0.7272727272727273,
+    "recall": 0.6557377049180327,
+    "f1": 0.6896551724137931
+   },
+   {
+    "label": "value_negative",
+    "support": 142,
+    "tp": 112,
+    "fp": 18,
+    "fn": 30,
+    "precision": 0.8615384615384616,
+    "recall": 0.7887323943661971,
+    "f1": 0.8235294117647058
+   },
+   {
+    "label": "food_positive",
+    "support": 276,
+    "tp": 257,
+    "fp": 63,
+    "fn": 19,
+    "precision": 0.803125,
+    "recall": 0.9311594202898551,
+    "f1": 0.8624161073825504
+   },
+   {
+    "label": "food_negative",
+    "support": 117,
+    "tp": 75,
+    "fp": 29,
+    "fn": 42,
+    "precision": 0.7211538461538461,
+    "recall": 0.6410256410256411,
+    "f1": 0.6787330316742082
+   }
+  ],
+  "ece": {
+   "cleanliness_positive": 0.012874023238605828,
+   "cleanliness_negative": 0.010438176591409063,
+   "room_positive": 0.014127142732358041,
+   "room_negative": 0.024283223138587485,
+   "staff_positive": 0.014494961868787922,
+   "staff_negative": 0.009953727786069939,
+   "location_positive": 0.020339798330576656,
+   "location_negative": 0.013603172242000111,
+   "noise_positive": 0.007565422072858326,
+   "noise_negative": 0.007081678897116019,
+   "wifi_positive": 0.009027588861185539,
+   "wifi_negative": 0.004863263277231364,
+   "value_positive": 0.00933493894137653,
+   "value_negative": 0.007631134674883498,
+   "food_positive": 0.01192178971434628,
+   "food_negative": 0.010463071085380202
+  },
+  "review_ece": {
+   "cleanliness_positive": 0.02119048869029176,
+   "cleanliness_negative": 0.01886264238641651,
+   "room_positive": 0.023361078930830347,
+   "room_negative": 0.04103115511636903,
+   "staff_positive": 0.020034898003050184,
+   "staff_negative": 0.016085302819744286,
+   "location_positive": 0.030247132906674246,
+   "location_negative": 0.020766510850427067,
+   "noise_positive": 0.012387974086180219,
+   "noise_negative": 0.011430381400700029,
+   "wifi_positive": 0.015497641153511692,
+   "wifi_negative": 0.008372060110819767,
+   "value_positive": 0.01481693506587997,
+   "value_negative": 0.013937829429094316,
+   "food_positive": 0.018103345561732785,
+   "food_negative": 0.015480582078462484
+  },
+  "review_brier": 0.038952972382211945,
+  "calibration_in_the_large": {
+   "cleanliness_positive": [
+    0.16098544673447537,
+    0.16776227887339
+   ],
+   "cleanliness_negative": [
+    0.06820828003735048,
+    0.059721488620859686
+   ],
+   "room_positive": [
+    0.39420958775888165,
+    0.3991731127789828
+   ],
+   "room_negative": [
+    0.3896652979096974,
+    0.357104911549356
+   ],
+   "staff_positive": [
+    0.45027116863287336,
+    0.4489626372540419
+   ],
+   "staff_negative": [
+    0.13329666466352197,
+    0.12377157821602267
+   ],
+   "location_positive": [
+    0.45951364910697134,
+    0.4700474798902472
+   ],
+   "location_negative": [
+    0.04252604987891905,
+    0.04555800593536443
+   ],
+   "noise_positive": [
+    0.05588758516900509,
+    0.0518717574063486
+   ],
+   "noise_negative": [
+    0.07061945496101182,
+    0.07427459682176663
+   ],
+   "wifi_positive": [
+    0.018804526761091855,
+    0.023396967579357518
+   ],
+   "wifi_negative": [
+    0.031546121257383465,
+    0.03275575461110052
+   ],
+   "value_positive": [
+    0.056652684967583515,
+    0.048077500572259485
+   ],
+   "value_negative": [
+    0.10266091489154369,
+    0.10835274982025506
+   ],
+   "food_positive": [
+    0.2353016810270029,
+    0.22016838041995274
+   ],
+   "food_negative": [
+    0.09534639408620996,
+    0.0975744819665155
+   ]
+  },
+  "cross_polarity": {
+   "support": 186.0,
+   "precision": 0.38461538461538464,
+   "recall": 0.2956989247311828,
+   "f1": 0.3343465045592705
+  },
+  "slices": [
+   {
+    "name": "part=liked",
+    "level": "part",
+    "n_items": 1128,
+    "macro_f1": {
+     "point": 0.6313826643414826,
+     "low": 0.5554531194419516,
+     "high": 0.679762109298872
+    }
+   },
+   {
+    "name": "part=disliked",
+    "level": "part",
+    "n_items": 932,
+    "macro_f1": {
+     "point": 0.49886919975524924,
+     "low": 0.46340840580956627,
+     "high": 0.5437973760636212
+    }
+   },
+   {
+    "name": "stratum=enriched",
+    "level": "review",
+    "n_items": 360,
+    "macro_f1": {
+     "point": 0.794891401909092,
+     "low": 0.7705757531672804,
+     "high": 0.814355028963849
+    }
+   },
+   {
+    "name": "stratum=uniform",
+    "level": "review",
+    "n_items": 840,
+    "macro_f1": {
+     "point": 0.7428200815464449,
+     "low": 0.7247878315818703,
+     "high": 0.8077391215262454
+    }
+   },
+   {
+    "name": "city=Amsterdam",
+    "level": "review",
+    "n_items": 155,
+    "macro_f1": {
+     "point": 0.7712356817366554,
+     "low": 0.7105106521165437,
+     "high": 0.8169998114595777
+    }
+   },
+   {
+    "name": "city=Barcelona",
+    "level": "review",
+    "n_items": 140,
+    "macro_f1": {
+     "point": 0.7963272104615892,
+     "low": 0.7441759170428135,
+     "high": 0.8226982051381639
+    }
+   },
+   {
+    "name": "city=London",
+    "level": "review",
+    "n_items": 556,
+    "macro_f1": {
+     "point": 0.8077684437513419,
+     "low": 0.7808333310528155,
+     "high": 0.8245726775770033
+    }
+   },
+   {
+    "name": "city=Milan",
+    "level": "review",
+    "n_items": 104,
+    "macro_f1": {
+     "point": 0.8172866662453029,
+     "low": 0.7508074880644166,
+     "high": 0.8571859970051207
+    }
+   },
+   {
+    "name": "city=Paris",
+    "level": "review",
+    "n_items": 135,
+    "macro_f1": {
+     "point": 0.7823682826198229,
+     "low": 0.7233758874949191,
+     "high": 0.8179506475412179
+    }
+   },
+   {
+    "name": "city=Vienna",
+    "level": "review",
+    "n_items": 110,
+    "macro_f1": {
+     "point": 0.8162350085596166,
+     "low": 0.7503177862925514,
+     "high": 0.8469943016104948
+    }
+   },
+   {
+    "name": "words<10",
+    "level": "review",
+    "n_items": 245,
+    "macro_f1": {
+     "point": 0.8765905245274848,
+     "low": 0.8202133987099075,
+     "high": 0.9078390761879586
+    }
+   },
+   {
+    "name": "words10-39",
+    "level": "review",
+    "n_items": 579,
+    "macro_f1": {
+     "point": 0.8544229192300506,
+     "low": 0.836242318306429,
+     "high": 0.870475308277956
+    }
+   },
+   {
+    "name": "words40+",
+    "level": "review",
+    "n_items": 376,
+    "macro_f1": {
+     "point": 0.7633148133263732,
+     "low": 0.7373493075902946,
+     "high": 0.782626077413325
+    }
+   }
+  ],
+  "thresholds": {
+   "cleanliness_positive": 0.7966537971870079,
+   "cleanliness_negative": 0.7128988641519363,
+   "room_positive": 0.5687633016892235,
+   "room_negative": 0.5806875546115158,
+   "staff_positive": 0.6205920168103795,
+   "staff_negative": 0.8688188816236376,
+   "location_positive": 0.7633372163407043,
+   "location_negative": 0.7462264201686133,
+   "noise_positive": 0.7321277773120874,
+   "noise_negative": 0.8939162982617793,
+   "wifi_positive": 0.8664849380516223,
+   "wifi_negative": 0.8498736446502182,
+   "value_positive": 0.8765391528531455,
+   "value_negative": 0.8734677745062311,
+   "food_positive": 0.695874188127627,
+   "food_negative": 0.8599896242996199
+  }
+ }
+}

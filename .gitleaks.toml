@@ -1,0 +1,19 @@
+# gitleaks configuration: the default rules, plus path allow-lists for
+# local state that v2 gitignores. v1 tracked data/processed/ (removed in
+# v2); a full-history scan with no allow-list finds nothing more
+# (docs/security/v2-security-review.md, section 4.1).
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "local caches, virtualenvs, dependencies and data (gitignored)"
+paths = [
+  '''(^|/)\.venv/''',
+  '''(^|/)node_modules/''',
+  '''(^|/)\.mypy_cache/''',
+  '''(^|/)\.ruff_cache/''',
+  '''(^|/)\.pytest_cache/''',
+  '''(^|/)var/''',
+  '''(^|/)data/(raw|processed|external)/''',
+  '''(^|/)web/(dist|test-results|playwright-report)/''',
+]

@@ -1,89 +1,35 @@
-"""CLI commands for Hotel Curator."""
+"""The ``curator`` command line: one sub-command per pipeline stage.
 
-import json
-from pathlib import Path
+Run ``curator --help`` for the list. Every stage reads and writes the
+locations defined in :mod:`hotel_curator.config`, so the Makefile targets
+are thin wrappers around these commands.
+"""
 
 import typer
 
+from hotel_curator.cli import data as data_cli
+from hotel_curator.cli import db as db_cli
+from hotel_curator.cli import label as label_cli
+from hotel_curator.cli import model as model_cli
+from hotel_curator.cli import score as score_cli
+from hotel_curator.config import get_settings
+from hotel_curator.logging import configure_logging
+
 app = typer.Typer(
     name="curator",
-    help="Hotel Curator -- CLI tools.",
+    help="hotel-curator v2: data, labels, models, scoring and serving.",
+    no_args_is_help=True,
 )
+app.add_typer(data_cli.app, name="data")
+app.add_typer(label_cli.app, name="label")
+app.add_typer(model_cli.app, name="model")
+app.add_typer(score_cli.app, name="score")
+app.add_typer(db_cli.app, name="db")
+app.command("serve")(db_cli.serve)
 
 
-@app.command()
-def serve(
-    host: str = "0.0.0.0",
-    port: int = 8000,
-    reload: bool = False,
-) -> None:
-    """Start the FastAPI server."""
-    import uvicorn
-
-    uvicorn.run(
-        "hotel_curator.api.app:app",
-        host=host,
-        port=port,
-        reload=reload,
-    )
-
-
-@app.command()
-def classify(
-    text: str = typer.Argument(..., help="Review text"),
-) -> None:
-    """Classify a single review from the command line."""
-    import torch
-
-    from hotel_curator.core.classifier import (
-        apply_thresholds,
-        infer_probs,
-        load_model_bundle,
-    )
-    from hotel_curator.settings import settings
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model, tokenizer, labels, thresholds = load_model_bundle(
-        settings.model_dir,
-        device=device,
-        threshold_set=settings.threshold_set,
-    )
-    probs = infer_probs(
-        model, tokenizer, [text],
-        max_length=settings.max_seq_length,
-        batch_size=1, device=device,
-    )
-    preds = apply_thresholds(probs, thresholds, labels)
-
-    typer.echo("Label predictions:")
-    for i, lbl in enumerate(labels):
-        flag = "*" if preds[0, i] else " "
-        typer.echo(
-            f"  {flag} {lbl:<26s} "
-            f"prob={probs[0, i]:.3f}"
-        )
-
-
-@app.command()
-def export_tiers(
-    output: Path = typer.Option(
-        "hotel_tiers.json", help="Output path",
-    ),
-) -> None:
-    """Export hotel tiers as JSON."""
-    import pandas as pd
-
-    path = Path("data/processed/hotel_tiers.parquet")
-    if not path.exists():
-        typer.echo(f"Not found: {path}. Run the pipeline.")
-        raise typer.Exit(code=1)
-
-    df = pd.read_parquet(path)
-    records = df.to_dict(orient="records")
-    with output.open("w") as f:
-        json.dump(records, f, indent=2)
-    typer.echo(f"Exported {len(records)} hotels to {output}")
-
-
-if __name__ == "__main__":
-    app()
+@app.callback()
+def main() -> None:
+    """Configure logging from settings before any command runs."""
+    settings = get_settings()
+    configure_logging(settings.log_level, settings.log_format)

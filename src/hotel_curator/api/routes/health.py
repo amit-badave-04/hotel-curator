@@ -1,24 +1,53 @@
-"""Health check endpoints."""
+"""Liveness and readiness probes."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Response
+from pydantic import BaseModel
+from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
 
-from hotel_curator.api.deps import get_device, get_model_bundle
-from hotel_curator.core.classifier import ModelBundle
-from hotel_curator.schema import HealthResponse
+from hotel_curator.api.deps import SessionDep, StateDep
+from hotel_curator.db.models import Hotel
 
 router = APIRouter(tags=["health"])
 
 
-@router.get("/health", response_model=HealthResponse)
-def health(
-    bundle: ModelBundle = Depends(get_model_bundle),
-    device: str = Depends(get_device),
-) -> HealthResponse:
-    """Health check: confirms model is loaded and ready."""
-    _, _, label_names, _ = bundle
-    return HealthResponse(
-        status="ok",
-        model_loaded=True,
-        num_labels=len(label_names),
-        device=device,
-    )
+class Health(BaseModel):
+    """Probe result."""
+
+    status: str
+    hotels: int | None = None
+    model: str | None = None
+
+
+@router.get(
+    "/healthz",
+    response_model=Health,
+    response_model_exclude_none=True,
+    summary="Liveness probe",
+)
+def healthz() -> Health:
+    """The process is up."""
+    return Health(status="ok")
+
+
+@router.get(
+    "/readyz",
+    response_model=Health,
+    response_model_exclude_none=True,
+    summary="Readiness probe",
+)
+def readyz(response: Response, session: SessionDep, state: StateDep) -> Health:
+    """Ready when the database answers and hotel data is loaded.
+
+    The model is reported but not required: search and details work without
+    it; only ``/v1/analyze`` needs it.
+    """
+    try:
+        hotels = session.scalar(select(func.count()).select_from(Hotel)) or 0
+    except SQLAlchemyError:
+        response.status_code = 503
+        return Health(status="database unavailable")
+    if hotels == 0:
+        response.status_code = 503
+        return Health(status="no hotel data loaded", hotels=0)
+    return Health(status="ready", hotels=hotels, model=state.model_name)
