@@ -26,16 +26,18 @@ are in [Reproduce everything](#reproduce-everything).
 | Difference, paired over the same reviews | **+0.236** [+0.216, +0.255] | |
 | Calibration (mean review-level ECE; lower is better) | 0.010 | 0.029 |
 | Served model | roberta-base fine-tuned on 8,006 labelled reviews, ONNX int8, gold-test 0.920 | |
-| Speed on 4 CPU threads | 224 review parts/s; the whole corpus in about 1.1 hours | |
+| Speed on 4 CPU threads | 224 review parts/s in a 20,000-part benchmark (about 1.1 hours for the corpus); the measured full run took 1.7 hours (5,987 s) | |
 
 Tiers for the 1,494 hotels: **Good 58, Fair 960, Caution 271**, not enough
-evidence 129, not enough reviews 76, **Excellent 0**. No hotel is Excellent
-because Excellent needs a confirmed strength in the room, and no hotel's
-share of praise for its room reaches the registered 80% line: Booking.com asks
-every guest what they disliked, and the room collects most of those
-complaints. The lines were fixed before any hotel was scored and were not
-moved after seeing this; [TIERS.md](docs/model/TIERS.md) shows how the mix
-would change with other lines. Grades from 2015-2016 predict what guests said
+evidence 129, not enough reviews 76, **Excellent 0**. No hotel is Excellent:
+Excellent needs cleanliness, room and staff all graded Strong, and Strong
+means at least 95% certain that 80% or more of the guests' opinions on it are
+praise. 64 hotels reach that for both cleanliness and staff, but none for the
+room (the closest is 94.1% certain). Booking.com asks every guest what they
+disliked, and the room collects most of those complaints. The lines were
+fixed before any hotel was scored and were not moved after seeing this;
+[TIERS.md](docs/model/TIERS.md) shows how the mix would change with other
+lines. Grades from 2015-2016 predict what guests said
 in 2017 (Spearman 0.43 to 0.72 per attribute), and in a simulation with the
 model's real errors at most 2.8% of claims were false (target 5%).
 
@@ -45,10 +47,13 @@ How the model was chosen: [comparison](docs/model/COMPARISON.md),
 
 > **The trained model's weights are not in this repository yet.** The build
 > environment could not reach Git LFS, which a 126 MB file needs
-> ([BLOCKERS](docs/BLOCKERS.md) B8). Everything that depends on the weights
-> was computed and committed (evaluation, scores, tiers), so search, hotel
-> pages and compare work fully; only "Try the model" (`POST /v1/analyze`)
-> answers "model not loaded" until the weights are added.
+> ([BLOCKERS](docs/BLOCKERS.md) B8). The evaluation, the hotel results and
+> the tiers computed with the weights are committed, so search, hotel pages
+> and compare work fully; only "Try the model" (`POST /v1/analyze`) answers
+> "model not loaded" until the weights are added. The corpus part scores
+> (`data/processed/part_scores.parquet`, 13 MB) are not committed, so
+> re-running `make score-hotels` or `make validate-tiers` also needs the
+> weights.
 
 ## Try it
 

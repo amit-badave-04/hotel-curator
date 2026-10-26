@@ -1,6 +1,7 @@
 """Tests for the promotion rule applied to saved evaluation directories."""
 
 import json
+import math
 import shutil
 from pathlib import Path
 
@@ -9,11 +10,16 @@ import pandas as pd
 import pytest
 
 from hotel_curator.ml.compare import (
+    NO_HUMAN_CHECK,
+    NO_HUMAN_CHECK_NOTE,
     Decision,
     RungRow,
     _pick_winner,
+    _size,
     comparison_markdown,
     decide,
+    load_rows,
+    mean_part_ece,
 )
 from hotel_curator.ml.data import LabeledParts
 from hotel_curator.ml.evaluate import EvalConfig
@@ -150,6 +156,45 @@ def test_decide_promotes_the_rule_2_candidate_when_it_passes(
     assert "| good | int8 | 0.900 / 0.900 |" in text
 
 
+def test_part_ece_is_reported_next_to_review_ece(
+    evals: tuple[Path, LabeledParts],
+) -> None:
+    root, test = evals
+    shutil.rmtree(root / "slow")
+    decision = decide(root, test.frame, n_boot=50, seed=0)
+    text = comparison_markdown(decision, root)
+    report = json.loads((root / "good" / "report.json").read_text())
+    review_ece = report["summary"]["test_mean_review_ece"]
+    part_ece = mean_part_ece(report["test"])
+    assert "| Review ECE | Part ECE |" in text
+    (line,) = [x for x in text.splitlines() if x.startswith("| **good** |")]
+    assert f"| {review_ece:.3f} | {part_ece:.3f} |" in line
+    assert "| Label | Review ECE | Part ECE |" in text  # calibration table
+    assert mean_part_ece({"ece": {"a": 0.1, "b": 0.3}}) == pytest.approx(0.2)
+    assert math.isnan(mean_part_ece({"ece": {}}))  # a whole-review rung
+
+
+def test_labels_without_a_human_check_are_flagged(
+    evals: tuple[Path, LabeledParts],
+) -> None:
+    root, test = evals
+    shutil.rmtree(root / "slow")
+    assert NO_HUMAN_CHECK == (
+        "noise_positive",
+        "noise_negative",
+        "wifi_positive",
+        "wifi_negative",
+    )
+    text = comparison_markdown(
+        decide(root, test.frame, n_boot=50, seed=0), root
+    )
+    for label in NO_HUMAN_CHECK:
+        # Once in the per-label table, once in the calibration table.
+        assert text.count(f"| {label} † |") == 2
+    assert "| cleanliness_positive |" in text
+    assert text.count(NO_HUMAN_CHECK_NOTE) == 2
+
+
 def test_a_package_that_loses_to_v1_is_not_promoted(
     evals: tuple[Path, LabeledParts],
 ) -> None:
@@ -228,13 +273,57 @@ def test_decide_without_v1_fails(tmp_path: Path) -> None:
 def test_tie_note_shows_when_speed_would_pick_another_rung() -> None:
     from hotel_curator.ml.compare import _speed_note
 
-    def row(name: str, size: int, hours: float) -> RungRow:
+    def row(name: str, size: float, hours: float) -> RungRow:
         return RungRow(name, "encoder", size, {}, corpus_hours=hours)
 
-    small_slow, big_fast = row("small", 100, 2.0), row("big", 140, 1.0)
+    small_slow, big_fast = row("small", 68.4, 2.0), row("big", 140, 1.0)
     (note,) = _speed_note([small_slow, big_fast], small_slow)
     assert "big would win the tie" in note
+    assert "(68M vs 140M)" in note
     assert _speed_note([small_slow, big_fast], big_fast) == []
+
+
+def test_size_uses_the_recorded_count_for_a_base_the_table_lacks() -> None:
+    encoder = {"family": "encoder"}
+    counted = {"base_model": "ettin-small", "n_parameters": 68_000_000}
+    assert _size(encoder, counted) == pytest.approx(68.0)
+    assert _size(encoder, {"base_model": "roberta-base"}) == 125  # older run
+    assert _size({"family": "tfidf"}, {}) == 1
+    # A new base without a recorded count has no size, not a made-up one.
+    assert _size(encoder, {"base_model": "ettin-small"}) is None
+
+
+def test_runs_of_one_listed_base_have_one_size() -> None:
+    # An old roberta-base run (no count) and a new one (its exact count) are
+    # the same model: the tie falls to gold-dev F1, not to the rounding of
+    # the table's 125M against 124,657,936 parameters.
+    encoder = {"family": "encoder"}
+    old = _size(encoder, {"base_model": "roberta-base"})
+    new = _size(
+        encoder, {"base_model": "roberta-base", "n_parameters": 124_657_936}
+    )
+    assert old == new == 125
+    decision = _decision(
+        [
+            _row("roberta-base-ft-train2", old, 0.936),
+            _row("roberta-base-ft-seed7", new, 0.930),
+        ]
+    )
+    assert decision.winner == "roberta-base-ft-train2"
+
+
+def test_load_rows_reads_the_recorded_parameter_count(
+    evals: tuple[Path, LabeledParts],
+) -> None:
+    root, _ = evals
+    path = root / "good" / "report.json"
+    report = json.loads(path.read_text())
+    report["params"] = {"base_model": "ettin", "n_parameters": 68_000_000}
+    path.write_text(json.dumps(report))
+    sizes = {r.name: r.size_millions for r in load_rows(root)}
+    assert sizes["good"] == pytest.approx(68.0)
+    assert sizes["slow"] is None  # family "encoder", nothing recorded
+    assert sizes["v1-a"] == 125
 
 
 def test_run_notes_are_shown(evals: tuple[Path, LabeledParts]) -> None:
@@ -245,7 +334,9 @@ def test_run_notes_are_shown(evals: tuple[Path, LabeledParts]) -> None:
     assert "## Run notes\n\n- `slow`: Trained with random batches." in text
 
 
-def _row(name: str, size: int, dev_f1: float, **rules: bool | None) -> RungRow:
+def _row(
+    name: str, size: float | None, dev_f1: float, **rules: bool | None
+) -> RungRow:
     passes = {
         "1_beats_v1": True,
         "3_calibrated": True,
@@ -273,6 +364,16 @@ def test_rule_2_tie_goes_to_the_smaller_model() -> None:
     assert any("tie within 0.01" in n for n in decision.notes)
     clear = _decision([_row("big", 125, 0.930), _row("small", 14, 0.912)])
     assert clear.winner == "big"  # 0.018 apart: no tie
+
+
+def test_rule_2_tie_uses_recorded_sizes_and_refuses_unknown_ones() -> None:
+    # A new base (e.g. a 68M Ettin-small) wins a tie on its real size.
+    decision = _decision([_row("roberta", 125, 0.92), _row("new", 68.0, 0.915)])
+    assert decision.winner == "new"
+    with pytest.raises(ValueError, match="unknown parameter count"):
+        _decision([_row("roberta", 125, 0.92), _row("new", None, 0.915)])
+    # Without a tie the size is not needed.
+    assert _decision([_row("new", None, 0.92)]).winner == "new"
 
 
 def test_rule_3_failure_of_the_candidate_blocks_promotion() -> None:

@@ -252,3 +252,33 @@ def test_spread_text_names_the_failing_condition() -> None:
     busy = assign_tier(_counts(), 200, ReviewSpread(12, 0.4), POLICY)
     line = blocker_line(Blocker(BlockerKind.REVIEW_SPREAD), busy, POLICY)
     assert line.startswith("Too many reviews come from one month (40%)")
+
+
+def test_a_share_beside_its_line_never_prints_as_the_line() -> None:
+    from hotel_curator.scoring.explain import _pct_beside
+
+    assert _pct_beside(0.70, 0.80) == "70%"
+    assert _pct_beside(0.7951, 0.80) == "79.5%"  # not "80%"
+    assert _pct_beside(0.79996, 0.80) == "79.9%"  # not "80.0%"
+    assert _pct_beside(0.80, 0.80) == "80%"
+    assert _pct_beside(0.8034, 0.80, places=1) == "80.3%"
+    assert _pct_beside(0.80003, 0.80, places=1) == "80.01%"  # not "80.0%"
+
+
+@pytest.mark.parametrize(
+    ("room", "text"),
+    [
+        ((79.6, 20.4), "(now 79.6%; the line is 80%)"),
+        ((160.05, 39.95), "(80.03% against 80%)"),
+    ],
+)
+def test_share_too_low_text_keeps_the_share_off_the_line(
+    room: tuple[float, float], text: str
+) -> None:
+    from hotel_curator.scoring.explain import blocker_line
+    from hotel_curator.scoring.tiers import BlockerKind
+
+    result = assign_tier(_counts(room=room), 200, SPREAD, POLICY)
+    blocker = result.blockers[0]
+    assert blocker.kind is BlockerKind.SHARE_TOO_LOW
+    assert text in blocker_line(blocker, result, POLICY)

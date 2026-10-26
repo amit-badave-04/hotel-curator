@@ -24,6 +24,9 @@ from tests.helpers import (
 )
 
 TEST_HOTELS = {"h_00000000a1", "h_00000000c3"}
+RUNG = "tiny-ft-lr0.005-ep1"
+"""The run's default name: its learning rate and epochs are not the
+defaults, so the name carries them (ADR 005)."""
 
 
 def _write_processed(home: Path) -> int:
@@ -60,31 +63,31 @@ def _check_package_outputs_and_publish(home: Path, package: Path) -> None:
     """Fingerprints are recorded, reassess drops them, publish checks them."""
     from hotel_curator.ml.experiment import PACKAGE_OUTPUTS, rung_rules_sha256
 
-    evals = home / "artifacts" / "evals" / "tiny-ft"
+    evals = home / "artifacts" / "evals" / RUNG
     report = json.loads((evals / "package_report.json").read_text())
     assert report["rules_sha256"] == rung_rules_sha256(evals)
     assert all((evals / name).is_file() for name in PACKAGE_OUTPUTS)
 
-    invoke_cli("model", "reassess", "tiny-ft")
+    invoke_cli("model", "reassess", RUNG)
     assert not any((evals / name).exists() for name in PACKAGE_OUTPUTS)
-    invoke_cli("model", "package", "tiny-ft")
+    invoke_cli("model", "package", RUNG)
     report = json.loads((evals / "package_report.json").read_text())
 
     promotion = {
-        "winner": "tiny-ft",
-        "rows": [{"name": "tiny-ft", "package": report}],
+        "winner": RUNG,
+        "rows": [{"name": RUNG, "package": report}],
     }
     (home / "artifacts" / "evals" / "promotion.json").write_text(
         json.dumps(promotion)
     )
     invoke_cli("model", "publish")
-    published = home / "artifacts" / "models" / "tiny-ft"
+    published = home / "artifacts" / "models" / RUNG
     assert (published / "model.onnx").read_bytes() == (
         package / "model.onnx"
     ).read_bytes()
     metadata = package / "metadata.json"
     original = metadata.read_text()
-    metadata.write_text(original.replace("tiny-ft", "tampered"))
+    metadata.write_text(original.replace(RUNG, "tampered"))
     refused = CliRunner().invoke(cli_app, ["model", "publish"])
     assert refused.exit_code != 0
     assert "metadata.json differ" in refused.output
@@ -105,8 +108,8 @@ def test_package_score_and_validate_a_tiny_model(
         "model", "run-encoder", "tiny", "--base-dir", str(base),
         "--learning-rate", "0.005", "--epochs", "1",
     )  # fmt: skip
-    assert "tiny-ft:" in invoke_cli("model", "package", "tiny-ft")
-    package = home / "var" / "packages" / "tiny-ft"
+    assert f"{RUNG}:" in invoke_cli("model", "package", RUNG)
+    package = home / "var" / "packages" / RUNG
     assert (package / "model.onnx").is_file()
     _check_package_outputs_and_publish(home, package)
 
@@ -134,7 +137,7 @@ def test_package_score_and_validate_a_tiny_model(
     manifest = json.loads(
         (home / "data" / "manifests" / "hotel_results.json").read_text()
     )
-    assert manifest["inputs"]["model_package"] == "tiny-ft"
+    assert manifest["inputs"]["model_package"] == RUNG
     assert manifest["stats"]["hotels"] == len(hotels)
 
     invoke_cli("score", "validate")

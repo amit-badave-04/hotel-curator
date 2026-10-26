@@ -35,11 +35,15 @@ Not chosen: SQLModel (still 0.0.x, adds a layer over SQLAlchemy); asyncpg
 ## Consequences
 
 - One codebase, two databases: SQLite file for `make serve` and tests,
-  Postgres 16 in `docker compose`; migrations are tested on both (Postgres in
-  CI and locally when `CURATOR_TEST_POSTGRES_URL` is set).
+  Postgres 16 in `docker compose`. Migrations round-trip (upgrade, downgrade,
+  upgrade) on SQLite in the unit tests. On Postgres they are applied, with
+  the demo seed, whenever the API container starts (`curator db upgrade` and
+  `curator db seed`); in CI that happens only in the containers job. *As built; the original text
+  promised a Postgres test that was not written.*
 - Rate-limit counters are per process; documented in the API docs.
 - Python 3.12 is the target (numpy 2.5 and scipy 1.18 need >= 3.12; 3.13
   also resolves).
 - PyTorch is not needed by the server (ADR 007). On Linux the PyPI torch wheel
-  is a ~3 GB CUDA build; CPU-only machines can install `pytorch-cpu` from
-  conda-forge instead (documented in the README).
+  is a ~3 GB CUDA build, which also runs on CPU; `make setup-ml` installs it
+  from `uv.lock`. *As built; an earlier version suggested conda-forge's
+  `pytorch-cpu`, which `environment.yml` does not use.*

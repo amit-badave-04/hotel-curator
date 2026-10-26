@@ -11,7 +11,9 @@ A claim (Strong or Weak) is made only when the Beta posterior puts at least
 ``policy.confirmation`` (0.95) of its mass beyond the line. Counts are
 expected counts (sums of calibrated probabilities), so they may be
 fractional. Every number here can be recomputed by hand from ``P``, ``N``
-and ``n`` with a spreadsheet's ``BETA.DIST`` / ``BETA.INV``.
+and ``n`` with a spreadsheet's ``BETA.DIST`` / ``BETA.INV``; the grade also
+needs ``complaining_reviews``, because Weak needs at least
+``policy.min_complaining_reviews`` of them.
 """
 
 from collections.abc import Callable

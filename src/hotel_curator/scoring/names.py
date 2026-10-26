@@ -8,12 +8,13 @@ first skips any part in which a person-introducing word is followed by a word
 that is rare in the corpus, and any part about staff that contains a rare
 capitalised word ("Andreea was so helpful", "reception Nicola").
 
-The rarity cut-off is a share of the corpus's parts, measured on the 865,732
-review parts: staff names appear in at most about 200 parts each (e.g.
-"maria" in 196), while the ordinary words that follow "especially" or
-"receptionist" appear in thousands (e.g. "courteous" in 2,746). A rare
-ordinary word after a trigger also skips the part; that costs one candidate,
-never a wrong quote.
+The rarity cut-off is a share of the parts the guard is built from: the
+pipeline builds it from the eligible reviews' parts, the ones that can be
+quoted (851,834 of the corpus's 865,732). In those, staff names appear in at
+most about 200 parts each (e.g. "maria" in 195), while the ordinary words
+that follow "especially" or "receptionist" appear in thousands (e.g.
+"courteous" in 2,706). A rare ordinary word after a trigger also skips the
+part; that costs one candidate, never a wrong quote.
 """
 
 import math
@@ -24,7 +25,7 @@ from spacy.lang.en.stop_words import STOP_WORDS
 
 COMMON_WORD_MIN_SHARE = 0.0005
 """A word is ordinary if at least this share of review parts contains it
-(433 of the corpus's 865,732 parts)."""
+(426 of the 851,834 eligible review parts)."""
 PERSON_TRIGGERS = frozenset(
     {
         "especially",

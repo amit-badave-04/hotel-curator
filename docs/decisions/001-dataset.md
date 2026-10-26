@@ -83,7 +83,9 @@ Facts behind the scores:
 - Model weights trained on A inherit A's licence uncertainty; the model card
   says so.
 - Noise and wifi have no human or external gold anywhere reachable; their
-  metrics rest on the panel gold only and are flagged.
+  metrics rest on the panel gold only and are flagged (marked in the
+  per-label and calibration tables of `docs/model/COMPARISON.md` and listed
+  in the model card's limits).
 
 ## Consequences
 

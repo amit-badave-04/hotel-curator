@@ -8,12 +8,12 @@ Terms are grouped by where you first meet them.
 | Term | Meaning |
 |---|---|
 | **Review** | One guest's feedback about one stay at one hotel, with a date, a reviewer score and two free-text parts. |
-| **Part** (Liked / Disliked) | The two text boxes of a booking-site review: "What did you like?" and "What did you not like?". v2 labels each part separately. Also called a *segment*. |
+| **Part** (Liked / Disliked) | The two text boxes of a booking-site review: "What did you like?" and "What did you not like?". v2 labels each part separately. (A *segment* is something else: see Who it suits.) |
 | **Placeholder** | Text the site inserts when a part is left empty ("No Negative", "No Positive"), or a guest's "Nothing"/"N/A". Placeholders carry no labels. |
 | **Hotel identity** | The stable `hotel_id` v2 derives from the hotel's name and address in the source data. v1 had no hotel identity and hashed reviews into 200 fake hotels; v2 removes that. |
 | **Canonical tables** | The cleaned, validated `hotels` and `reviews` Parquet files every later step reads. Their columns are defined once in `hotel_curator.data.contracts`. |
 | **Data contract** | A schema with types, ranges and uniqueness rules that a table must satisfy; the pipeline stops with an error if it does not. |
-| **Manifest** | A JSON file recording the source URL, SHA-256 digest, size and row counts of every input and output, so a rebuild can be checked byte for byte. |
+| **Manifest** | A JSON file under `data/manifests/` recording, for one pipeline stage, the path, row count, size and SHA-256 of every output, the SHA-256 of each input (or the model package used), the code commit and the time, so a rebuild can be checked byte for byte. Source URLs and their SHA-256 pins live in `src/hotel_curator/data/sources.py`, not in the manifest. |
 | **Hotel-disjoint split** | Train, validation and test sets that never share a hotel, so the model is always evaluated on hotels it has not seen. |
 
 ## Labels
@@ -71,7 +71,7 @@ Terms are grouped by where you first meet them.
 | **What would change it** | The conditions between a hotel and the next tier up, e.g. "room would be confirmed as a strength after about 12 more opinions at the current rate". |
 | **For you** | The tier a hotel would have if a catch does not matter to you ("if noise doesn't bother you, this hotel is Excellent"). |
 | **Trend** | The last 6 months of data versus the 18 months before; flagged only when a shift of 10 points (5 for noise and wifi) is at least 90% likely. |
-| **Who it suits** | A credible difference between one kind of guest (couples, families, groups, solo, business) and the others. |
+| **Who it suits** | A credible difference between one kind of guest (couples, families, groups, solo, business) and the others. Each kind of guest is a traveler *segment* (`segments` in the API). |
 | **Evidence quote** | A whole review part, redacted (names, numbers) and cut to 200 characters, shown for or against a grade, with month and traveler type only. |
 
 ## Engineering

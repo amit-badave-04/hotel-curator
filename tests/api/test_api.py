@@ -157,8 +157,16 @@ def test_hotel_detail(client: TestClient) -> None:
 
 def test_hotel_errors(client: TestClient) -> None:
     _assert_error(client.get("/v1/hotels/h_ffffffffff"), 404, "not_found")
-    _assert_error(client.get("/v1/hotels/../etc"), 404, "not_found")
     _assert_error(client.get("/v1/hotels/H_NOT_AN_ID"), 422, "invalid_request")
+    # A literal "../" never reaches the app (the client removes dot segments
+    # first), but an encoded ".." does, and the id pattern rejects it.
+    error = _assert_error(
+        client.get("/v1/hotels/%2E%2E"), 422, "invalid_request"
+    )
+    assert error["fields"][0]["location"] == ["path", "hotel_id"]
+    # An encoded slash is decoded before routing, so it never matches the
+    # one-segment hotel route at all.
+    _assert_error(client.get("/v1/hotels/..%2Fetc"), 404, "not_found")
 
 
 def test_compare(client: TestClient) -> None:

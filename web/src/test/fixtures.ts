@@ -435,6 +435,69 @@ export const echo = hotel({
   },
 });
 
+/**
+ * Not in HOTELS: Fair with one catch, as the tier rules give it. No essential
+ * is Strong (Good needs two) and none is Weak, so the strength blockers are
+ * the reason; Good allows one catch, so setting noise aside leaves it Fair.
+ */
+export const foxtrot = hotel({
+  hotel_id: 'h_00000000f6',
+  name: 'Foxtrot Inn',
+  city: 'Paris',
+  country: 'France',
+  tier: 'fair',
+  label: 'Fair, but noisy',
+  reviews: 120,
+  attributes: {
+    cleanliness: { grade: 'ok', observed: 0.78, low: 0.7, high: 0.85, trend: null },
+    room: { grade: 'ok', observed: 0.76, low: 0.68, high: 0.83, trend: null },
+    staff: { grade: 'ok', observed: 0.72, low: 0.64, high: 0.79, trend: null },
+    location: strong(),
+    noise: {
+      grade: 'weak',
+      observed: 0.4,
+      low: 0.33,
+      high: 0.47,
+      material: true,
+      trend: null,
+    },
+  },
+  catches: ['noise'],
+  highlights: ['location', 'wifi'],
+  detail: {
+    explanation: {
+      label: 'Fair, but noisy',
+      verdict:
+        'In reviews from Sep 2015 to Aug 2017, none of cleanliness, room and staff is a confirmed strength.',
+      essentials: [
+        'Cleanliness: OK. 78% of about 118 opinions were praise (likely 70% to 85%).',
+        'Room: OK. 76% of about 118 opinions were praise (likely 68% to 83%).',
+        'Staff: OK. 72% of about 118 opinions were praise (likely 64% to 79%).',
+      ],
+      what_would_change: [
+        'Cleanliness needs more praise to count as a strength (now 78%; the line is 80%).',
+        'Room needs more praise to count as a strength (now 76%; the line is 80%).',
+      ],
+      for_you: [],
+      who_it_suits: [],
+    },
+    blockers: [
+      {
+        kind: 'share_too_low',
+        attribute: 'cleanliness',
+        more: null,
+        text: 'Cleanliness needs more praise to count as a strength (now 78%; the line is 80%).',
+      },
+      {
+        kind: 'share_too_low',
+        attribute: 'room',
+        more: null,
+        text: 'Room needs more praise to count as a strength (now 76%; the line is 80%).',
+      },
+    ],
+  },
+});
+
 export const HOTELS: HotelDetail[] = [alpha, charlie, bravo, delta, echo];
 
 export function summary(detail: HotelDetail): HotelSummary {

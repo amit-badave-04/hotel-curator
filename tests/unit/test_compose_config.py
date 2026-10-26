@@ -42,3 +42,41 @@ def test_env_example_names_only_real_settings() -> None:
     known = {f"CURATOR_{name.upper()}" for name in Settings.model_fields}
     assert names, "no settings found in .env.example"
     assert names <= known, names - known
+
+
+def test_database_is_reachable_only_through_the_api_socket() -> None:
+    services = yaml.safe_load((ROOT / "docker-compose.yml").read_text())[
+        "services"
+    ]
+    db, api = services["db"], services["api"]
+    assert db["network_mode"] == "none"
+    assert "ports" not in db and "networks" not in db
+    assert db["command"] == ["postgres", "-c", "listen_addresses="]
+    socket = "db-socket:/var/run/postgresql"
+    assert socket in db["volumes"] and socket in api["volumes"]
+    users = [
+        name for name, s in services.items() if socket in s.get("volumes", [])
+    ]
+    assert sorted(users) == ["api", "db"]
+    assert (
+        "host=/var/run/postgresql" in api["environment"]["CURATOR_DATABASE_URL"]
+    )
+
+
+def test_api_role_is_not_the_superuser_and_alone_on_the_socket() -> None:
+    db = yaml.safe_load((ROOT / "docker-compose.yml").read_text())["services"][
+        "db"
+    ]
+    assert db["environment"]["POSTGRES_USER"] == "postgres"
+    assert "./docker/db-init:/docker-entrypoint-initdb.d:ro" in db["volumes"]
+    script = (ROOT / "docker" / "db-init" / "10-app-role.sh").read_text()
+    assert "CREATE ROLE curator LOGIN NOSUPERUSER" in script
+    assert "NOBYPASSRLS" in script
+    hba = script.split("<<'HBA'\n", 1)[1].split("\nHBA", 1)[0]
+    rules = [
+        line.split() for line in hba.splitlines() if not line.startswith("#")
+    ]
+    assert rules == [
+        ["local", "curator", "curator", "trust"],
+        ["local", "all", "postgres", "peer"],
+    ]

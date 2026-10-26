@@ -156,6 +156,7 @@ def test_mlflow_run_is_logged(tmp_path: Path) -> None:
 
 def test_run_encoder_end_to_end_on_a_tiny_model(home: Path) -> None:
     pytest.importorskip("torch")
+    from hotel_curator.ml.hf import load_classifier
     from tests.helpers import tiny_bert
 
     base = tiny_bert(home / "tiny")
@@ -178,13 +179,36 @@ def test_run_encoder_end_to_end_on_a_tiny_model(home: Path) -> None:
         "--train-fraction",
         "0.5",
     )
-    assert "tiny-ft: dev macro-F1" in output
-    report = json.loads(
-        (home / "artifacts" / "evals" / "tiny-ft" / "report.json").read_text()
-    )
+    # Half the data and other hyperparameters: a rung of its own, so the
+    # full run's results, checkpoint and package are never overwritten.
+    rung = "tiny-ft-frac0.5-lr0.005-ep2"
+    assert f"{rung}: dev macro-F1" in output
+    evals = home / "artifacts" / "evals"
+    assert not (evals / "tiny-ft").exists()
+    report = json.loads((evals / rung / "report.json").read_text())
     assert report["params"]["n_train_reviews"] == 30
     assert report["params"]["epochs"] == 2
     assert report["params"]["train_sets"] == "train"
+    checkpoint = load_classifier(home / "var" / "runs" / rung)
+    assert report["params"]["n_parameters"] == sum(
+        p.numel() for p in checkpoint.parameters()
+    )
+
+
+def test_package_of_an_unevaluated_rung_lists_the_evaluated_ones(
+    home: Path,
+) -> None:
+    pytest.importorskip("torch")
+    # A run with non-default settings is evaluated under its tagged name, so
+    # `package tiny-ft` must say where its results are, not crash.
+    probe = home / "artifacts" / "evals" / "tiny-ft-lr0.005-ep1"
+    probe.mkdir(parents=True)
+    (probe / "report.json").write_text("{}")
+    result = CliRunner().invoke(app, ["model", "package", "tiny-ft"])
+    assert result.exit_code == 2
+    assert result.exc_info is None or result.exc_info[0] is SystemExit
+    assert "no evaluation of rung 'tiny-ft'" in result.output
+    assert "tiny-ft-lr0.005-ep1" in result.output
 
 
 def test_runs_on_more_data_get_their_own_rung_name() -> None:
@@ -192,3 +216,31 @@ def test_runs_on_more_data_get_their_own_rung_name() -> None:
 
     assert rung_name("tfidf-logreg", extra=False) == "tfidf-logreg"
     assert rung_name("roberta-base-ft", extra=True) == "roberta-base-ft-train2"
+
+
+def test_encoder_rung_name_tags_every_non_default_setting() -> None:
+    from hotel_curator.cli.model import encoder_rung_name
+
+    defaults: dict[str, float | int] = {
+        "train_fraction": 1.0,
+        "seed": 20261024,
+        "learning_rate": 3e-5,
+        "epochs": 4,
+    }
+
+    def name(extra: bool = False, **run: float | int) -> str:
+        return encoder_rung_name(
+            "roberta-base", defaults | run, defaults, extra=extra
+        )
+
+    assert name() == "roberta-base-ft"
+    assert name(extra=True) == "roberta-base-ft-train2"
+    assert name(seed=20261024, learning_rate=3e-5) == "roberta-base-ft"
+    assert name(train_fraction=0.5) == "roberta-base-ft-frac0.5"
+    assert name(seed=7) == "roberta-base-ft-seed7"
+    assert name(learning_rate=2e-5) == "roberta-base-ft-lr2e-05"
+    assert name(epochs=3) == "roberta-base-ft-ep3"
+    assert (
+        name(extra=True, train_fraction=0.5, seed=7, learning_rate=2e-5)
+        == "roberta-base-ft-frac0.5-seed7-lr2e-05-train2"
+    )

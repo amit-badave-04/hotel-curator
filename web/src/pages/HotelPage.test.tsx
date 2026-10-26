@@ -2,6 +2,8 @@ import { screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 
+import type { HotelDetail } from '@/api/generated/model';
+import { foxtrot } from '@/test/fixtures';
 import { renderApp } from '@/test/render';
 import { server } from '@/test/server';
 
@@ -13,6 +15,14 @@ async function openHotel(id: string) {
 
 function section(name: string): HTMLElement {
   return screen.getByRole('region', { name });
+}
+
+function card(heading: string): HTMLElement {
+  return screen.getByRole('heading', { name: heading }).closest('div')!.parentElement!;
+}
+
+function serveHotel(hotel: HotelDetail) {
+  server.use(http.get('*/api/v1/hotels/:hotelId', () => HttpResponse.json(hotel)));
 }
 
 describe('Hotel page', () => {
@@ -43,6 +53,29 @@ describe('Hotel page', () => {
     expect(
       screen.getByText('Based on 120 usable reviews of 120 from Sep 2015 to Aug 2017.'),
     ).toBeInTheDocument();
+  });
+
+  it('says "No catch to set aside" only when the hotel has no catch', async () => {
+    await openHotel('h_00000000a1');
+    expect(card('For you')).toHaveTextContent(/^For youNo catch to set aside\.$/);
+  });
+
+  it('says a catch does not change the tier when setting it aside would not', async () => {
+    // Fair for want of Strong essentials, with one catch: Good allows one
+    // catch, so ignoring it changes nothing and the API sends no "for you".
+    serveHotel(foxtrot);
+    await openHotel(foxtrot.hotel_id);
+    expect(screen.getByText('Catch:').parentElement).toHaveTextContent('Catch: noise');
+    expect(card('The three essentials')).not.toHaveTextContent('Strong');
+    expect(card('What would change it')).not.toHaveTextContent('noise');
+    const forYou = card('For you');
+    expect(forYou).toHaveTextContent('Setting aside the catch (noise) would not change the tier.');
+    expect(forYou).not.toHaveTextContent('No catch to set aside');
+    // The Fair meaning allows a Weak essential (ADR 006, erratum E1).
+    expect(screen.getByText(/^Short of Good: /)).toHaveTextContent(
+      'an essential is graded Weak but does not pass the stricter test for Caution',
+    );
+    expect(screen.queryByText(/No essential is weak/)).not.toBeInTheDocument();
   });
 
   it('lists all eight attributes with grade, observed share, likely range and trend', async () => {

@@ -356,6 +356,18 @@ function BulletList({ items, empty }: { items: string[]; empty: string }) {
   );
 }
 
+/**
+ * "For you" lists only catches whose removal changes the tier, so an empty
+ * list can mean no catch at all or catches that do not decide the tier.
+ */
+function forYouEmptyText(catches: HotelDetail['catches']): string {
+  if (catches.length === 0) return 'No catch to set aside.';
+  const names = joinAttributes(catches);
+  return catches.length === 1
+    ? `Setting aside the catch (${names}) would not change the tier.`
+    : `Setting aside any one of the catches (${names}) would not change the tier.`;
+}
+
 function WhoItSuits({ lines, segments }: { lines: string[]; segments: SegmentOut[] }) {
   if (lines.length === 0 && segments.length === 0) {
     return (
@@ -547,10 +559,7 @@ function HotelView({ hotel }: { hotel: HotelDetail }) {
             <h2 className="text-lg font-semibold">For you</h2>
           </CardHeader>
           <CardContent>
-            <BulletList
-              items={hotel.explanation.for_you}
-              empty="No catch to set aside: ignoring one attribute would not change the tier."
-            />
+            <BulletList items={hotel.explanation.for_you} empty={forYouEmptyText(hotel.catches)} />
           </CardContent>
         </Card>
       </div>

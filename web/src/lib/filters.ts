@@ -5,7 +5,7 @@
  */
 import type { Attribute, ListHotelsParams, SortOrder, Tier } from '@/api/generated/model';
 
-import { ATTRIBUTES, CITY_PATTERN, MAX_QUERY_LENGTH, TIERS } from './domain';
+import { ATTRIBUTES, CITY_PATTERN, isNotEnough, MAX_QUERY_LENGTH, TIERS } from './domain';
 
 export const PAGE_SIZE = 20;
 const MAX_PAGE = 10_000;
@@ -40,13 +40,23 @@ function pick<T extends string>(values: string[], allowed: readonly T[]): T[] {
   return allowed.filter((a) => set.has(a));
 }
 
+/**
+ * The two "not enough" tiers are one filter choice, so a URL naming only one
+ * of them (hand-edited or old) selects both: the checkbox, the count and the
+ * results then agree.
+ */
+function groupNotEnough(tiers: Tier[]): Tier[] {
+  if (!tiers.some(isNotEnough)) return tiers;
+  return TIERS.filter((tier) => tiers.includes(tier) || isNotEnough(tier));
+}
+
 export function parseFilters(params: URLSearchParams): ExplorerFilters {
   const city = params.get('city');
   const sort = params.get('sort');
   const page = Number.parseInt(params.get('page') ?? '1', 10);
   return {
     city: city && CITY_PATTERN.test(city) ? city : null,
-    tiers: pick(params.getAll('tier'), TIERS),
+    tiers: groupNotEnough(pick(params.getAll('tier'), TIERS)),
     strong: pick(params.getAll('strong'), ATTRIBUTES),
     avoidWeak: pick(params.getAll('avoid_weak'), ATTRIBUTES),
     q: (params.get('q') ?? '').trim().slice(0, MAX_QUERY_LENGTH),
@@ -82,12 +92,18 @@ export function toApiParams(filters: ExplorerFilters): ListHotelsParams {
   return params;
 }
 
+/** Tier choices selected; both "not enough" tiers together count once. */
+function tierChoiceCount(tiers: readonly Tier[]): number {
+  const ranked = tiers.filter((tier) => !isNotEnough(tier)).length;
+  return ranked + (tiers.some(isNotEnough) ? 1 : 0);
+}
+
 /** Number of filters that narrow the results (sort and page excluded). */
 export function activeFilterCount(filters: ExplorerFilters): number {
   return (
     (filters.city ? 1 : 0) +
     (filters.q ? 1 : 0) +
-    filters.tiers.length +
+    tierChoiceCount(filters.tiers) +
     filters.strong.length +
     filters.avoidWeak.length
   );

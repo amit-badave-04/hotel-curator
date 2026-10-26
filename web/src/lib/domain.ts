@@ -109,13 +109,15 @@ export const TIER_INFO: Record<Tier, TierInfo> = {
     name: 'Good',
     tone: 'good',
     meaning:
-      'At least two of the three essentials are confirmed strengths, with at most one material weak spot elsewhere.',
+      'At least two of the three essentials are confirmed strengths and none is graded Weak, with at most one material weak spot elsewhere.',
   },
   fair: {
     name: 'Fair',
     tone: 'fair',
+    // An essential that is Weak on probabilities but not on whole reviews
+    // gives Fair, not Caution (ADR 006, erratum E1).
     meaning:
-      'No essential is weak, but fewer than two are confirmed strengths, or there are several weak spots.',
+      'Short of Good: fewer than two essentials are confirmed strengths, an essential is graded Weak but does not pass the stricter test for Caution, or there are two or more weak spots elsewhere.',
   },
   caution: {
     name: 'Caution',
@@ -306,6 +308,23 @@ export function complaintAxisMax(highs: readonly number[]): number {
   return Math.min(1, Math.max(0.2, ...highs.map((high) => Math.ceil(high * 20) / 20)));
 }
 
+/** Good allows one catch; a second keeps a hotel Fair (ADR 006, rule 5). */
+const GOOD_MAX_CATCHES = 1;
+
+/**
+ * Whether the catches are a reason for the tier, as in the API's blockers:
+ * one catch keeps a Good hotel out of Excellent, and more than one keeps a
+ * Fair hotel out of Good. A single catch never makes a hotel Fair, an
+ * Excellent hotel has none, and Caution and the "not enough" tiers are
+ * decided before catches count.
+ */
+function catchesHoldBack(hotel: HotelSummary): boolean {
+  if (hotel.catches.length === 0) return false;
+  return (
+    hotel.tier === 'good' || (hotel.tier === 'fair' && hotel.catches.length > GOOD_MAX_CATCHES)
+  );
+}
+
 /**
  * One line on why a search result has its tier, built from the summary
  * fields only (the hotel page has the full generated explanation).
@@ -326,10 +345,12 @@ export function summaryWhy(hotel: HotelSummary): string {
   const parts: string[] = [];
   parts.push(
     strong.length > 0
-      ? `Guests confirmed ${joinAttributes(strong)} as strengths`
+      ? `Guests confirmed ${joinAttributes(strong)} as ${strong.length === 1 ? 'a strength' : 'strengths'}`
       : 'No essential is a confirmed strength yet',
   );
-  if (hotel.catches.length > 0) {
+  // A Weak essential outside Caution (Weak on probabilities only) gives Fair.
+  if (weak.length > 0) parts.push(`complaints about ${joinAttributes(weak)} outnumbered praise`);
+  if (catchesHoldBack(hotel)) {
     parts.push(`complaints about ${joinAttributes(hotel.catches)} hold it back`);
   }
   return `${parts.join('; ')}.`;

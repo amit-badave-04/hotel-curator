@@ -74,9 +74,11 @@ Extra conditions:
 - **Lean** (display only): an OK grade whose posterior mean is past a line is
   shown as "trending strong" / "trending weak".
 - **Material** (for non-essential Weak grades): complaint rate `N / n >= 5%`
-  ("at least 1 guest in 20 raised it"). Defined on complaint rate so that one
-  more positive review can never make a hotel's tier worse (monotonicity is
-  property-tested; scope in erratum E2).
+  ("at least 1 guest in 20 raised it"). Defined on complaint rate so that
+  more praise can never make a Weak grade material (monotonicity is
+  property-tested; its scope is in erratum E2 and its two exceptions in E6:
+  praise that brings an ungraded attribute up to the opinions floor, or a
+  Weak essential's hard-label opinions up to it).
 
 Hand formulas: mean = (P + 0.5) / (M + 1); 90% interval =
 `BETA.INV(0.05, P+0.5, N+0.5)` to `BETA.INV(0.95, P+0.5, N+0.5)`.
@@ -176,8 +178,9 @@ outcome, never used as a target.
 
 1. **Subset invariance**: demo-subset tiers equal full-run tiers (CI test,
    using the same stored probabilities).
-2. **Monotonicity**: one more praise never lowers a tier, one more complaint
-   never raises it (property tests; scope in erratum E2).
+2. **Monotonicity**: one more praise never lowers a ranked tier, one more
+   complaint never raises it (property tests; scope in erratum E2, two
+   exceptions in E6).
 3. **Truth tables**: every rule boundary, with a documented tolerance at
    exact boundary values.
 4. **Out-of-time**: grades from 2015-08 to 2016-12 vs the raw 2017 shares and
@@ -247,18 +250,60 @@ was scored. None of these changes a parameter value.
   punctuation-free text, so masking alone leaked names into quotes. Quote
   selection now skips parts that probably name a person
   (`scoring/names.py`: a person-introducing word followed by a word that
-  fewer than 0.05% of the review parts contain, 433 of 865,732, or a rare
-  capitalised word in a part about staff) and takes the next candidate;
-  NER masking stays as the second layer. It skips 6.1% of parts; 96 of
-  11,104 graded attributes have no quote. Section 4 of this ADR is
-  otherwise unchanged.
+  fewer than 0.05% of the eligible reviews' parts contain, 426 of 851,834,
+  or a rare capitalised word in a part about staff) and takes the next
+  candidate; NER masking stays as the second layer. It skips 6.1% of
+  parts; 96 of 11,104 graded attributes have no quote. Section 4 of this
+  ADR is otherwise unchanged.
+
+### Erratum (final verification, after the corpus was tiered)
+
+The final verification checked the monotonicity claim of sections 2 and 7
+against the rules after the corpus was tiered. E6 changes no rule,
+parameter, grade or tier; it corrects what those two sections claimed.
+
+- **E6, the exceptions to monotonicity.** E2's guarantee covers the ranked
+  tiers (Excellent to Caution), and even with n and the month spread fixed
+  it has two exceptions, both at the 10 opinions needed for a grade:
+  - *A new catch.* Praise that brings an attribute outside the essentials
+    up to 10 opinions can reveal a material Weak grade, a new catch, and so
+    lower the tier. Example: at a hotel with 150 eligible reviews,
+    breakfast & food with 9 complaints and no praise has too few opinions;
+    one praise makes it Weak, material at 9 / 150 = 6%, and the hotel falls
+    from Excellent to Good.
+  - *Caution confirmed on hard labels.* Praise can also lower Fair to
+    Caution: when an essential is Weak on expected counts but has fewer
+    than 10 opinions on hard labels, one praise can bring its hard-label
+    opinions to 10 and confirm the Weak grade on hard labels too (rule 2).
+    Example: at a hotel with 200 eligible reviews and every other
+    attribute Strong, room with 1.0 expected praise, 9.5 expected
+    complaints (10.5 opinions) and 9 complaining reviews is Weak, but its
+    hard labels, no praise and 9 complaints, are too few to grade, so the
+    hotel is Fair (E1); one praise makes them 1 praise and 9 complaints,
+    Weak, and the hotel is Caution.
+
+  Sections 2 and 7 were corrected to say so. Praise can also lift a hotel
+  out of Caution into `not_enough_evidence` when another essential has too
+  few opinions, because rule 2 is checked before rule 3; the two "not
+  enough" tiers are not ordered against the ranked ones. The property
+  tests in `tests/unit/test_tiers.py` draw n, expected counts around the
+  opinions floor and hard-label counts within 2 of the rounded expected
+  ones, and accept a lower tier only in these cases; a separate property
+  test and a regression test with the example's counts cover each
+  exception. In the 1,494 served hotels, one more praise (expected and
+  hard-label) for any single attribute lowers no ranked tier; 7 of their
+  essentials have at least 10 opinions but fewer than 10 on hard labels,
+  and none of these is Weak.
 
 ## Consequences
 
 - Tiers are conservative: Excellent requires three confirmed strengths, and
   hotels with little evidence say so instead of being ranked.
 - Every grade and tier can be recomputed by hand from the API's P, N and n,
-  plus the hard counts (`positive_hard`, `negative_hard`) for rule 2.
+  plus `complaining_reviews` for Weak (at least 3 complaining reviews), the
+  hard counts (`positive_hard`, `negative_hard`) for rule 2, and the month
+  spread for rule 4 (months with reviews and the busiest month's share,
+  both from `review_volume`).
 - Expected counts treat calibrated probabilities as observations, so
   intervals are somewhat too narrow; validation items 6 and 7 measure how
   much.

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     import pandas as pd
 
     from hotel_curator.ml.data import LabeledParts
-    from hotel_curator.ml.encoder import EncoderConfig
+    from hotel_curator.ml.encoder import EncoderConfig, TrainResult
     from hotel_curator.ml.evaluate import EvalConfig
     from hotel_curator.ml.experiment import FloatMatrix, RungOutcome
     from hotel_curator.ml.v1 import V1Predictor
@@ -45,7 +45,14 @@ ExtraTrain = Annotated[
     ),
 ]
 BaseKey = Annotated[str, typer.Argument(help="Base model key.")]
-RungName = Annotated[str | None, typer.Option(help="Rung name.")]
+RungName = Annotated[
+    str | None,
+    typer.Option(
+        help="Rung name. Default: <base>-ft, a tag for each setting that"
+        " differs from its default (-frac0.5, -seed7, -lr2e-05, -ep3), then"
+        " -train2."
+    ),
+]
 Seed = Annotated[int | None, typer.Option(help="Training seed.")]
 TrainFraction = Annotated[
     float, typer.Option(help="Share of training reviews (learning curve).")
@@ -64,6 +71,13 @@ Epochs = Annotated[int | None, typer.Option(help="Override the epochs.")]
 
 
 EXTRA_TRAIN_SUFFIX = "-train2"
+VARIANT_TAGS = (
+    ("train_fraction", "frac"),
+    ("seed", "seed"),
+    ("learning_rate", "lr"),
+    ("epochs", "ep"),
+)
+"""Encoder run settings that change the default rung name, and their tags."""
 
 
 def rung_name(base_name: str, *, extra: bool) -> str:
@@ -73,6 +87,29 @@ def rung_name(base_name: str, *, extra: bool) -> str:
     the first training sample.
     """
     return f"{base_name}{EXTRA_TRAIN_SUFFIX}" if extra else base_name
+
+
+def encoder_rung_name(
+    base: str,
+    run: dict[str, float | int],
+    defaults: dict[str, float | int],
+    *,
+    extra: bool,
+) -> str:
+    """Default name of an encoder rung: one tag per non-default setting.
+
+    ``<base>-ft``, then ``-<tag><value>`` for every setting of
+    :data:`VARIANT_TAGS` whose ``run`` value differs from ``defaults``, then
+    the ``train_2`` suffix: ``roberta-base-ft-frac0.5-lr2e-05-train2``. A
+    learning-curve point or a hyperparameter probe therefore never
+    overwrites the full run's results, checkpoint and package measurements.
+    """
+    tags = "".join(
+        f"-{tag}{run[key]}"
+        for key, tag in VARIANT_TAGS
+        if run[key] != defaults[key]
+    )
+    return rung_name(f"{base}-ft{tags}", extra=extra)
 
 
 def _eval_config(settings: Settings) -> "EvalConfig":
@@ -263,9 +300,11 @@ def run_encoder_cmd(
     train = _subsample(
         training_set(sets, extra=extra_train), train_fraction, run_seed
     )
-    rung = name or rung_name(f"{base}-ft", extra=extra_train)
     config = _encoder_config(
         base, base_dir, learning_rate, epochs, run_seed, settings
+    )
+    rung = name or _default_rung(
+        base, config, train_fraction, settings.seed, extra=extra_train
     )
     checkpoint = settings.runs_dir / rung
     result = train_encoder(
@@ -275,9 +314,31 @@ def run_encoder_cmd(
         config,
         checkpoint,
     )
-    params = _encoder_params(config, base, train_fraction, train)
-    params |= {"best_epoch": result.best_epoch, "history": result.history}
+    params = _encoder_params(config, base, train_fraction, train, result)
     _assess_encoder(settings, rung, checkpoint, config, params, result.seconds)
+
+
+def _default_rung(
+    base: str,
+    config: "EncoderConfig",
+    train_fraction: float,
+    default_seed: int,
+    *,
+    extra: bool,
+) -> str:
+    """:func:`encoder_rung_name` of a run, against ``base``'s defaults."""
+    run: dict[str, float | int] = {
+        "train_fraction": train_fraction,
+        "seed": config.seed,
+        "learning_rate": config.learning_rate,
+        "epochs": config.epochs,
+    }
+    defaults: dict[str, float | int] = {
+        "train_fraction": 1.0,
+        "seed": default_seed,
+        **_default_hyper(base),
+    }
+    return encoder_rung_name(base, run, defaults, extra=extra)
 
 
 def _assess_encoder(
@@ -345,8 +406,13 @@ def _encoder_params(
     base: str,
     train_fraction: float,
     train: "LabeledParts",
+    result: "TrainResult",
 ) -> dict[str, Any]:
-    """What an encoder run logs: its config and the data it trained on."""
+    """What an encoder run logs: its config, its data and its training.
+
+    ``n_parameters`` is the model's size for rule-2 ties when its base is
+    not in ``ml.compare.SIZE_MILLIONS`` (a listed base keeps that value).
+    """
     return {
         **asdict(config),
         "base_model": base,
@@ -355,6 +421,9 @@ def _encoder_params(
         "n_train_reviews": int(train.frame["review_id"].nunique()),
         "n_train_hotels": int(train.frame["hotel_id"].nunique()),
         "train_sets": train.name,
+        "best_epoch": result.best_epoch,
+        "history": result.history,
+        "n_parameters": result.n_parameters,
     }
 
 
@@ -373,6 +442,22 @@ def _subsample(
     return train.subset(train.frame["review_id"].isin(keep).to_numpy())
 
 
+def _default_hyper(base: str) -> dict[str, float | int]:
+    """``base``'s pre-specified learning rate, epochs and batch size.
+
+    :data:`ENCODER_DEFAULTS` for a known base, else ``EncoderConfig``'s.
+    """
+    from hotel_curator.ml.encoder import EncoderConfig
+
+    fallback = EncoderConfig(base_model=base)
+    return {
+        "learning_rate": fallback.learning_rate,
+        "epochs": fallback.epochs,
+        "batch_size": fallback.batch_size,
+        **ENCODER_DEFAULTS.get(base, {}),
+    }
+
+
 def _encoder_config(
     base: str,
     base_dir: Path | None,
@@ -385,13 +470,7 @@ def _encoder_config(
     from hotel_curator.ml.bases import BASE_MODELS, fetch_base
     from hotel_curator.ml.encoder import EncoderConfig
 
-    fallback = EncoderConfig(base_model=base)
-    hyper: dict[str, float | int] = {
-        "learning_rate": fallback.learning_rate,
-        "epochs": fallback.epochs,
-        "batch_size": fallback.batch_size,
-        **ENCODER_DEFAULTS.get(base, {}),
-    }
+    hyper = _default_hyper(base)
     if learning_rate is not None:
         hyper["learning_rate"] = learning_rate
     if epochs is not None:
@@ -412,11 +491,12 @@ def eval_v1_cmd(
         Path | None, typer.Option(help="v1 checkpoint directory.")
     ] = None,
 ) -> None:
-    """Score the frozen v1 checkpoint in every fair configuration.
+    """Score the frozen v1 checkpoint in four configurations.
 
-    Two inputs (whole review, each part) x two threshold sets (v1's shipped,
-    tuned on gold-dev); ``curator model compare`` picks v1's configuration on
-    gold-dev, exactly as it picks among v2 rungs.
+    Two inputs (whole review, each part; both lowercased, see ``ml.v1``) x
+    two threshold sets (v1's shipped, tuned on gold-dev); ``curator model
+    compare`` picks v1's configuration on gold-dev, exactly as it picks
+    among v2 rungs.
     """
     from hotel_curator.ml.data import load_all
     from hotel_curator.ml.experiment import (
@@ -586,7 +666,7 @@ def package_cmd(
     from hotel_curator.ml.package import build_package, score_package
 
     settings = get_settings()
-    eval_dir = settings.artifacts_dir / "evals" / name
+    eval_dir = _evaluated_rung(settings, name)
     report = json.loads((eval_dir / "report.json").read_text())
     # A failure below must never leave new and old measurements side by side.
     clear_package_outputs(eval_dir)
@@ -618,6 +698,25 @@ def package_cmd(
         f"{throughput['parts_per_second']:.0f} parts/s, corpus "
         f"{throughput['corpus_hours']:.2f} h -> {out_dir}"
     )
+
+
+def _evaluated_rung(settings: Settings, name: str) -> Path:
+    """``artifacts/evals/<name>``, which must hold the rung's report.
+
+    Raises:
+        typer.BadParameter: If ``name`` was never evaluated, e.g. because a
+            run with non-default settings got a tagged default name
+            (``roberta-base-ft-lr2e-05``); the message lists the rungs that
+            were.
+    """
+    evals = settings.artifacts_dir / "evals"
+    if not (evals / name / "report.json").is_file():
+        known = sorted(p.parent.name for p in evals.glob("*/report.json"))
+        raise typer.BadParameter(
+            f"no evaluation of rung {name!r}; evaluated rungs: "
+            + (", ".join(known) or "none")
+        )
+    return evals / name
 
 
 def _write_package_scores(

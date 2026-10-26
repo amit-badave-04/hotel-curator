@@ -3,7 +3,7 @@ import { useId, useRef, useState, type FormEvent } from 'react';
 
 import { ApiError } from '@/api/fetcher';
 import { useAnalyzeReview, useGetMeta } from '@/api/generated/endpoints';
-import type { AnalyzeResponse, Attribute, Evaluation, Meta } from '@/api/generated/model';
+import type { AnalyzeResponse, Attribute, Evaluation, Meta, Tier } from '@/api/generated/model';
 import { GradeBadge, TierBadge } from '@/components/badges';
 import { IntervalChart } from '@/components/IntervalChart';
 import { Section } from '@/components/Section';
@@ -27,6 +27,7 @@ import {
   formatProbability,
   formatScore,
   formatSigned,
+  isNotEnough,
   joinAttributes,
   MAX_PART_CHARS,
   TIERS,
@@ -51,6 +52,16 @@ function policyAttributes(policy: Meta['policy'] | undefined, key: string, fallb
   if (!Array.isArray(value)) return fallback;
   const attributes = value.filter((v): v is Attribute => ATTRIBUTES.includes(v as Attribute));
   return attributes.length > 0 ? attributes : fallback;
+}
+
+/** Tells the two "not enough" tiers apart; their badges read the same. */
+function NotEnoughHint({ tier }: { tier: Tier }) {
+  if (!isNotEnough(tier)) return null;
+  return (
+    <span className="ml-2 text-xs text-muted-foreground">
+      {tier === 'not_enough_reviews' ? '(too few reviews)' : '(too few opinions)'}
+    </span>
+  );
 }
 
 function Policy({ meta }: { meta: Meta | undefined }) {
@@ -99,17 +110,31 @@ function Policy({ meta }: { meta: Meta | undefined }) {
             <TableRow>
               <TableCell>
                 <TierBadge tier="not_enough_reviews" />
+                <NotEnoughHint tier="not_enough_reviews" />
               </TableCell>
               <TableCell>
-                Fewer than {minReviews} usable reviews, or fewer than {minOpinions} opinions on an
-                essential. Not a bad sign, just not enough to go on.
+                Fewer than {minReviews} usable reviews. Not a bad sign, just not enough to go on.
               </TableCell>
             </TableRow>
             <TableRow>
               <TableCell>
                 <TierBadge tier="caution" />
               </TableCell>
-              <TableCell>An essential is graded Weak.</TableCell>
+              <TableCell>
+                An essential is graded Weak, and is still Weak by the stricter test: every review
+                counts as a full praise or complaint when the model gives it 50% or more, and not at
+                all below that, instead of by its probability. This rule comes before the next one,
+                so too few opinions on one essential never hide a Weak one.
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>
+                <TierBadge tier="not_enough_evidence" />
+                <NotEnoughHint tier="not_enough_evidence" />
+              </TableCell>
+              <TableCell>
+                Fewer than {minOpinions} opinions on an essential. Not a bad sign either.
+              </TableCell>
             </TableRow>
             <TableRow>
               <TableCell>
@@ -126,7 +151,8 @@ function Policy({ meta }: { meta: Meta | undefined }) {
                 <TierBadge tier="good" />
               </TableCell>
               <TableCell>
-                At least two essentials Strong and at most one material weak spot elsewhere.
+                At least two essentials Strong, no essential Weak, and at most one material weak
+                spot elsewhere.
               </TableCell>
             </TableRow>
             <TableRow>
@@ -134,7 +160,9 @@ function Policy({ meta }: { meta: Meta | undefined }) {
                 <TierBadge tier="fair" />
               </TableCell>
               <TableCell>
-                Everything else: no essential is Weak, but the bar for Good is not met.
+                Everything else: fewer than two essentials Strong, an essential graded Weak that
+                does not pass the stricter test for Caution, or two or more material weak spots
+                elsewhere.
               </TableCell>
             </TableRow>
           </TableBody>
@@ -167,11 +195,7 @@ function Policy({ meta }: { meta: Meta | undefined }) {
                 <TableRow key={tier}>
                   <TableCell>
                     <TierBadge tier={tier} />
-                    {(tier === 'not_enough_reviews' || tier === 'not_enough_evidence') && (
-                      <span className="ml-2 text-xs text-muted-foreground">
-                        {tier === 'not_enough_reviews' ? '(too few reviews)' : '(too few opinions)'}
-                      </span>
-                    )}
+                    <NotEnoughHint tier={tier} />
                   </TableCell>
                   <TableCell>{formatCount(meta.tiers[tier] ?? 0)}</TableCell>
                 </TableRow>
@@ -294,13 +318,32 @@ function Stat({ label, value, detail }: { label: string; value: string; detail: 
   );
 }
 
+/**
+ * The served model's row in the ladder, when it shows other numbers than the
+ * headline: the headline is the served ONNX package's own score, the ladder
+ * row its checkpoint's (they differ slightly, e.g. with int8 weights).
+ */
+function servedCheckpoint(evaluation: Evaluation, rungs: Rung[]): Rung | undefined {
+  const rung = rungs.find((r) => r.name === evaluation.model);
+  if (!rung) return undefined;
+  const headline = evaluation.macro_f1;
+  const pairs: [number, number][] = [
+    [rung.value, headline.point],
+    [rung.low, headline.low],
+    [rung.high, headline.high],
+  ];
+  return pairs.every(([a, b]) => formatScore(a) === formatScore(b)) ? undefined : rung;
+}
+
 function EvaluationView({ evaluation }: { evaluation: Evaluation }) {
   const rungs = parseRungs(evaluation);
   const diff = evaluation.difference;
   const better = diff.low > 0;
+  const checkpoint = servedCheckpoint(evaluation, rungs);
+  const servedMark = checkpoint ? '(served, checkpoint)' : '(served)';
   const rungLabel = (rung: Rung) =>
     rung.name === evaluation.model
-      ? `${rung.name} (served)`
+      ? `${rung.name} ${servedMark}`
       : rung.name === evaluation.v1_configuration
         ? `${rung.name} (v1)`
         : rung.name;
@@ -336,14 +379,24 @@ function EvaluationView({ evaluation }: { evaluation: Evaluation }) {
         over the 16 labels on the held-out test reviews; intervals come from a bootstrap that
         resamples hotels.
       </p>
+      {checkpoint && (
+        <p className="text-sm text-muted-foreground">
+          The served model is an ONNX package built from the{' '}
+          <code className="font-mono">{checkpoint.name}</code> checkpoint. The served model&apos;s
+          numbers above (macro-F1, the difference from v1 and the calibration error) are the
+          package&apos;s own. The chart and table below show each model&apos;s checkpoint, so the
+          served model&apos;s row there reads {formatScore(checkpoint.value)} (95% interval{' '}
+          {formatScore(checkpoint.low)} to {formatScore(checkpoint.high)}).
+        </p>
+      )}
       {rungs.length > 0 && (
         <>
           <figure className="space-y-2 rounded-lg border bg-card p-4">
             <figcaption>
               <h3 className="font-semibold">All models tried, macro-F1 on the test set</h3>
               <p className="text-sm text-muted-foreground">
-                With 95% intervals. The served model is drawn in orange and marked
-                &quot;(served)&quot;.
+                With 95% intervals. The served model is drawn in orange and marked{' '}
+                {`"${servedMark}"`}.
               </p>
             </figcaption>
             <IntervalChart
@@ -359,14 +412,18 @@ function EvaluationView({ evaluation }: { evaluation: Evaluation }) {
               format={(v) => formatScore(v, 2)}
               valueName="Macro-F1"
               rangeName="95% interval"
-              emphasisName="Served model"
+              emphasisName={checkpoint ? 'Served model (checkpoint)' : 'Served model'}
               title="Macro-F1 by model"
               description="Macro-F1 with 95% intervals for every model tried; the table below lists the same numbers."
               labelWidth={170}
             />
           </figure>
           <Table containerLabel="Models tried (scrollable table)">
-            <TableCaption>Every model tried, scored on the same test reviews.</TableCaption>
+            <TableCaption>
+              Every model tried, scored on the same test reviews. Names ending in -train2 were
+              trained on both labelled training sets, the other new models on the first set only;
+              the v1 family is the earlier project&apos;s model.
+            </TableCaption>
             <TableHeader>
               <TableRow>
                 <TableHead scope="col">Model</TableHead>
@@ -624,11 +681,13 @@ export function AboutPage() {
 
       <Section id="ladder" title="The model ladder">
         <p>
-          Several models, from simple to complex, were trained on the same rows and scored the same
-          way: a word-count baseline with logistic regression, the same features with
-          gradient-boosted trees, ready-made sentence embeddings with simple classifiers, and
-          fine-tuned transformer encoders of different sizes. The first version of this project (v1)
-          was scored on the same test reviews as the target to beat.
+          Several models, from simple to complex, were scored the same way on the same test reviews:
+          a word-count baseline with logistic regression, the same features with gradient-boosted
+          trees, ready-made sentence embeddings with simple classifiers, and fine-tuned transformer
+          encoders of different sizes. They were not all trained on the same data: models whose name
+          ends in <code className="font-mono">-train2</code> were trained on both labelled training
+          sets (8,006 reviews), the others on the first set only (4,006 reviews). The first version
+          of this project (v1) was scored on the same test reviews as the target to beat.
         </p>
         <p>The rule for shipping a model was written before any result was seen:</p>
         <ol className="list-decimal space-y-1 pl-6">

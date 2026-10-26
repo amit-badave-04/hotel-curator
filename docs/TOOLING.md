@@ -22,7 +22,7 @@ in its place. Measured on 2026-10-24.
 
 | Reachable | Blocked (HTTP 403 on CONNECT) |
 |---|---|
-| pypi.org, files.pythonhosted.org, registry.npmjs.org, conda.anaconda.org, github.com (git + release assets), raw.githubusercontent.com, media.githubusercontent.com (LFS), codeload.github.com, s3.amazonaws.com, storage.googleapis.com (public objects), Docker Hub, ghcr.io | huggingface.co (+ CDN, hf-mirror.com), www.kaggle.com, query.wikidata.org, overpass-api.de / openstreetmap.org, data.world, zenodo.org, figshare.com, api.osv.dev, semgrep.dev, archive.ics.uci.edu, download.pytorch.org |
+| pypi.org, files.pythonhosted.org, registry.npmjs.org, conda.anaconda.org, github.com (git + release assets), raw.githubusercontent.com, media.githubusercontent.com (LFS), codeload.github.com, s3.amazonaws.com, storage.googleapis.com (public objects), Docker Hub, ghcr.io | huggingface.co (+ CDN, hf-mirror.com), www.kaggle.com, query.wikidata.org, overpass-api.de / openstreetmap.org, data.world, zenodo.org, figshare.com, api.osv.dev, semgrep.dev, archive.ics.uci.edu, download.pytorch.org, lfs.github.com (Git LFS uploads), dl-cdn.alpinelinux.org (Alpine packages) |
 
 Consequences are tracked in [`BLOCKERS.md`](BLOCKERS.md).
 
@@ -30,12 +30,19 @@ Consequences are tracked in [`BLOCKERS.md`](BLOCKERS.md).
 
 | Tool | Available at start? | Version used | Notes |
 |---|---|---|---|
-| ruff | Yes | 0.16.9 | lint + format |
-| mypy | Yes | 2.3.1 | type-check |
+| ruff | Yes (0.16.9 preinstalled) | 0.17.2 (`uv.lock`) | lint + format; `make` and CI run the locked version |
+| mypy | Yes (2.3.1 preinstalled) | 2.4.0 (`uv.lock`) | type-check; `make` and CI run the locked version |
 | pytest, pytest-cov | Installed into the project env | see `uv.lock` | |
-| gitleaks | No | _pending_ | installed from GitHub release into a scratch dir |
-| semgrep | No | _pending_ | rules registry blocked; rules cloned from GitHub |
-| osv-scanner | No | _pending_ | api.osv.dev blocked; offline DB from public GCS bucket |
-| pip-audit | No | _pending_ | |
-| bandit | No | _pending_ | |
-| npm audit | Yes (npm 10.9.4) | | |
+| gitleaks | No | 8.30.1 | GitHub release, checksum verified, installed in a scratch dir; `.gitleaks.toml` allow-lists only local paths v2 gitignores (`.venv/`, `var/`, raw data); v1 tracked `data/processed/`, and a history scan with no allow-list finds nothing more |
+| trufflehog | No | 3.99.7 | second secret scanner; `--no-verification` (offline) |
+| semgrep | No | 1.182.1 (PyPI) | registry `semgrep.dev` blocked, so rules come from a clone of `semgrep/semgrep-rules` (python, generic/secrets, dockerfile, docker-compose, javascript, typescript) |
+| osv-scanner | No | 2.7.0 | `api.osv.dev` blocked; runs `--offline` against the PyPI, npm, Debian, Alpine and Go databases downloaded from the public GCS bucket; scans the lockfiles and the three container images (`scan image --archive`) |
+| pip-audit | No | 2.10.1 (PyPI) | audits `uv export` output against PyPI's advisory data (`-s osv` needs the blocked API) |
+| bandit | No | 1.9.4 (PyPI) | Python SAST |
+| npm audit | Yes (npm 10.9.4) | | registry reachable |
+| docker, docker compose | Yes (29.9.2, compose 5.6.1) | | Docker Hub pulls work; GitHub's container registry blobs are blocked |
+
+Each tool was first run against a known-bad fixture (a planted secret, a
+vulnerable requirement pin, an insecure Python snippet) and caught it, so a
+clean result means "no findings", not "tool not working". Results of the
+gates on v2 are in `docs/security/v2-security-review.md`.

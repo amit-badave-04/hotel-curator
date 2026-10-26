@@ -5,6 +5,7 @@ the label tables), so the numbers in the documents always match the files.
 """
 
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from hotel_curator.ml.compare import NO_HUMAN_CHECK, mean_part_ece
 from hotel_curator.taxonomy import LABELS
 
 EXAMPLES_PER_KIND = 3
@@ -179,6 +181,8 @@ def _card_evaluation(c: CardInputs) -> list[str]:
     v1 = c.promotion["v1_config"]
     v1s = rows[v1]["summary"]
     ece = np.mean(list(test["review_ece"].values()))
+    part_ece = mean_part_ece(test)
+    part = "-" if math.isnan(part_ece) else f"{part_ece:.4f}"
     return [
         "## Evaluation (gold-test: 1,200 reviews, 182 hotels never seen)",
         "",
@@ -197,7 +201,8 @@ def _card_evaluation(c: CardInputs) -> list[str]:
         f"{diff['point']:+.3f} [{diff['low']:+.3f}, {diff['high']:+.3f}] |",
         f"| Review-level micro-F1 | {test['review_micro_f1']:.3f} |",
         f"| Part-level macro-F1 | {_fmt_ci(test['part_macro_f1'])} |",
-        f"| Mean review-level ECE (calibrated) | {ece:.4f} |",
+        f"| Mean review-level ECE (calibrated; rule 3) | {ece:.4f} |",
+        f"| Mean part-level ECE (calibrated) | {part} |",
         f"| Review-level Brier score | {test['review_brier']:.4f} |",
         "| Cross-polarity F1 (complaints in Liked, praise in Disliked) | "
         f"{test['cross_polarity']['f1']:.3f} "
@@ -234,10 +239,12 @@ def _card_package(c: CardInputs) -> list[str]:
         lines.append(
             f"- Throughput on {t.get('threads', 4):.0f} CPU threads (median "
             f"of {t.get('repeats', 1):.0f} timed passes): "
-            f"{t['parts_per_second']:.0f} "
-            f"parts/s on a {t['sample_parts']:.0f}-part corpus sample; the "
-            f"{t['corpus_parts']:,.0f}-part corpus takes about "
-            f"{t['corpus_hours']:.2f} hours."
+            f"{t['parts_per_second']:.0f} parts/s on a "
+            f"{t['sample_parts']:,.0f}-part corpus sample. Extrapolated to "
+            f"the {t['corpus_parts']:,.0f}-part corpus, that is an estimated "
+            f"{t['corpus_hours']:.2f} hours (rule 4's measure), not a timed "
+            "full run; the measured full `curator score parts` run is "
+            "reported in `docs/specs/v2-plan.md` (Status, M3 backend)."
         )
     return [*lines, ""]
 
@@ -262,11 +269,16 @@ WEAKEST_LABELS = 4
 
 
 def _label_limits(c: CardInputs) -> list[str]:
-    """The labels with the least gold-test support and the lowest F1."""
+    """Labels no human checked, and those with the least support and F1."""
     rows = c.report["test"]["per_label"]
     rare = sorted(rows, key=lambda r: r["support"])[:RARE_LABELS]
     weak = sorted(rows, key=lambda r: r["f1"])[:WEAKEST_LABELS]
     return [
+        "- No human or external check for "
+        + ", ".join(NO_HUMAN_CHECK)
+        + ": the external human set has no noise or wifi aspect, so their "
+        "gold is the LLM panel's alone (ADR 001; "
+        "`docs/labeling/EXTERNAL_CHECK.md`).",
         "- Fewest gold-test examples: "
         + ", ".join(f"{r['label']} ({r['support']} reviews)" for r in rare)
         + "; lowest F1: "

@@ -67,6 +67,29 @@ def _pct(value: float) -> str:
     return f"{100 * value:.0f}%"
 
 
+def _pct_beside(value: float, line: float, places: int = 0) -> str:
+    """``value`` as a percent that never reads as the ``line`` beside it.
+
+    ``places`` decimals, unless that prints the line's own figure for a
+    value off the line (79.6% against 80% would read "80%"); then one more
+    decimal, kept at least one step on the value's side of the line
+    ("79.6%", and "79.9%" for 79.96%). A value equal to the line prints as
+    the line.
+    """
+    shown = f"{100 * value:.{places}f}"
+    if value == line or shown != f"{100 * line:.{places}f}":
+        return f"{shown}%"
+    finer = places + 1
+    scale = 10**finer
+    steps = round(100 * value * scale)
+    line_steps = round(100 * line * scale)
+    if value < line:
+        steps = min(steps, line_steps - 1)
+    else:
+        steps = max(steps, line_steps + 1)
+    return f"{steps / scale:.{finer}f}%"
+
+
 DECIMAL_BELOW = 20
 """Expected counts under this are shown with one decimal, so a count just
 under a threshold (9.6 opinions against a minimum of 10) never reads as the
@@ -144,22 +167,7 @@ def blocker_line(
             f"{more} at the current rate."
         )
     if blocker.kind is BlockerKind.SHARE_TOO_LOW and grade is not None:
-        line = (
-            policy.two_sided.strong
-            if grade.family == "two_sided"
-            else policy.must_be_lines.strong
-        )
-        share = observed_share(grade)
-        if share > line:
-            return (
-                f"{name.capitalize()} is just past the line for a strength "
-                f"({100 * share:.1f}% against {_pct(line)}), too close to "
-                "confirm; it needs a clearly higher share."
-            )
-        return (
-            f"{name.capitalize()} needs more praise to count as a strength "
-            f"(now {_pct(share)}; the line is {_pct(line)})."
-        )
+        return _share_line(name, grade, policy)
     if blocker.kind is BlockerKind.WEAK_ESSENTIAL:
         return (
             f"Complaints about {name} outnumber praise; this has to change "
@@ -171,6 +179,30 @@ def blocker_line(
             "guests) hold it back."
         )
     return _spread_line(result, policy)
+
+
+def _share_line(name: str, grade: AttributeGrade, policy: TierPolicy) -> str:
+    """Why more of the same opinions would not confirm a strength.
+
+    The share is printed so that it never reads as the line it is compared
+    with ("now 79.5%; the line is 80%", not "now 80%").
+    """
+    line = (
+        policy.two_sided.strong
+        if grade.family == "two_sided"
+        else policy.must_be_lines.strong
+    )
+    share = observed_share(grade)
+    if share > line:
+        return (
+            f"{name.capitalize()} is just past the line for a strength "
+            f"({_pct_beside(share, line, places=1)} against {_pct(line)}), "
+            "too close to confirm; it needs a clearly higher share."
+        )
+    return (
+        f"{name.capitalize()} needs more praise to count as a strength "
+        f"(now {_pct_beside(share, line)}; the line is {_pct(line)})."
+    )
 
 
 def _spread_line(result: TierResult, policy: TierPolicy) -> str:

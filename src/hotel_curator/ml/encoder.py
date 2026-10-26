@@ -73,6 +73,14 @@ class TrainResult:
     thresholds: dict[str, float]
     history: list[dict[str, float]] = field(default_factory=list)
     seconds: float = 0.0
+    n_parameters: int = 0
+    """Parameters of the fine-tuned model, encoder and head (the rule-2 size
+    of a base not in ``ml.compare.SIZE_MILLIONS``)."""
+
+
+def count_parameters(model: torch.nn.Module) -> int:
+    """Number of parameters (weights and biases) in ``model``."""
+    return sum(p.numel() for p in model.parameters())
 
 
 def set_seed(seed: int) -> None:
@@ -288,7 +296,7 @@ def train_encoder(
             ``thresholds.json`` and ``train_config.json``.
 
     Returns:
-        Best epoch, its dev macro-F1, thresholds and per-epoch history.
+        Best epoch, its dev macro-F1, thresholds, history, parameter count.
     """
     started = time.perf_counter()
     set_seed(config.seed)
@@ -316,6 +324,7 @@ def train_encoder(
             model.save_pretrained(out_dir, safe_serialization=True)
             tokenizer.save_pretrained(out_dir)
     result.seconds = time.perf_counter() - started
+    result.n_parameters = count_parameters(model)
     _write_run_files(out_dir, result, config)
     return result
 

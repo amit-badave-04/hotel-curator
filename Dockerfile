@@ -26,7 +26,13 @@ ENV PATH=/opt/venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     CURATOR_HOME=/app \
     CURATOR_LOG_FORMAT=json
-RUN groupadd --system --gid 10001 curator \
+# The app runs from /opt/venv; the base image's own pip is never used and
+# carries known advisories (osv-scanner image scan), so it is removed.
+RUN rm -rf /usr/local/lib/python3.12/site-packages/pip \
+        /usr/local/lib/python3.12/site-packages/pip-*.dist-info \
+        /usr/local/lib/python3.12/ensurepip/_bundled/pip-*.whl \
+        /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.12 \
+    && groupadd --system --gid 10001 curator \
     && useradd --system --uid 10001 --gid curator --home-dir /app curator
 WORKDIR /app
 COPY --from=build /opt/venv /opt/venv

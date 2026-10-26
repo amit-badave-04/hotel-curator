@@ -241,12 +241,22 @@ so git history alone cannot prove the order):
 - *Rule 3's ECE* is measured on **review-level probabilities** (noisy-OR of
   the calibrated part probabilities), because that is the quantity the hotel
   scores add up (ADR 006). It is the mean over the 16 labels of 10-bin ECE on
-  gold-test. Part-level ECE is reported next to it.
-- *v1's configuration*: v1 is scored with two inputs (whole review
-  lowercased, the input shape it was trained on; or each part separately)
-  and two threshold sets (its shipped thresholds; thresholds tuned on
-  gold-dev). The configuration with the best gold-dev macro-F1 is "the v1
-  checkpoint" in rule 1. All four are reported.
+  gold-test. Part-level ECE is reported next to it. *(As built: the "Part
+  ECE" columns of `docs/model/COMPARISON.md` and a row of the model card,
+  added after review; per label it is `test.ece` in each rung's
+  `report.json`. It is empty for v1's whole-review configurations, whose
+  review probabilities are calibrated directly instead of combined from
+  parts. No rule uses it.)*
+- *v1's configuration*: v1 is scored with two inputs (the whole review,
+  since v1 was trained on whole reviews; or each part separately; both
+  lowercased) and two threshold sets (its shipped thresholds; thresholds
+  tuned on gold-dev). The configuration with the best gold-dev macro-F1 is
+  "the v1 checkpoint" in rule 1. All four are reported. *(Corrected after
+  review: this line first called the lowercased whole review "the input
+  shape it was trained on", but v1's training text was also
+  stopword-stripped with split contractions (v1 audit, D3). That
+  undocumented preprocessing is not reproduced, so v1's "best
+  configuration" is the best of these four.)*
 - *Encoder hyperparameters* are fixed per base model from the published
   fine-tuning recipes and not searched on gold data: roberta-base lr 3e-5,
   4 epochs; ELECTRA-small lr 1e-4, 5 epochs; mmBERT-small lr 5e-5, 4 epochs;
@@ -263,7 +273,10 @@ so git history alone cannot prove the order):
 - *Ties under rule 2* ("the smaller, faster model") are broken by
   parameter count, as coded before any result. When measured corpus speed
   would break the tie differently, `COMPARISON.md` says so in a note; the
-  decision does not change.
+  decision does not change. *(As built: the counts are the table coded
+  before any result for every base it lists, so all runs of one base have
+  one size and a tie between them falls to gold-dev macro-F1; a run's
+  recorded `n_parameters` sizes only a base the table lacks.)*
 
 ### 3.7 Model card
 
@@ -359,7 +372,7 @@ the market average). Summary:
 | Types | clean, strict | mypy |
 | Frontend | lint, type-check, unit tests, build | eslint, tsc, vitest, vite |
 | End-to-end + a11y | critical journeys pass, no serious axe violations | Playwright + axe |
-| CI | all of the above on every push | GitHub Actions |
+| CI | all of the above on pushes to `main` and `v2` and on every pull request | GitHub Actions |
 | Containers | `docker compose up` serves the demo end to end | docker compose |
 
 ### 7.2 Security requirements and abuse cases (checkable claims)
@@ -460,9 +473,9 @@ length drift); OpinRank sub-rating validity check; aspect span extraction.
 | Step 1 audit | `docs/v1-audit.md` | four independent reviewers; numbers cited by cell/file | done |
 | Step 2 plan | this file + ADRs 001-010 | dataset panel unanimous on A; tier panel: simplest-credible design 163 / traveler-first 153 / risk-first 149 | done (M0) |
 | M1 data | contracts pass on full data | `curator data build`: 515,738 raw rows -> 515,212 reviews, 1,494 hotels (1,048/220/226 train/val/test); contracts pass; rebuild byte-identical (sha256 of both tables unchanged); 47 s with cached downloads | done (M1) |
-| M2 labels/models | promotion rule | Labels: gold-test 1,200 and gold-dev 594 reviews (3 LLM annotators, majority; Fleiss' kappa 0.943-0.997 per label), train 4,006 + train_2 4,000 reviews (1 annotator). 14 rungs scored by one harness; `curator model compare` promotes `roberta-base-ft-train2`: gold-test review macro-F1 0.922 [0.911, 0.932] vs v1 0.687 [0.668, 0.705], paired difference +0.236 [+0.216, +0.255], review ECE 0.010; its int8 package 0.920 [0.909, 0.930], corpus in 1.07 h (224 parts/s, 4 threads); `pytest -m eval`: 3 passed | done (M2) |
-| M3 backend | API tests, coverage | `curator score parts`: 865,732 parts in 5,987 s on 4 threads; `curator score hotels`: 1,494 hotels (good 58, fair 960, caution 271, not enough evidence 129, not enough reviews 76; excellent 0, because no hotel's room praise reaches the 80% Strong line); `curator score validate` (docs/model/TIERS.md): out-of-time rho 0.43-0.72, all intervals above 0; highest simulated false-claim rate 0.028 (target <= 0.05); tier kept in 88% of replicates; API, DB and scoring tests in the M3 commit message | done (M3) |
+| M2 labels/models | promotion rule | Labels: gold-test 1,200 and gold-dev 594 reviews (3 LLM annotators, majority; Fleiss' kappa 0.943-0.997 per label), train 4,006 + train_2 4,000 reviews (1 annotator). 14 rungs scored by one harness; `curator model compare` promotes `roberta-base-ft-train2`: gold-test review macro-F1 0.922 [0.911, 0.932] vs v1 0.687 [0.668, 0.705], paired difference +0.236 [+0.216, +0.255], review ECE 0.010; its int8 package 0.920 [0.909, 0.930], corpus estimated at 1.07 h from a 20,000-part benchmark (224 parts/s, 4 threads); `pytest -m eval`: 3 passed | done (M2) |
+| M3 backend | API tests, coverage | `curator score parts`: 865,732 parts in 5,987 s on 4 threads; `curator score hotels`: 1,494 hotels (good 58, fair 960, caution 271, not enough evidence 129, not enough reviews 76; excellent 0: no hotel's room is 95% certain to reach the 80% Strong line, closest 0.941; 64 hotels have cleanliness and staff Strong); `curator score validate` (docs/model/TIERS.md): out-of-time rho 0.43-0.72, all intervals above 0; highest simulated false-claim rate 0.028 (target <= 0.05); tier kept in 88% of replicates; API, DB and scoring tests in the M3 commit message | done (M3) |
 | M4 frontend | component, e2e, a11y | `npm run check` (eslint, tsc, vitest, vite build): 65 unit tests passed; `npx playwright test`: 37 passed (17 journeys, 20 axe checks in light and dark mode, no serious or critical violations); `npm audit --audit-level=high`: 0 vulnerabilities; `prettier --check`: clean | done (M4) |
 | M5 polish | compose up, CI | Both images built from the M5 tree (`docker build`; API 260 MB compressed, 1.11 GB unpacked; web 26 MB); `docker compose up --no-build -d`: db, api and web healthy, web answering after 24 s; `/` 200 with CSP and security headers, `/api/readyz` ready with 1,494 hotels, `/api/docs` and `:8000/docs` 200, `POST /api/v1/analyze` 503 (no weights, B8); Postgres not reachable from the host; API filesystem read-only, uid 10001; `docker compose down -v` leaves no containers or volumes. `pytest -m "not eval" --cov`: 375 passed, coverage 90%. The CI workflow's first GitHub run follows the M5 push; its result is recorded in M6 | done (M5) |
-| M6 gates | security review | — | not started |
+| M6 gates | security review | `docs/security/v2-security-review.md`: SR-1..SR-14 with evidence (SR-3 narrower than registered: probes and docs are not rate-limited); gitleaks (PR range, all refs, tree, staged), trufflehog (history, tree): 0 findings in the pull request, 1 false positive (a file hash) on the session backup branch only; pip-audit (188 packages), osv-scanner (780 locked packages), npm audit (600): 0 known vulnerabilities; bandit 0 findings; semgrep 286 results triaged, 0 security issues; container images scanned with osv-scanner (pip removed from the API image; the rest has no upstream fix or is not reachable); independent automated reviews: a four-area security review with a skeptic per finding (3 low findings, fixed), a structured security-review pass (nothing reportable), a separate review whose finding moved Postgres off the network, and a verification of the whole diff by five reviewers and five skeptics (44 confirmed findings, each fixed or documented with its reason in two rounds, each fix checked by a separate skeptic); a red-team exercise with four attacker teams and a skeptic each (6 findings reproduced, 2 confirmed low: the database role is no longer a superuser, and the compose setup's shared rate-limit bucket is documented; 74 attacks resisted). Final tree: `pytest --cov` 398 passed, 2 skipped (the eval gates that need the weights), coverage 90%; with the weights present locally `pytest -m eval` 3 passed; ruff, mypy strict clean; web `npm run check` 74 tests, prettier clean, npm audit 0; `npx playwright test` 37 passed. CI: the first GitHub run (run 40149142437, on the M5 commit before its message was rewritten; same code apart from documentation wording) passed all three jobs; the M6 run is recorded in M7 | done (M6) |
 | M7 architecture | views | — | not started |

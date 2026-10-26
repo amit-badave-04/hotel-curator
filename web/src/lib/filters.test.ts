@@ -41,6 +41,21 @@ describe('explorer filters', () => {
     expect(filters.q).toHaveLength(80);
   });
 
+  it('treats the two "not enough" tiers as one choice', () => {
+    const both = parseFilters(
+      new URLSearchParams('tier=not_enough_evidence&tier=not_enough_reviews'),
+    );
+    expect(both.tiers).toEqual(['not_enough_evidence', 'not_enough_reviews']);
+    expect(activeFilterCount(both)).toBe(1);
+
+    // A hand-edited or old URL with only one of them selects both, so the
+    // checkbox, the count and the results agree.
+    const one = parseFilters(new URLSearchParams('tier=not_enough_reviews&tier=good'));
+    expect(one.tiers).toEqual(['good', 'not_enough_evidence', 'not_enough_reviews']);
+    expect(activeFilterCount(one)).toBe(2);
+    expect(toApiParams(one).tier).toEqual(['good', 'not_enough_evidence', 'not_enough_reviews']);
+  });
+
   it('leaves defaults out of the URL and builds API params', () => {
     expect(filtersToSearchParams(DEFAULT_FILTERS).toString()).toBe('');
     expect(toApiParams({ ...DEFAULT_FILTERS, tiers: ['caution'] })).toEqual({

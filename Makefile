@@ -5,7 +5,7 @@
 SHELL := /bin/bash
 UV ?= uv
 RUN := $(UV) run --frozen
-PY_SRC := $(wildcard src tests scripts)
+PY_SRC := $(wildcard src tests scripts notebooks)
 
 .DEFAULT_GOAL := help
 
@@ -108,13 +108,13 @@ format: ## Apply ruff formatting and safe fixes
 	$(RUN) ruff check --fix $(PY_SRC)
 	$(RUN) ruff format $(PY_SRC)
 
-typecheck: ## mypy (strict) on the package
+typecheck: ## mypy (strict) on the package (needs make setup-ml)
 	$(RUN) mypy
 
-test: ## Full Python test suite with coverage
+test: ## Full Python test suite with coverage (needs make setup-ml)
 	$(RUN) pytest --cov --cov-report=term-missing
 
-test-fast: ## Unit tests only
+test-fast: ## Unit tests only (needs make setup-ml)
 	$(RUN) pytest tests/unit -q
 
-check: lint typecheck test ## Everything CI runs for Python
+check: lint typecheck test ## Everything CI runs for Python (needs make setup-ml)

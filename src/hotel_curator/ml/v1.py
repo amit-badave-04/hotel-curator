@@ -1,18 +1,23 @@
 """The frozen v1 checkpoint, adapted to the v2 evaluation harness.
 
-v1 is a roberta-base classifier fine-tuned on lowercased whole TripAdvisor
-reviews, with its own label order (``label_names.json``) and per-label
-thresholds tuned on its own validation data. It never saw a Liked/Disliked
-split, so two ways of feeding it a Booking review are fair:
+v1 is a roberta-base classifier fine-tuned on whole TripAdvisor reviews,
+with its own label order (``label_names.json``) and per-label thresholds
+tuned on its own validation data. Its training text came from the source
+already lowercased, stopword-stripped and with split contractions ("did
+n't"; v1 audit, D3). It never saw a Liked/Disliked split, so two ways of
+feeding it a Booking review are scored:
 
-* ``review``: the review's parts joined into one lowercased text, the input
-  shape v1 was trained on; one prediction per review.
+* ``review``: the review's parts joined into one lowercased text, a whole
+  review as v1 was trained on; one prediction per review.
 * ``parts``: each part on its own, lowercased; the review's labels are the
   union of its parts' labels, as for v2.
 
-Which one is used, and whether v1 keeps its shipped thresholds or gets
-thresholds tuned on gold-dev, is chosen on gold-dev by the same rule as for
-v2 models, so the comparison gives v1 its best configuration.
+Both inputs are only lowercased: the stopword removal and contraction
+splitting of v1's training text were never documented and are not
+reproduced, so v1 sees stopwords it rarely saw in training. Which input is
+used, and whether v1 keeps its shipped thresholds or gets thresholds tuned
+on gold-dev, is chosen on gold-dev by the same rule as for v2 models, so the
+comparison gives v1 the best of these four configurations.
 """
 
 import json

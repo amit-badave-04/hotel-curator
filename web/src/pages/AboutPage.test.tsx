@@ -19,12 +19,16 @@ async function openAbout() {
 }
 
 describe('About page', () => {
-  it('explains the method with the live policy values', async () => {
+  it('explains the method with the policy values', async () => {
     await openAbout();
     expect(region('How the labels were made')).toHaveTextContent('machine-made');
-    expect(region('The model ladder')).toHaveTextContent('macro-F1');
+    const ladder = region('The model ladder');
+    expect(ladder).toHaveTextContent('macro-F1');
+    expect(ladder).toHaveTextContent('were scored the same way on the same test reviews');
+    expect(ladder).toHaveTextContent(
+      'models whose name ends in -train2 were trained on both labelled training sets (8,006 reviews), the others on the first set only (4,006 reviews)',
+    );
     const tiers = region('How tiers work');
-    expect(tiers).toHaveTextContent('Fewer than 30 usable reviews, or fewer than 10 opinions');
     expect(tiers).toHaveTextContent('at least 6 different months');
     expect(tiers).toHaveTextContent('Policy version 2026-10-24.1');
     const grades = region('What the grades mean');
@@ -39,6 +43,50 @@ describe('About page', () => {
     expect(
       within(region('For developers')).getByRole('link', { name: /API documentation/ }),
     ).toHaveAttribute('href', '/api/docs');
+  });
+
+  it('lists the tier rules in the order the API applies them', async () => {
+    await openAbout();
+    const table = within(region('How tiers work')).getByRole('region', {
+      name: 'Tier rules (scrollable table)',
+    });
+    const rules = within(table).getAllByRole('row').slice(1);
+    expect(rules).toHaveLength(6);
+    expect(rules[0]).toHaveTextContent(/too few reviews.*Fewer than 30 usable reviews\./);
+    expect(rules[1]).toHaveTextContent(/Caution.*graded Weak, and is still Weak by the stricter/);
+    expect(rules[2]).toHaveTextContent(/too few opinions.*Fewer than 10 opinions on an essential/);
+    expect(rules[3]).toHaveTextContent(/Excellent.*All three essentials Strong/);
+    expect(rules[4]).toHaveTextContent(/Good.*At least two essentials Strong, no essential Weak/);
+    expect(rules[5]).toHaveTextContent(
+      /Fair.*an essential graded Weak that does not pass the stricter test for Caution/,
+    );
+  });
+
+  it('shows the live policy values from /v1/meta, not the built-in defaults', async () => {
+    const live = meta();
+    live.policy = {
+      ...live.policy,
+      min_reviews: 40,
+      min_opinions: 12,
+      materiality: 0.04,
+      two_sided: { strong: 0.75, weak: 0.5 },
+      must_be_lines: { strong: 0.04, weak: 0.1 },
+      excellent: { min_months: 8, max_month_share: 0.2 },
+    };
+    server.use(http.get('*/api/v1/meta', () => HttpResponse.json(live)));
+    await openAbout();
+    const tiers = region('How tiers work');
+    expect(tiers).toHaveTextContent('Fewer than 40 usable reviews.');
+    expect(tiers).toHaveTextContent('Fewer than 12 opinions on an essential.');
+    expect(tiers).toHaveTextContent(
+      'at least 8 different months with no month holding more than 20% of them',
+    );
+    expect(tiers).toHaveTextContent('raised by at least 4% of guests');
+    const grades = region('What the grades mean');
+    expect(grades).toHaveTextContent('At least 75% praise (about 3 praises per complaint)');
+    expect(grades).toHaveTextContent('At most 4% complained (1 guest in 25)');
+    expect(grades).toHaveTextContent('Fewer than 12 opinions');
+    expect(grades).toHaveTextContent('Fewer than 40 reviews');
   });
 
   it('says when no evaluation is available', async () => {
@@ -60,6 +108,29 @@ describe('About page', () => {
     expect(within(table).getAllByRole('row')).toHaveLength(4);
     expect(within(table).getByRole('rowheader', { name: 'encoder-small (served)' })).toBeVisible();
     expect(within(table).getByRole('rowheader', { name: 'v1-parts-tuned (v1)' })).toBeVisible();
+    expect(evaluation).toHaveTextContent('marked "(served)".');
+    expect(evaluation).not.toHaveTextContent('ONNX package');
+  });
+
+  it("explains when the served package's score differs from its checkpoint's", async () => {
+    const evaluation = { ...EVALUATION, macro_f1: { point: 0.709, low: 0.679, high: 0.739 } };
+    server.use(http.get('*/api/v1/meta', () => HttpResponse.json(meta(evaluation))));
+    await openAbout();
+    const section = region('Evaluation');
+    await waitFor(() => expect(section).toHaveTextContent('95% interval 0.679 to 0.739'));
+    // v1's stat is v1's own score, so the note names only the package's numbers.
+    expect(section).toHaveTextContent(
+      "The served model is an ONNX package built from the encoder-small checkpoint. The served model's numbers above (macro-F1, the difference from v1 and the calibration error) are the package's own.",
+    );
+    expect(section).not.toHaveTextContent('The numbers above are');
+    expect(section).toHaveTextContent(
+      "the served model's row there reads 0.712 (95% interval 0.681 to 0.741)",
+    );
+    expect(section).toHaveTextContent('marked "(served, checkpoint)".');
+    const table = within(section).getByRole('table');
+    expect(
+      within(table).getByRole('rowheader', { name: 'encoder-small (served, checkpoint)' }),
+    ).toBeVisible();
   });
 });
 

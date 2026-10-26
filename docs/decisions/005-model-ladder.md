@@ -39,7 +39,7 @@ MiniLM-L12 at 10.3.
 | Rung | Model | Notes |
 |---|---|---|
 | a | TF-IDF + logistic regression; TF-IDF + LightGBM | `hotel_curator.ml.baselines` |
-| b | frozen bge-small embeddings + logistic heads | embeddings computed once, cached |
+| b | frozen bge-small embeddings + logistic heads | each part embedded once per run (not cached: every `run-embeddings` embeds all sets again) |
 | c | fine-tuned roberta-base (primary), ELECTRA-small, mmBERT-small | `hotel_curator.ml.encoder`, one training loop for all |
 | v1 | v1 checkpoint, frozen | scored on the v2 gold set by the same harness |
 | d | LLM annotator panel | labels only (ADR 004) |
@@ -50,7 +50,20 @@ MiniLM-L12 at 10.3.
 - The v1 checkpoint is **not** used to initialise v2 models (its encoder saw
   v1's training reviews).
 - The same command trains ModernBERT, DeBERTa-v3 or Ettin as soon as the owner
-  unblocks huggingface.co; that run is listed as an owner action.
+  unblocks huggingface.co; that run is listed as an owner action. Rule-2
+  ties are broken by the fixed sizes in `ml/compare.py` (`SIZE_MILLIONS`,
+  coded before any result) for every base and family listed there, so all
+  runs of one base have the same size and a tie between them falls to
+  gold-dev macro-F1. Every encoder run also records its exact parameter
+  count (`n_parameters`), which sizes a base the table lacks (e.g. Ettin);
+  `curator model compare` refuses a tie it cannot size.
+- An encoder rung's default name carries every setting that differs from the
+  pre-specified one (`-frac0.5`, `-seed7`, `-lr2e-05`, `-ep3`, then
+  `-train2`), so a learning-curve point or a hyperparameter probe never
+  overwrites the full run's results, checkpoint or package measurements.
+  Commands that take a rung name (`curator model package`) therefore need
+  the tagged name of such a run; given an unevaluated name, `package` lists
+  the evaluated rungs instead of failing on a missing file.
 
 ## Consequences
 

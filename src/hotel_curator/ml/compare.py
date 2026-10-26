@@ -31,6 +31,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from hotel_curator.labeling.external import EXTERNAL_LABELS
+from hotel_curator.ml.calibration import DEFAULT_BINS
 from hotel_curator.ml.experiment import (
     PACKAGE_SCORES,
     load_review_level_predictions,
@@ -50,7 +52,31 @@ SIZE_MILLIONS = {
     "roberta-base": 125,
     "mmbert-small": 140,
 }
-"""Approximate parameter counts used only to break rule-2 ties."""
+"""Approximate (published) parameter counts in millions, coded before any
+result and used only to break rule-2 ties, by base model (encoders) or
+else by family. A base listed here always takes this value, even when a
+run recorded its exact ``n_parameters``, so every run of one base has one
+size and a tie between them falls to gold-dev F1."""
+NO_HUMAN_CHECK = tuple(
+    label for label in LABELS if label not in EXTERNAL_LABELS
+)
+"""Labels with no human or external check (noise, wifi): the external set
+has no such aspect, so their gold is the LLM panel's alone (ADR 001)."""
+NO_HUMAN_CHECK_MARK = "†"
+NO_HUMAN_CHECK_NOTE = (
+    f"{NO_HUMAN_CHECK_MARK} No human or external check: the external human "
+    "set has no noise or wifi aspect, so these labels' gold is the LLM "
+    "panel's alone (ADR 001; `docs/labeling/EXTERNAL_CHECK.md`)."
+)
+ECE_NOTE = (
+    "Review ECE (rule 3) is measured on calibrated review-level "
+    "probabilities (for part-level rungs, the noisy-OR of the calibrated "
+    "part probabilities). Part ECE, shown next to it and not used by any "
+    f"rule, is the same mean over the {len(LABELS)} labels of "
+    f"{DEFAULT_BINS}-bin ECE, measured on each Liked or Disliked text on "
+    "its own; `-` for the v1 runs scored on whole reviews."
+)
+"""How the two ECE columns of the comparison differ."""
 RUN_NOTES = "NOTES.md"
 """Optional hand-written note in a rung's eval directory, shown verbatim
 (e.g. how a run differed from the others)."""
@@ -62,7 +88,8 @@ class RungRow:
 
     name: str
     family: str
-    size_millions: int
+    size_millions: float | None
+    """Parameter count in millions (rule-2 ties); ``None`` when unknown."""
     summary: dict[str, Any]
     train_sets: str = "train"
     notes: str = ""
@@ -116,11 +143,21 @@ class Decision:
         }
 
 
-def _size(summary: dict[str, Any], params: dict[str, Any]) -> int:
+def _size(summary: dict[str, Any], params: dict[str, Any]) -> float | None:
+    """A rung's parameter count in millions, or ``None`` if it is unknown.
+
+    :data:`SIZE_MILLIONS` by base model comes first, so an old run of a
+    base (no count) and a new one (exact count) are the same size. The
+    count the run recorded (``n_parameters``) sizes a base the table lacks;
+    other rungs fall back to the table by family.
+    """
     base = params.get("base_model")
     if isinstance(base, str) and base in SIZE_MILLIONS:
         return SIZE_MILLIONS[base]
-    return SIZE_MILLIONS.get(str(summary["family"]), 1000)
+    counted = params.get("n_parameters")
+    if isinstance(counted, int) and counted > 0:
+        return counted / 1e6
+    return SIZE_MILLIONS.get(str(summary["family"]))
 
 
 def load_rows(evals_dir: Path) -> list[RungRow]:
@@ -245,7 +282,7 @@ def _pick_winner(pool: list[RungRow], decision: Decision) -> None:
     """Rule 2 among rule-1 passers, then rules 3 and 4 for the candidate."""
     best = max(r.dev_f1 for r in pool)
     tied = [r for r in pool if r.dev_f1 >= best - TIE_WINDOW]
-    candidate = min(tied, key=lambda r: (r.size_millions, -r.dev_f1))
+    candidate = tied[0] if len(tied) == 1 else _smallest(tied)
     if len(tied) > 1:
         decision.notes.append(
             f"Rule 2 tie within {TIE_WINDOW}: "
@@ -269,6 +306,30 @@ def _pick_winner(pool: list[RungRow], decision: Decision) -> None:
         decision.winner = candidate.name
 
 
+def _smallest(tied: list[RungRow]) -> RungRow:
+    """Rule 2's tie-break: fewest parameters, then the best gold-dev score.
+
+    Raises:
+        ValueError: If the size of a tied rung is unknown, since the rule
+            cannot then be applied (retraining records ``n_parameters``).
+    """
+    sized = [(r.size_millions, r) for r in tied if r.size_millions is not None]
+    if len(sized) < len(tied):
+        unknown = sorted(r.name for r in tied if r.size_millions is None)
+        raise ValueError(
+            f"rule 2 tie: unknown parameter count of {unknown}; train them "
+            "again (runs record n_parameters) or add them to SIZE_MILLIONS"
+        )
+    return min(sized, key=lambda pair: (pair[0], -pair[1].dev_f1))[1]
+
+
+def _millions(size: float | None) -> str:
+    """``125M``, ``1,500M`` or ``0.03M``; ``?`` when unknown."""
+    if size is None:
+        return "?"
+    return f"{size:,.0f}M" if size >= 10 else f"{size:.2g}M"
+
+
 def _speed_note(tied: list[RungRow], winner: RungRow) -> list[str]:
     """Say so when "faster" would break the tie differently from "smaller".
 
@@ -285,9 +346,9 @@ def _speed_note(tied: list[RungRow], winner: RungRow) -> list[str]:
     hours = ", ".join(f"{r.name} {r.corpus_hours:.2f} h" for r in timed)
     return [
         f"By measured speed ({hours} for the corpus) {fastest.name} would "
-        f"win the tie; by parameter count ({winner.size_millions}M vs "
-        f"{fastest.size_millions}M) {winner.name} does. The rule as coded "
-        "before results breaks ties by parameter count."
+        f"win the tie; by parameter count ({_millions(winner.size_millions)} "
+        f"vs {_millions(fastest.size_millions)}) {winner.name} does. The rule "
+        "as coded before results breaks ties by parameter count."
     ]
 
 
@@ -369,53 +430,82 @@ def _ci(point: float, low: float, high: float) -> str:
     return f"{point:.3f} [{low:.3f}, {high:.3f}]"
 
 
-def _main_table(decision: Decision) -> list[str]:
-    lines = [
-        "| Rung | Family | Trained on | Dev macro-F1 | "
-        "Test macro-F1 [95% CI] | Test minus v1 [95% CI] | Micro-F1 | "
-        "Review ECE | Cross-polarity F1 | Train s | Rules 1/3/4/P |",
-        "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|",
-    ]
+def _test_report(evals_dir: Path, name: str) -> dict[str, Any]:
+    """The gold-test part of a rung's ``report.json``."""
+    report = json.loads((evals_dir / name / "report.json").read_text())
+    test: dict[str, Any] = report["test"]
+    return test
+
+
+def mean_part_ece(test: dict[str, Any]) -> float:
+    """Mean over labels of the part-level ECE; NaN if not measured.
+
+    Shown next to rule 3's review-level ECE, not used by the rule. A rung
+    scored on whole reviews (v1's ``review`` input) has none.
+    """
+    ece = test.get("ece") or {}
+    return float(np.mean(list(ece.values()))) if ece else math.nan
+
+
+def _rules_cell(row: RungRow) -> str:
+    if not row.rules:
+        return "-"
+    return "/".join(
+        "-" if v is None else "yes" if v else "no" for v in row.rules.values()
+    )
+
+
+def _main_line(row: RungRow, decision: Decision, part_ece: float) -> str:
+    s = row.summary
+    diff = (
+        _ci(row.vs_v1.point, row.vs_v1.low, row.vs_v1.high)
+        if row.vs_v1
+        else ("reference" if row.name == decision.v1_config else "-")
+    )
+    name = f"**{row.name}**" if row.name == decision.winner else row.name
+    return (
+        f"| {name} | {row.family} | {_trained_on(row)} | {row.dev_f1:.3f} | "
+        + _ci(
+            s["test_review_macro_f1"],
+            s["test_review_macro_f1_low"],
+            s["test_review_macro_f1_high"],
+        )
+        + f" | {diff} | {s['test_review_micro_f1']:.3f} | "
+        f"{s['test_mean_review_ece']:.3f} | {_number(part_ece, '.3f')} | "
+        f"{_number(s['test_cross_polarity_f1'], '.3f')} | "
+        f"{_number(s.get('seconds_train', math.nan), '.0f')} | "
+        f"{_rules_cell(row)} |"
+    )
+
+
+def _main_table(decision: Decision, evals_dir: Path) -> list[str]:
     ordered = sorted(
         decision.rows, key=lambda r: -r.summary["test_review_macro_f1"]
     )
-    for row in ordered:
-        s = row.summary
-        diff = (
-            _ci(row.vs_v1.point, row.vs_v1.low, row.vs_v1.high)
-            if row.vs_v1
-            else ("reference" if row.name == decision.v1_config else "-")
-        )
-        rules = (
-            "/".join(
-                "-" if v is None else "yes" if v else "no"
-                for v in row.rules.values()
+    return [
+        "| Rung | Family | Trained on | Dev macro-F1 | "
+        "Test macro-F1 [95% CI] | Test minus v1 [95% CI] | Micro-F1 | "
+        "Review ECE | Part ECE | Cross-polarity F1 | Train s | "
+        "Rules 1/3/4/P |",
+        "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|",
+        *(
+            _main_line(
+                row, decision, mean_part_ece(_test_report(evals_dir, row.name))
             )
-            if row.rules
-            else "-"
-        )
-        name = f"**{row.name}**" if row.name == decision.winner else row.name
-        lines.append(
-            f"| {name} | {row.family} | {_trained_on(row)} | "
-            f"{row.dev_f1:.3f} | "
-            + _ci(
-                s["test_review_macro_f1"],
-                s["test_review_macro_f1_low"],
-                s["test_review_macro_f1_high"],
-            )
-            + f" | {diff} | {s['test_review_micro_f1']:.3f} | "
-            f"{s['test_mean_review_ece']:.3f} | "
-            f"{_number(s['test_cross_polarity_f1'], '.3f')} | "
-            f"{_number(s.get('seconds_train', math.nan), '.0f')} | {rules} |"
-        )
-    return lines
+            for row in ordered
+        ),
+    ]
+
+
+def marked_label(label: str) -> str:
+    """``label``, with :data:`NO_HUMAN_CHECK_MARK` if no human checked it."""
+    if label in NO_HUMAN_CHECK:
+        return f"{label} {NO_HUMAN_CHECK_MARK}"
+    return label
 
 
 def _per_label_table(evals_dir: Path, names: list[str]) -> list[str]:
-    reports = {
-        n: json.loads((evals_dir / n / "report.json").read_text())["test"]
-        for n in names
-    }
+    reports = {n: _test_report(evals_dir, n) for n in names}
     lines = [
         "| Label | Support | " + " | ".join(names) + " |",
         "|---|---:|" + "---:|" * len(names),
@@ -423,8 +513,10 @@ def _per_label_table(evals_dir: Path, names: list[str]) -> list[str]:
     for k, label in enumerate(LABELS):
         support = reports[names[0]]["per_label"][k]["support"]
         cells = [f"{reports[n]['per_label'][k]['f1']:.3f}" for n in names]
-        lines.append(f"| {label} | {support} | " + " | ".join(cells) + " |")
-    return lines
+        lines.append(
+            f"| {marked_label(label)} | {support} | " + " | ".join(cells) + " |"
+        )
+    return [*lines, "", NO_HUMAN_CHECK_NOTE]
 
 
 def _slice_table(evals_dir: Path, name: str, v1: str) -> list[str]:
@@ -458,18 +550,20 @@ def _slice_table(evals_dir: Path, name: str, v1: str) -> list[str]:
 
 
 def _calibration_table(evals_dir: Path, name: str) -> list[str]:
-    test = json.loads((evals_dir / name / "report.json").read_text())["test"]
+    test = _test_report(evals_dir, name)
+    part_ece = test.get("ece") or {}
     lines = [
-        "| Label | Review ECE | Predicted share | Observed share |",
-        "|---|---:|---:|---:|",
+        "| Label | Review ECE | Part ECE | Predicted share | Observed share |",
+        "|---|---:|---:|---:|---:|",
     ]
     for label in LABELS:
         expected, observed = test["calibration_in_the_large"][label]
         lines.append(
-            f"| {label} | {test['review_ece'][label]:.3f} | "
+            f"| {marked_label(label)} | {test['review_ece'][label]:.3f} | "
+            f"{_number(part_ece.get(label, math.nan), '.3f')} | "
             f"{expected:.1%} | {observed:.1%} |"
         )
-    return lines
+    return [*lines, "", NO_HUMAN_CHECK_NOTE]
 
 
 def _trained_on(row: RungRow) -> str:
@@ -478,7 +572,7 @@ def _trained_on(row: RungRow) -> str:
     return "train + train_2" if "train_2" in row.train_sets else "train"
 
 
-def _comparison_intro(decision: Decision) -> list[str]:
+def _comparison_intro(decision: Decision, evals_dir: Path) -> list[str]:
     verdict = (
         f"promote `{decision.winner}`"
         if decision.winner
@@ -510,13 +604,15 @@ def _comparison_intro(decision: Decision) -> list[str]:
         "package's own gold-test scores, since the package is what is "
         "served. `-` in the rules column means not measured.",
         "",
+        ECE_NOTE,
+        "",
         f"**Decision: {verdict}.**",
         "",
         *[f"- {note}" for note in decision.notes],
         "",
         "## All rungs (gold-test, review level)",
         "",
-        *_main_table(decision),
+        *_main_table(decision, evals_dir),
         "",
         *_package_table(decision),
     ]
@@ -617,7 +713,7 @@ def _notes_section(decision: Decision) -> list[str]:
 def comparison_markdown(decision: Decision, evals_dir: Path) -> str:
     """The committed ``docs/model/COMPARISON.md``."""
     lines = (
-        _comparison_intro(decision)
+        _comparison_intro(decision, evals_dir)
         + _notes_section(decision)
         + _winner_sections(decision, evals_dir)
     )

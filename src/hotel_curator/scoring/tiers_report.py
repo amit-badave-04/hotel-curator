@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from hotel_curator.scoring.grades import Grade
 from hotel_curator.scoring.policy import TierPolicy
 from hotel_curator.scoring.tiers import RANKED_TIERS as RANKED
 from hotel_curator.scoring.tiers import Tier, TierResult
@@ -77,6 +78,60 @@ class TierValidation:
     """Hotels in the test split (the out-of-time population)."""
 
 
+def essential_strengths(
+    results: Mapping[str, TierResult], policy: TierPolicy
+) -> str:
+    """Strong grades per essential, and how close the rarest one comes.
+
+    Excellent needs every essential Strong, so the essential with the fewest
+    Strong grades caps the top tier.
+    """
+    if not results:
+        raise ValueError("no tier results")
+    essentials = policy.essentials
+    strong = {
+        e: sum(r.grades[e].grade is Grade.STRONG for r in results.values())
+        for e in essentials
+    }
+    rarest = min(essentials, key=lambda e: strong[e])
+    others = [e for e in essentials if e is not rarest]
+    others_strong = sum(
+        all(r.grades[e].grade is Grade.STRONG for e in others)
+        for r in results.values()
+    )
+    closest = max(r.grades[rarest].prob_strong for r in results.values())
+    counts = ", ".join(f"{e.value} {n}" for e, n in strong.items())
+    return (
+        f"Strong essentials (Excellent needs all {len(essentials)}): "
+        f"{counts}. {others_strong} hotels have "
+        f"{' and '.join(e.value for e in others)} Strong; for "
+        f"{rarest.value}, the hotel closest to Strong is "
+        f"{closest:.3f} certain that at least "
+        f"{policy.two_sided.strong:.0%} of its opinions are praise "
+        f"(Strong needs {policy.confirmation:.2f})."
+    )
+
+
+def monotonicity_claim(policy: TierPolicy) -> str:
+    """What the property tests guarantee, with both exceptions (ADR 006, E6).
+
+    Both exceptions sit at the opinions floor: praise can grade a
+    non-essential as a material Weak (a new catch), or confirm an
+    essential's Weak grade on hard labels (rule 2, Caution).
+    """
+    floor = policy.min_opinions
+    return (
+        "with the review count and month spread held fixed, one more "
+        "complaint never raises a ranked tier, and one more praise never "
+        f"lowers one except in two cases, both at the {floor} opinions "
+        f"needed for a grade: it lifts a non-essential attribute to {floor} "
+        "opinions and the new grade is a material Weak, a new catch; or it "
+        "lifts an essential that is Weak on expected counts to "
+        f"{floor} opinions on hard labels, where it is Weak too, so Fair "
+        "falls to Caution by rule 2; ADR 006, errata E2 and E6"
+    )
+
+
 def _intro_and_mix(v: TierValidation) -> list[str]:
     catches = pd.Series(
         [a.value for r in v.results.values() for a in r.catches]
@@ -96,16 +151,17 @@ def _intro_and_mix(v: TierValidation) -> list[str]:
         "",
         f"Catches (material weak spots outside the essentials): {listed}.",
         "",
+        essential_strengths(v.results, v.policy),
+        "",
         "## 1-3. Subset invariance, monotonicity, truth tables",
         "",
         "Checked by tests, not by this report: "
         "`tests/unit/test_demo_subset.py` recomputes the tiers of the "
         "committed demo subset from its stored review signals and requires "
         "them to equal the served tiers; `tests/unit/test_tiers.py` holds "
-        "the truth tables and the property tests (with the review count "
-        "and month spread held fixed, one more praise never lowers a tier "
-        "and one more complaint never raises it; ADR 006, erratum E2); "
-        "`tests/unit/test_grades.py` holds the grade truth tables.",
+        "the truth tables and the property tests "
+        f"({monotonicity_claim(v.policy)}); `tests/unit/test_grades.py` "
+        "holds the grade truth tables.",
         "",
     ]
 

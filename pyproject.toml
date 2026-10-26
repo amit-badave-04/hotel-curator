@@ -1,6 +1,7 @@
 [build-system]
-requires = ["hatchling>=1.27"]
-build-backend = "hatchling.build"
+# uv's own build backend: building the package downloads nothing.
+requires = ["uv_build>=0.11.32,<0.12"]
+build-backend = "uv_build"
 
 [project]
 name = "hotel-curator"
@@ -68,9 +69,6 @@ curator = "hotel_curator.cli.main:app"
 [project.urls]
 Repository = "https://github.com/amit-badave-04/hotel-curator"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/hotel_curator"]
-
 [tool.ruff]
 line-length = 80
 target-version = "py312"
@@ -117,8 +115,6 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
 markers = [
-    "slow: needs real data or trained model artifacts",
-    "postgres: needs a running PostgreSQL (CURATOR_TEST_POSTGRES_URL)",
     "eval: model-behaviour evaluation thresholds",
 ]
 filterwarnings = ["error::DeprecationWarning:hotel_curator.*"]

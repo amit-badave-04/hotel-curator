@@ -18,6 +18,8 @@ htmlcov/
 # Credentials (never commit; see .env.example)
 .env
 .env.*
+# Local compose overrides (may hold a database URL with a password)
+docker-compose.override.yml
 !.env.example
 
 # Data that is rebuilt by `make data` (manifests in data/manifests are committed)

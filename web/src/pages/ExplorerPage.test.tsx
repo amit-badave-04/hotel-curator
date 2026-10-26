@@ -88,6 +88,20 @@ describe('Explorer page', () => {
       expect(search().getAll('tier')).toEqual(['not_enough_evidence', 'not_enough_reviews']),
     );
     await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(2));
+    // One box, one filter, although it puts two tiers in the URL.
+    expect(screen.getByRole('heading', { level: 2, name: /^Filters/ })).toHaveTextContent(
+      /\(1 active\)$/,
+    );
+  });
+
+  it('checks "Not enough evidence to judge" for a URL with only one of its tiers', async () => {
+    renderApp('/?tier=not_enough_reviews');
+    await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(2));
+    expect(screen.getByRole('article', { name: 'Echo Stay' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Not enough evidence to judge' })).toBeChecked();
+    expect(screen.getByRole('heading', { level: 2, name: /^Filters/ })).toHaveTextContent(
+      /\(1 active\)$/,
+    );
   });
 
   it('reads filters from the URL, ignoring invalid values', async () => {

@@ -14,8 +14,9 @@ FastAPI app with the `/api` prefix removed.
 ## Requirements
 
 - Node.js 22.22.2 or newer (`engines` in `package.json`; jsdom 30 needs it).
-  CI and the Docker build use 22.23. Older 22.22 releases print an engine
-  warning on `npm ci`.
+  The Docker build pins 22.23.4; CI asks `actions/setup-node` for `"22"`, so
+  it runs whatever Node 22 release the runner resolves. Older 22.22 releases
+  print an engine warning on `npm ci`.
 - The Python API from the repository root (`.venv/bin/curator`), for `dev`,
   `preview` and the end-to-end tests.
 
@@ -176,7 +177,9 @@ test/           tooling tests (nginx headers)
   choice is kept in `localStorage` (guarded, so the app works without it).
 - Grades and tiers are always text plus an icon plus colour. The two "not
   enough" tiers read as "Not enough evidence to judge", styled neutrally.
-- Every chart has a caption, a legend, and a table with the same numbers.
+- Every chart has a heading, a caption or summary line, and a table with the
+  same numbers. The interval charts (points, ranges, grade lines) have a
+  legend; the review-volume chart has a single series, so no legend.
   Chart colours: blue `#2a78d6` for points, orange `#eb6834` for the
   highlighted mark (a credible leader, the served model), grey for intervals;
   dark mode uses the dark steps of the same hues.

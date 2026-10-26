@@ -9,7 +9,8 @@ import type { Interval } from './interval';
 /**
  * Headline gold-test numbers of the served model versus v1.
  *
- * For a judged ONNX package these are the package's own numbers.
+ * For a judged ONNX package, macro_f1, difference and mean_review_ece
+ * are the package's own numbers; v1_macro_f1 is always v1's.
  */
 export interface Evaluation {
   difference: Interval;

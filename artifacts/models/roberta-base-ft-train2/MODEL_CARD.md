@@ -34,7 +34,8 @@ Gold labels are the majority of three LLM annotators; their agreement with human
 | Difference vs v1 (paired, hotel clusters) | +0.236 [+0.216, +0.255] |
 | Review-level micro-F1 | 0.944 |
 | Part-level macro-F1 | 0.919 [0.907, 0.928] |
-| Mean review-level ECE (calibrated) | 0.0104 |
+| Mean review-level ECE (calibrated; rule 3) | 0.0104 |
+| Mean part-level ECE (calibrated) | 0.0068 |
 | Review-level Brier score | 0.0169 |
 | Cross-polarity F1 (complaints in Liked, praise in Disliked) | 0.699 (support 186) |
 | Gold-dev review-level macro-F1 (selection) | 0.936 |
@@ -45,7 +46,7 @@ Per-label scores, slices and calibration tables: `docs/model/COMPARISON.md`. Typ
 
 - Format: ONNX, int8 weights. Gold-dev review macro-F1 fp32 0.9333, int8 0.9315 (int8 is shipped when it loses at most 0.005).
 - Packaged model on gold-test: review-level macro-F1 0.920 [0.909, 0.930], mean review-level ECE 0.0120. Promotion re-checks rules 1 and 3 on these scores.
-- Throughput on 4 CPU threads (median of 3 timed passes): 224 parts/s on a 20000-part corpus sample; the 865,732-part corpus takes about 1.07 hours.
+- Throughput on 4 CPU threads (median of 3 timed passes): 224 parts/s on a 20,000-part corpus sample. Extrapolated to the 865,732-part corpus, that is an estimated 1.07 hours (rule 4's measure), not a timed full run; the measured full `curator score parts` run is reported in `docs/specs/v2-plan.md` (Status, M3 backend).
 
 ## Limits and known failure modes
 
@@ -53,4 +54,5 @@ Per-label scores, slices and calibration tables: `docs/model/COMPARISON.md`. Typ
 - English reviews from European city hotels on one booking site, 2015-2017; other sites, languages, regions or years are untested.
 - The publisher removed punctuation, so sentence boundaries and negation scope are harder; see the cross-polarity row above.
 - The comparison with modern encoders is partial: huggingface.co was blocked during the build (`docs/BLOCKERS.md` B1), so the only ModernBERT-architecture model tried was mmBERT-small; ModernBERT-base, DeBERTa-v3 and Ettin were not trained (ADR 005).
+- No human or external check for noise_positive, noise_negative, wifi_positive, wifi_negative: the external human set has no noise or wifi aspect, so their gold is the LLM panel's alone (ADR 001; `docs/labeling/EXTERNAL_CHECK.md`).
 - Fewest gold-test examples: value_positive (61 reviews), noise_positive (66 reviews), wifi_positive (75 reviews); lowest F1: value_positive (0.825), cleanliness_negative (0.846), location_negative (0.858), food_negative (0.867). Per-label scores: `docs/model/COMPARISON.md`.

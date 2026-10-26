@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import type { HotelSummary } from '@/api/generated/model';
 import { alpha, bravo, charlie, delta, echo, summary } from '@/test/fixtures';
 
 import {
@@ -54,6 +55,43 @@ describe('wording', () => {
       'Only 12 usable reviews; at least 30 are needed to give a tier.',
     );
     expect(summaryWhy(summary(echo))).toContain('Too few guests gave an opinion');
+  });
+
+  it('says a catch holds a hotel back only when the tier rules make it binding', () => {
+    const ok = { cleanliness: 'ok', room: 'ok', staff: 'ok' } as const;
+    // Good allows one catch, so a single catch never keeps a hotel out of Good.
+    const fairOneCatch: HotelSummary = {
+      ...summary(charlie),
+      tier: 'fair',
+      essentials: ok,
+      catches: ['value'],
+    };
+    expect(summaryWhy(fairOneCatch)).toBe('No essential is a confirmed strength yet.');
+    // Two catches keep a hotel with three Strong essentials Fair.
+    const fairTwoCatches: HotelSummary = {
+      ...summary(charlie),
+      tier: 'fair',
+      catches: ['noise', 'value'],
+    };
+    expect(summaryWhy(fairTwoCatches)).toBe(
+      'Guests confirmed cleanliness, room and staff as strengths; complaints about noise and value hold it back.',
+    );
+    // Caution is decided by the essentials; a catch there is not the reason.
+    const cautionWithCatch: HotelSummary = { ...summary(bravo), catches: ['noise'] };
+    expect(summaryWhy(cautionWithCatch)).toBe('Complaints about cleanliness outnumbered praise.');
+  });
+
+  it('names a Weak essential on a Fair hotel (Weak, but not by the test for Caution)', () => {
+    const essentials = { cleanliness: 'ok', room: 'weak', staff: 'strong' } as const;
+    const fair: HotelSummary = { ...summary(alpha), tier: 'fair', essentials, highlights: [] };
+    expect(summaryWhy(fair)).toBe(
+      'Guests confirmed staff as a strength; complaints about room outnumbered praise.',
+    );
+    expect(TIER_INFO.fair.meaning).not.toContain('No essential is weak');
+    expect(TIER_INFO.fair.meaning).toContain(
+      'an essential is graded Weak but does not pass the stricter test for Caution',
+    );
+    expect(TIER_INFO.good.meaning).toContain('none is graded Weak');
   });
 });
 

@@ -68,6 +68,9 @@ def test_train_predict_export_and_onnx_parity(
     predictor = EncoderPredictor(tmp_path / "model", max_length=16)
     probs = predictor.predict_proba(dev_texts, dev_parts)
     assert probs.shape == (32, 2)
+    # The size rule 2 breaks ties with: encoder and head, as saved.
+    saved = sum(p.numel() for p in predictor.model.parameters())
+    assert result.n_parameters == saved > 0
 
     onnx_path = export_onnx(
         tmp_path / "model", tmp_path / "onnx", max_length=16

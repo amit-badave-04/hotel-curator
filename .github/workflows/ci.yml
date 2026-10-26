@@ -1,6 +1,7 @@
 # Continuous integration: Python (lint, types, tests, coverage), web (lint,
-# types, unit tests, build, API-client drift, npm audit), end-to-end browser
-# tests, and container builds. Actions are pinned to commit SHAs.
+# types, unit tests, build, API-client drift, npm audit), security (gitleaks,
+# pip-audit, bandit), end-to-end browser tests, and container builds. Actions
+# are pinned to commit SHAs.
 name: ci
 
 on:
@@ -25,8 +26,10 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          lfs: true
+      # Only the served model from Git LFS (none is committed yet, BLOCKERS
+      # B8); the frozen v1 checkpoint (500 MB) is never needed here.
+      - name: Served model weights (Git LFS)
+        run: git lfs pull --include="artifacts/models/*/model.onnx"
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           version: "0.11.32"
@@ -35,8 +38,8 @@ jobs:
         run: uv sync --all-extras
       - name: Lint and format
         run: |
-          uv run ruff check src tests scripts
-          uv run ruff format --check src tests scripts
+          uv run ruff check src tests scripts notebooks
+          uv run ruff format --check src tests scripts notebooks
       - name: Types
         run: uv run mypy
       - name: Tests with coverage (fails under 80%)
@@ -71,13 +74,72 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0 # the full history of the commit under test
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.32"
+          enable-cache: true
+      - name: Secrets in git history (gitleaks 8.30.1, checksum verified)
+        run: |
+          curl -sSLo gitleaks.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tgz" | sha256sum --check
+          tar -xzf gitleaks.tgz gitleaks
+          # HEAD's history only: other branches (such as a session backup
+          # branch) are not part of what this commit ships.
+          ./gitleaks git --config .gitleaks.toml --redact --exit-code 1 \
+            --log-opts="--full-history HEAD" .
+      - name: Known vulnerabilities in Python dependencies (pip-audit)
+        # The export pins every package. The spaCy model wheel comes from a
+        # GitHub release URL (SHA-256 pinned in uv.lock) and has no PyPI
+        # advisory data, so it is the one line left out.
+        run: |
+          uv export --all-extras --no-hashes --no-emit-project \
+            | grep -v '^en-core-web-sm @ ' > requirements-audit.txt
+          uvx pip-audit==2.10.1 --strict --no-deps -r requirements-audit.txt
+      - name: Python SAST (bandit)
+        run: uvx bandit==1.9.4 -r src -q
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [python, web]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.32"
+          enable-cache: true
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install API (serving dependencies only)
+        run: uv sync --extra postgres
+      - name: Install web and browser
+        working-directory: web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: End-to-end and accessibility tests
+        working-directory: web
+        run: npm run test:e2e
+
   containers:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          lfs: true
+      # Only the served model from Git LFS (none is committed yet, BLOCKERS
+      # B8); the frozen v1 checkpoint (500 MB) is never needed here.
+      - name: Served model weights (Git LFS)
+        run: git lfs pull --include="artifacts/models/*/model.onnx"
       - name: Build images
         run: docker compose build
       - name: Start the stack and check it answers

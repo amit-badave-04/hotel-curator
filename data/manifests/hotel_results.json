@@ -1,6 +1,6 @@
 {
-  "code_commit": "6ca397340479aff0d8736751a28316e69a49c167-dirty",
-  "created_at": "2026-10-25T00:48:01+00:00",
+  "code_commit": "806332b0139f7de94445f874af22ad0b4a97e4ef-dirty",
+  "created_at": "2026-10-25T03:12:33+00:00",
   "inputs": {
     "model_package": "roberta-base-ft-train2",
     "params_version": "2026-10-24.1"
@@ -9,8 +9,8 @@
     {
       "path": "data/demo/hotel_results.json.gz",
       "rows": 1494,
-      "sha256": "b8c29b7b1f4a18810433a04a33d2884ea4cd670a2adbc370baa99a60cce7a576",
-      "size_bytes": 3913796
+      "sha256": "e7e6b687f2861971c481e23de859715589bc76967090b10713116fb8f731ba52",
+      "size_bytes": 3913812
     },
     {
       "path": "data/demo/subset_signals.parquet",
@@ -22,7 +22,7 @@
   "stage": "hotel_results",
   "stats": {
     "hotels": 1494,
-    "seconds": 206.59212812799888,
+    "seconds": 239.86920298899986,
     "tiers": {
       "caution": 271,
       "fair": 960,
