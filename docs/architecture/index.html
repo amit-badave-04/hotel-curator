@@ -228,7 +228,7 @@ the db container.</p>
   <path class="arrow" d="M860 240 V190"/>
   <path class="arrow dashed" d="M550 306 V244"/>
 </svg>
-<figcaption>Only the API's root filesystem is read-only; the API (uid 10001) and web (uid 101) run as non-root, and Postgres drops to its own user after its entrypoint. Rate limits key on the client address; the API trusts <code>X-Forwarded-For</code> only from the web container. In laptop compose the Docker gateway rewrites client addresses, so every client on the host shares one bucket (an accepted risk in the security review). The role rules apply to a data volume initialised with <code>docker/db-init</code>.</figcaption>
+<figcaption>Only the API's root filesystem is read-only; the API (uid 10001) and web (uid 101) run as non-root, and Postgres drops to its own user after its entrypoint. Rate limits key on the client address that nginx writes into <code>X-Real-IP</code>; the API believes it (and nginx's <code>X-Request-ID</code>) only from the web container and never reads <code>X-Forwarded-For</code>. In laptop compose the Docker gateway rewrites client addresses, so every client on the host shares one bucket (an accepted risk in the security review). The role rules apply to a data volume initialised with <code>docker/db-init</code>.</figcaption>
 </figure>
 
 <h2 id="request">4. Request flow: a hotel page</h2>

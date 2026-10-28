@@ -51,14 +51,16 @@ def _settings(tmp_path: Path, **overrides: object) -> Settings:
     return Settings(**values)  # type: ignore[arg-type]
 
 
-def _client(settings: Settings, results: Path | None) -> TestClient:
+def _client(
+    settings: Settings, results: Path | None, peer: str = "testclient"
+) -> TestClient:
     upgrade(settings.db_url())
     if results is not None:
         engine = make_engine(settings.db_url())
         with session_scope(make_session_factory(engine)) as session:
             seed(session, results)
         engine.dispose()
-    return TestClient(create_app(settings))
+    return TestClient(create_app(settings), client=(peer, 50000))
 
 
 @pytest.fixture
@@ -336,6 +338,66 @@ def test_rate_limits(tmp_path: Path, results_file: Path) -> None:
         statuses = [c.get("/v1/cities").status_code for _ in range(4)]
         assert statuses[-1] == 429
         assert c.get("/healthz").status_code == 200  # probes are not limited
+
+
+NGINX = "172.28.0.10"
+
+
+def _analyze_codes(c: TestClient, n: int, **headers: str) -> list[int]:
+    return [
+        c.post("/v1/analyze", json={"liked": "ok"}, headers=headers).status_code
+        for _ in range(n)
+    ]
+
+
+def test_clients_behind_the_proxy_get_separate_buckets(
+    tmp_path: Path, results_file: Path
+) -> None:
+    settings = _settings(
+        tmp_path, analyze_rate_limit_per_minute=2, forwarded_allow_ips=NGINX
+    )
+    with _client(settings, results_file, peer=NGINX) as c:
+        c.app.state.curator._model = _FakeModel()  # type: ignore[attr-defined]
+        first = {"x-real-ip": "198.51.100.1"}
+        assert _analyze_codes(c, 3, **first) == [200, 200, 429]
+        assert _analyze_codes(c, 2, **{"x-real-ip": "198.51.100.2"}) == [
+            200,
+            200,
+        ]
+        # A client cannot leave its bucket with headers nginx overwrites
+        # or the API ignores.
+        dodges = {"x-forwarded-for": "203.0.113.9", "fly-client-ip": "::1"}
+        assert _analyze_codes(c, 1, **first, **dodges) == [429]
+
+
+def test_forged_identity_headers_from_other_peers_are_ignored(
+    tmp_path: Path, results_file: Path
+) -> None:
+    settings = _settings(
+        tmp_path, analyze_rate_limit_per_minute=2, forwarded_allow_ips=NGINX
+    )
+    with _client(settings, results_file, peer="203.0.113.50") as c:
+        c.app.state.curator._model = _FakeModel()  # type: ignore[attr-defined]
+        codes = [
+            _analyze_codes(c, 1, **{"x-real-ip": f"198.51.100.{i}"})[0]
+            for i in range(3)
+        ]
+        assert codes == [200, 200, 429]
+        sent = "0123456789abcdef0123456789abcdef"
+        echoed = c.get("/v1/cities", headers={"x-request-id": sent})
+        assert echoed.headers["x-request-id"] != sent
+
+
+def test_request_id_from_the_proxy_is_kept(
+    tmp_path: Path, results_file: Path
+) -> None:
+    settings = _settings(tmp_path, forwarded_allow_ips=NGINX)
+    with _client(settings, results_file, peer=NGINX) as c:
+        sent = "0123456789abcdef0123456789abcdef"
+        kept = c.get("/v1/cities", headers={"x-request-id": sent})
+        assert kept.headers["x-request-id"] == sent
+        bad = c.get("/v1/cities", headers={"x-request-id": "bad id"})
+        assert len(bad.headers["x-request-id"]) == 32
 
 
 def test_security_headers_and_request_id(client: TestClient) -> None:

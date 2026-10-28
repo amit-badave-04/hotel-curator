@@ -109,8 +109,8 @@ fly-secrets: ## Check .env.fly, then stage it as Fly secrets (values on stdin)
 fly-setup: ## Create the three apps, the database volume, the API private IP
 	$(RUN) python scripts/deploy.py setup
 
-fly-deploy: ## Deploy database, API, web, in that order
-	$(RUN) python scripts/deploy.py deploy
+fly-deploy: ## Deploy database, API, web, in that order (FLY_DEPLOY_ARGS="--edge ...")
+	$(RUN) python scripts/deploy.py deploy $(FLY_DEPLOY_ARGS)
 
 fly-status: ## Machines of each app; fails if the API or database is public
 	$(RUN) python scripts/deploy.py status

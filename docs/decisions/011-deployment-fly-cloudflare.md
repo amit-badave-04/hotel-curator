@@ -80,9 +80,21 @@ close it, where the Cloudflare plan offers them (unverified here).
 ### Client-IP trust chain
 
 In every mode nginx computes the client address once and **overwrites**
-`X-Real-IP` with it. The API keys its rate limits on `X-Real-IP` only and
-ignores `X-Forwarded-For`. Only nginx can reach the API, because the API
-has no public address.
+`X-Real-IP` with it. It blanks every other identity header it would
+otherwise pass on (`X-Forwarded-For`, `Forwarded`, `Fly-Client-IP`,
+`CF-Connecting-IP`, `True-Client-IP`). The API keys its rate limits on
+`X-Real-IP` only (IPv6 clients per /64), and only from peers in
+`CURATOR_FORWARDED_ALLOW_IPS`. Only nginx can reach the API, because the
+API has no public address. On Fly that setting is `*`: Fly's proxy sits
+between nginx and the API on the Flycast hop, so the API's TCP peer is
+never nginx's own address.
+
+nginx's site is a template rendered at start by
+`web/nginx/15-curator-site.sh` for `CURATOR_EDGE` (`local`, `fly` or
+`cloudflare`). A missing or malformed setting stops the container. nginx
+also sends its `$request_id` as `X-Request-ID`, and the API adopts it from
+a trusted peer, so one id follows a request through both logs.
+`tests/edge/test_nginx.py` runs real nginx in all three modes.
 
 | Mode | Source of the client address | Why it cannot be forged |
 |---|---|---|
@@ -159,7 +171,7 @@ interface an attacker could reach.
 | `hotel-curator-api` | `CURATOR_MIGRATION_DATABASE_URL` (`curator_owner`) | the release command only. Fly puts every secret into every machine of the app, so the API's entrypoint unsets it (in any spelling) before `curator serve` starts. That keeps it out of the server's environment but is not a hard boundary: Fly's in-machine API and an `ssh console` session still reach it. A separate release app holding only this secret would be one. |
 | `hotel-curator-api` | `CURATOR_SENTRY_DSN` (optional) | error reports |
 | `hotel-curator-db` | `POSTGRES_PASSWORD`, `CURATOR_OWNER_PASSWORD`, `CURATOR_APP_PASSWORD` | first initialisation of the volume |
-| `hotel-curator` | `CURATOR_ORIGIN_CERT`, `CURATOR_ORIGIN_KEY` | Cloudflare mode only |
+| `hotel-curator` | `CURATOR_ORIGIN_CERT_B64`, `CURATOR_ORIGIN_KEY_B64`, `CURATOR_ORIGIN_PULL_CA_B64` | Cloudflare mode only |
 | GitHub environment `production` | per-app deploy tokens | the deploy workflow |
 
 Secrets are pushed with `scripts/push_fly_secrets.py` from a git-ignored
@@ -212,6 +224,7 @@ owner's refit project already runs there.
 | A10 | `[metrics]` scrapes a port without a public service | metrics appear in Fly's Grafana |
 | A11 | Rocket Loader, Email Obfuscation, Web Analytics injection and Zaraz are off | `scripts/check_edge.py` finds the CSP unchanged and no injected script |
 | A12 | Traffic between Fly hosts on the private network is encrypted | Fly's documentation at deploy time; recorded here |
+| A13 | Fly's proxy passes `X-Real-IP` unchanged on the Flycast hop from nginx to the API | two clients through the web app get separate 429s from `/api/v1/analyze`; the API's log shows the visitors' request ids |
 
 ## Controls: compose versus Fly
 

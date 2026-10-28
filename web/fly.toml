@@ -14,7 +14,9 @@ kill_timeout = 30
   dockerfile = "Dockerfile"
 
 [env]
-  # Read by the nginx config template (web/templates/).
+  # Read by nginx/15-curator-site.sh, which renders the site at start.
+  # fly: the client address is Fly-Client-IP, set by Fly's edge.
+  CURATOR_EDGE = "fly"
   CURATOR_API_UPSTREAM = "hotel-curator-api.flycast:8000"
 
 [http_service]

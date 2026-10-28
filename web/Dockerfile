@@ -11,11 +11,16 @@ RUN --mount=type=secret,id=extra_ca,required=false \
 COPY . .
 RUN npm run build
 
-# Serve it with nginx as a non-root user on port 8080.
+# Serve it with nginx as a non-root user on port 8080 (8443 in Cloudflare
+# mode). The site is rendered at start for CURATOR_EDGE (local, fly or
+# cloudflare) by nginx/15-curator-site.sh; see ADR 011.
 FROM nginxinc/nginx-unprivileged:1.30.6-alpine3.24@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03 AS runtime
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx/*.conf nginx/*.template /etc/nginx/curator/
+COPY --chmod=0755 nginx/15-curator-site.sh /docker-entrypoint.d/15-curator-site.sh
 COPY --from=build /app/dist /usr/share/nginx/html
+ENV CURATOR_EDGE=local \
+    CURATOR_API_UPSTREAM=api:8000
 USER 101
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1
+  CMD wget -q -O /dev/null http://127.0.0.1:8080/healthz || exit 1

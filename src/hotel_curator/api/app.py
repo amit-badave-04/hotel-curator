@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from limits.strategies import MovingWindowRateLimiter
 
 from hotel_curator import __version__
+from hotel_curator.api.clientip import TrustedProxies
 from hotel_curator.api.errors import ErrorResponse, install_handlers
 from hotel_curator.api.middleware import (
     BodySizeLimitMiddleware,
@@ -128,7 +129,10 @@ def _add_middleware(
         allow_methods=["GET", "POST"],
         allow_headers=["content-type"],
     )
-    app.add_middleware(RequestContextMiddleware)
+    app.add_middleware(
+        RequestContextMiddleware,
+        trusted=TrustedProxies.parse(settings.forwarded_allow_ips),
+    )
 
 
 def _include_routers(app: FastAPI) -> None:

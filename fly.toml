@@ -29,6 +29,11 @@ kill_timeout = 30
   CURATOR_MIGRATE_ON_START = "false"
   # One origin behind nginx: no cross-origin callers.
   CURATOR_CORS_ORIGINS = "[]"
+  # Rate limits key on X-Real-IP, which nginx overwrites. Fly's proxy sits
+  # between nginx and this private app, so the TCP peer is never nginx's
+  # own address: believe X-Real-IP from any peer. Only apps in the same
+  # Fly organisation can reach the API at all (ADR 011).
+  CURATOR_FORWARDED_ALLOW_IPS = "*"
 
 # Flycast service: reachable only through the private IPv6 above.
 [[services]]

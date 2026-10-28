@@ -31,7 +31,7 @@ user accounts, no payment data and no user-submitted content at rest.
 | Third-party script in the API docs page | Swagger UI is vendored (pinned SHA-256) and served from the API itself under a CSP that allows only `'self'` | `tests/api/test_docs.py` |
 | Broken or missing model package | the API starts without it, logs why, answers 503 on `analyze`, and never retries per request | `::test_a_broken_model_package_is_reported_not_raised`, `::test_the_reason_a_model_is_missing_is_logged` |
 | Cross-origin abuse | CORS allow-list from settings, no credentials; in Docker the browser sees one origin | `::test_cors_allow_list` |
-| Clickjacking, MIME sniffing | `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`; nginx adds a strict CSP | `::test_security_headers_and_request_id`, `web/nginx.conf` |
+| Clickjacking, MIME sniffing | `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`; nginx adds a strict CSP | `::test_security_headers_and_request_id`, `web/nginx/site.conf`, `tests/edge/test_nginx.py` |
 | Malicious model files | weights only as safetensors or ONNX; `torch.load(weights_only=True)` for the one pickle conversion; `local_files_only=True`; no `trust_remote_code` | `tests/unit/test_security_invariants.py`, `tests/unit/test_bases.py::test_convert_refuses_pickled_code` |
 | Tampered downloads | HTTPS only, SHA-256 pins on every data file and weight file, Docker layers by digest; tar extraction reads only named regular files | `tests/unit/test_download.py`, `tests/unit/test_bases.py` |
 | Prompt injection into the labelling LLM | review text in a delimited block, explicit "data, not instructions", closing delimiter neutralised; no LLM at serving time | `tests/unit/test_prompt.py` |
@@ -184,13 +184,26 @@ and secrets in image layers.
   volumes (root on the host) is beyond this protection. A real deployment
   points `CURATOR_DATABASE_URL` at its own database and credentials.
 - **In the laptop compose setup the rate limit is shared by all clients.**
-  Docker publishes the ports on 127.0.0.1 through its proxy, so every
-  request reaches nginx and the API from the bridge gateway address and
-  every host client falls in one bucket (red team, section 4.6). The
-  limiter itself is per client: deployed with nginx as the entry point and
-  a front end that preserves client addresses (and
-  `CURATOR_FORWARDED_ALLOW_IPS` set to that proxy), each client gets its
-  own bucket. Never expose `:8000` directly.
+  This risk is now limited to compose. Docker publishes the ports on
+  127.0.0.1 through its proxy, so every request reaches nginx from the
+  bridge gateway address and every host client falls in one bucket (red
+  team, section 4.6). On Fly each client gets its own bucket (ADR 011,
+  client-IP trust chain):
+  - nginx overwrites `X-Real-IP` with `Fly-Client-IP` (Fly mode) or with
+    `CF-Connecting-IP` from Cloudflare's ranges behind origin pulls
+    (Cloudflare mode), and blanks every other identity header;
+  - the API reads only `X-Real-IP`, only from peers in
+    `CURATOR_FORWARDED_ALLOW_IPS`, and never `X-Forwarded-For`;
+  - IPv6 clients are counted per /64.
+
+  Tests: `tests/edge/test_nginx.py` (real nginx in all three modes) and
+  `tests/api/test_api.py::test_clients_behind_the_proxy_get_separate_buckets`
+  and `::test_forged_identity_headers_from_other_peers_are_ignored`.
+
+  What remains: on Fly the API trusts `X-Real-IP` from any peer (`*`),
+  because Fly's proxy sits between nginx and the API. So another app in
+  the same Fly organisation could pick its own bucket. Never expose
+  `:8000` directly.
 - **Rate-limit counters are per process.** With several workers each
   enforces its own limit; a shared store (Redis) is a configuration change.
 - **Health probes, docs and the OpenAPI schema are not rate-limited**

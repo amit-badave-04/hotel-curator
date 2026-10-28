@@ -95,15 +95,16 @@ def serve(
     """Run the API with uvicorn (binds to localhost unless told otherwise)."""
     import uvicorn
 
-    trusted = get_settings().forwarded_allow_ips
     uvicorn.run(
         "hotel_curator.api.app:create_app",
         factory=True,
         host=host,
         port=port,
         workers=workers,
-        proxy_headers=trusted is not None,
-        forwarded_allow_ips=trusted or "127.0.0.1",
+        # Client identity comes from X-Real-IP, read by the app itself
+        # (api/clientip.py); uvicorn must not rewrite the peer from
+        # X-Forwarded-For, which Fly's proxy appends to.
+        proxy_headers=False,
         server_header=False,
         timeout_graceful_shutdown=GRACEFUL_SHUTDOWN_SECONDS,
     )

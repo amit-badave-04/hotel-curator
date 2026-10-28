@@ -4,8 +4,11 @@
     python scripts/push_fly_secrets.py check
     python scripts/push_fly_secrets.py push --dry-run  # names only
     python scripts/push_fly_secrets.py push [--app hotel-curator-db]
+    python scripts/push_fly_secrets.py origin-tls --cert origin.pem \
+        --key origin.key --ca origin-pull-ca.pem   # Cloudflare mode only
 
-CREDENTIALS: this script handles the database passwords. Values reach
+CREDENTIALS: this script handles the database passwords and, for
+Cloudflare mode, the origin certificate's private key. Values reach
 ``flyctl secrets import`` on stdin, never on a command line (where ``ps``
 and shell history would see them), and are never printed. ``.env.fly`` is
 created with mode 0600 and is git-ignored (``.env.*``). Secrets are
@@ -16,9 +19,12 @@ Changing a password after the database volume exists also needs
 """
 
 import argparse
+import base64
+import binascii
 import os
 import re
 import secrets
+import stat
 import subprocess  # nosec B404 - runs flyctl only
 import sys
 from collections.abc import Callable, Sequence
@@ -29,6 +35,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ENV_FILE = ROOT / ".env.fly"
 DB_APP = "hotel-curator-db"
 API_APP = "hotel-curator-api"
+WEB_APP = "hotel-curator"
 DB_HOST = f"{DB_APP}.internal"
 DB_PORT = 5432
 DB_NAME = "curator"
@@ -53,6 +60,19 @@ SECRETS: dict[str, tuple[str, ...]] = {
     API_APP: ("CURATOR_DATABASE_URL", "CURATOR_MIGRATION_DATABASE_URL"),
 }
 """Secrets per app, in the order the apps are deployed."""
+ORIGIN_SECRETS: dict[str, str] = {
+    "CURATOR_ORIGIN_CERT_B64": "CERTIFICATE",
+    "CURATOR_ORIGIN_KEY_B64": "PRIVATE KEY",
+    "CURATOR_ORIGIN_PULL_CA_B64": "CERTIFICATE",
+}
+"""The web app's Cloudflare-mode secrets (base64 PEM) and their PEM type;
+all three or none (web/nginx/15-curator-site.sh)."""
+PEM_LABELS = {
+    "CERTIFICATE": "CERTIFICATE",
+    "PRIVATE KEY": "(?:RSA |EC )?PRIVATE KEY",
+}
+"""BEGIN labels nginx loads without a passphrase (not OpenSSH or
+encrypted keys)."""
 
 Secrets = dict[str, str]
 Runner = Callable[[list[str], str], None]
@@ -181,13 +201,54 @@ def _url_problems(name: str, url: str, role: str, password: str) -> list[str]:
     return problems
 
 
+def pem_problem(name: str, encoded: str, label: str) -> str | None:
+    """Why ``encoded`` is not a base64 PEM of type ``label``, if it is not.
+
+    CRLF line endings (a file saved on Windows) are accepted, as openssl
+    and nginx accept them.
+    """
+    try:
+        pem = base64.b64decode(encoded, validate=True).decode("ascii")
+    except (binascii.Error, UnicodeDecodeError):
+        return f"{name}: not base64 of a text PEM file"
+    pem = pem.replace("\r\n", "\n")
+    if "ENCRYPTED" in pem:
+        return f"{name}: encrypted; nginx needs it without a passphrase"
+    if not re.search(rf"^-----BEGIN {PEM_LABELS[label]}-----$", pem, re.M):
+        return f"{name}: not a PEM {label.lower()}"
+    return None
+
+
+def _same_pem(first: str, second: str) -> bool:
+    def text(encoded: str) -> str:
+        decoded = base64.b64decode(encoded).decode("ascii", "replace")
+        return "".join(decoded.split())
+
+    return text(first) == text(second)
+
+
+def _origin_problems(values: Secrets) -> list[str]:
+    present = [key for key in ORIGIN_SECRETS if key in values]
+    if present and len(present) != len(ORIGIN_SECRETS):
+        missing = ", ".join(k for k in ORIGIN_SECRETS if k not in values)
+        return [f"the three origin secrets go together; missing {missing}"]
+    found = [pem_problem(k, values[k], ORIGIN_SECRETS[k]) for k in present]
+    problems = [problem for problem in found if problem]
+    cert, ca = "CURATOR_ORIGIN_CERT_B64", "CURATOR_ORIGIN_PULL_CA_B64"
+    if not problems and present and _same_pem(values[cert], values[ca]):
+        problems.append(f"{cert} and {ca} are the same file")
+    return problems
+
+
 def problems_in(values: Secrets) -> list[str]:
     """Everything that would make the deployed apps fail to connect."""
-    known = {key for keys in SECRETS.values() for key in keys}
+    required = {key for keys in SECRETS.values() for key in keys}
+    known = required | ORIGIN_SECRETS.keys()
     problems = [
         f"{key}: not a known secret" for key in values if key not in known
     ]
-    problems += [f"{key}: missing" for key in sorted(known - values.keys())]
+    problems += [f"{key}: missing" for key in sorted(required - values.keys())]
+    problems += _origin_problems(values)
     if problems:
         return problems
     passwords = [values[key] for key in SECRETS[DB_APP]]
@@ -228,7 +289,7 @@ def push(
 ) -> None:
     """Stage each app's secrets with ``flyctl secrets import``."""
     for app in apps:
-        keys = SECRETS[app]
+        keys = SECRETS.get(app) or tuple(ORIGIN_SECRETS)
         command = [flyctl, "secrets", "import", "--app", app, "--stage"]
         print(f"$ {' '.join(command)}  < {', '.join(keys)} (on stdin)")
         if dry_run:
@@ -238,44 +299,152 @@ def push(
         runner(command, payload)
 
 
+def origin_tls_values(cert: Path, key: Path, ca: Path) -> Secrets:
+    """Base64 of the three PEM files, checked like the pushed values.
+
+    Raises:
+        ValueError: Naming the file that is not the expected PEM type.
+    """
+    values = {
+        name: base64.b64encode(path.read_bytes()).decode("ascii")
+        for name, path in zip(ORIGIN_SECRETS, (cert, key, ca), strict=True)
+    }
+    problems = _origin_problems(values)
+    if problems:
+        raise ValueError("; ".join(problems))
+    return values
+
+
+def _check_owned_file(path: Path) -> None:
+    """Refuse a file this script would not rewrite safely in place."""
+    info = path.lstat()
+    link = f"{path.name} is a link: point --env-file at the file"
+    if stat.S_ISLNK(info.st_mode):
+        raise ValueError(link)
+    if not stat.S_ISREG(info.st_mode):
+        raise ValueError(f"{path.name} is not a regular file")
+    if info.st_nlink > 1:
+        raise ValueError(link)
+    if info.st_uid != os.getuid():
+        raise ValueError(f"{path.name} belongs to another user")
+    if info.st_mode & 0o077:
+        raise ValueError(f"{path.name} is readable by others: chmod 600 it")
+
+
+def append_env_lines(path: Path, values: Secrets) -> None:
+    """Add ``KEY=VALUE`` lines to an existing env file, keys not yet in it.
+
+    A temporary 0600 file beside it is created first and doubles as a
+    lock: a second run at the same time finds it and stops. The new
+    content is parsed again before it replaces the old file; on any
+    failure the old file stays as it was. A missing final newline is
+    supplied.
+
+    Raises:
+        ValueError: If a key is already there, or the file is a link, not
+            the user's own, or readable by anyone else.
+        FileExistsError: If another run holds the temporary file.
+    """
+    _check_owned_file(path)
+    temporary = path.with_name(f".{path.name}.new")
+    # CREDENTIALS: the key goes only into a 0600 file, never to stdout.
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        text = read_env_file(path)
+        clash = sorted(values.keys() & parse_env(text).keys())
+        if clash:
+            raise ValueError(f"already in {path.name}: {', '.join(clash)}")
+        if text and not text.endswith("\n"):
+            text += "\n"
+        text += "".join(f"{k}={v}\n" for k, v in values.items())
+        parse_env(text)
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
+            fd = -1
+            handle.write(text)
+        temporary.replace(path)
+    except BaseException:
+        if fd >= 0:
+            os.close(fd)
+        temporary.unlink(missing_ok=True)
+        raise
+
+
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("action", choices=("init", "check", "push"))
+    parser.add_argument(
+        "action", choices=("init", "check", "push", "origin-tls")
+    )
     parser.add_argument("--env-file", type=Path, default=ENV_FILE)
     parser.add_argument(
-        "--app", choices=tuple(SECRETS), action="append", dest="apps"
+        "--app", choices=(*SECRETS, WEB_APP), action="append", dest="apps"
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--flyctl", default=os.environ.get("FLYCTL", "flyctl"))
+    for name in ("cert", "key", "ca"):
+        parser.add_argument(f"--{name}", type=Path)
     return parser.parse_args(argv)
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    """Command-line entry point; returns the exit code."""
-    args = _parse_args(argv)
-    if args.action == "init":
-        try:
-            write_env_file(args.env_file, generate())
-        except FileExistsError:
-            print(f"{args.env_file} exists; not overwritten", file=sys.stderr)
-            return 1
-        print(f"wrote {args.env_file} (mode 0600, git-ignored)")
-        return 0
+def _init(env_file: Path) -> int:
+    try:
+        write_env_file(env_file, generate())
+    except FileExistsError:
+        print(f"{env_file} exists; not overwritten", file=sys.stderr)
+        return 1
+    print(f"wrote {env_file} (mode 0600, git-ignored)")
+    return 0
+
+
+def _origin_tls(args: argparse.Namespace) -> int:
+    if None in (args.cert, args.key, args.ca):
+        print("error: origin-tls needs --cert, --key and --ca", file=sys.stderr)
+        return 1
+    try:
+        values = origin_tls_values(args.cert, args.key, args.ca)
+        append_env_lines(args.env_file, values)
+    except FileExistsError:
+        print(
+            "error: another origin-tls run is in progress (or remove the "
+            f"stale .{args.env_file.name}.new)",
+            file=sys.stderr,
+        )
+        return 1
+    except (OSError, ValueError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+    print(f"added {', '.join(values)} to {args.env_file}")
+    return 0
+
+
+def _check_and_push(args: argparse.Namespace) -> int:
     try:
         values = parse_env(read_env_file(args.env_file))
     except ValueError as error:  # the message names a line, never a value
         print(f"error: {args.env_file}: {error}", file=sys.stderr)
         return 1
     problems = problems_in(values)
+    with_web = ORIGIN_SECRETS.keys() <= values.keys()
+    if WEB_APP in (args.apps or []) and not with_web:
+        problems.append(f"{WEB_APP}: no origin secrets (run origin-tls)")
     for problem in problems:
         print(f"error: {problem}", file=sys.stderr)
     if problems:
         return 1
     if args.action == "push":
-        apps = args.apps or list(SECRETS)
+        apps = args.apps or [*SECRETS, *([WEB_APP] if with_web else [])]
         push(values, apps, flyctl=args.flyctl, dry_run=args.dry_run)
     print(f"{args.env_file}: {len(values)} secrets, consistent")
     return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Command-line entry point; returns the exit code."""
+    args = _parse_args(argv)
+    if args.action == "init":
+        return _init(args.env_file)
+    if args.action == "origin-tls":
+        return _origin_tls(args)
+    return _check_and_push(args)
 
 
 if __name__ == "__main__":

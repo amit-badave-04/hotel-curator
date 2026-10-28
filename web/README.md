@@ -72,8 +72,8 @@ by MSW handlers (`src/test/handlers.ts`) built from fixtures
 fixture that no longer matches `openapi.json` fails the type check. They cover
 explorer filters and the URL, the hotel page sections, compare highlighting,
 the analyze states (200, 422, 429, 503), error states with request ids, the
-theme toggle, and that `nginx.conf` sends the same security headers as
-`security-headers.ts`.
+theme toggle, and that the nginx site (`nginx/site.conf`) sends the same
+security headers as `security-headers.ts`.
 
 **End-to-end tests** (`e2e/`) run in Chromium against the production build
 and the real API with the synthetic dev data:
@@ -136,9 +136,12 @@ docker build -t hotel-curator-web .
 
 A two-stage build: `node:22.23.4-alpine3.24` runs `npm ci` and `npm run build`,
 then `nginxinc/nginx-unprivileged:1.30.6-alpine3.24` (both pinned by digest)
-serves `dist/` as a non-root user on port 8080 with `nginx.conf`: SPA fallback
-to `index.html`, `/api/` proxied to `http://api:8000/` with the prefix
-stripped, gzip, long caching for hashed assets, and security headers (a strict
+serves `dist/` as a non-root user on port 8080. At start,
+`nginx/15-curator-site.sh` renders the site for `CURATOR_EDGE` (`local` for
+compose, `fly` behind Fly's edge, `cloudflare` behind Cloudflare; ADR 011)
+from `nginx/`: SPA fallback to `index.html`, `/api/` proxied to
+`CURATOR_API_UPSTREAM` (default `api:8000`) with the prefix stripped and
+the client address in `X-Real-IP`, one HSTS value, gzip, long caching for hashed assets, and security headers (a strict
 Content-Security-Policy with no inline scripts or styles,
 `X-Content-Type-Options`, `Referrer-Policy`, `frame-ancestors 'none'`).
 API answers get a deny-all CSP (`default-src 'none'`). The API docs page

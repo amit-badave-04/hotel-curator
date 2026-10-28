@@ -2,6 +2,7 @@
 
 import json
 import stat
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,7 @@ from tests.helpers import load_script
 secrets_cli = load_script("push_fly_secrets")
 deploy_cli = load_script("deploy")
 LFS_POINTER = b"version https://git-lfs.github.com/spec/v1\noid sha256:ab\n"
+LEAK_WINDOW = 16
 
 
 def test_generated_secrets_are_consistent_and_valid_settings() -> None:
@@ -352,3 +354,317 @@ def test_a_file_that_is_not_utf8_names_the_line_only(
     err = capsys.readouterr().err
     assert "line 2: not UTF-8" in err
     assert "secret" not in err and "0xe9" not in err
+
+
+def _pem(directory: Path, name: str, label: str, eol: str = "\n") -> Path:
+    path = directory / name
+    body = f"MIIBfake{name.replace('.', '')}"
+    lines = [f"-----BEGIN {label}-----", body, f"-----END {label}-----", ""]
+    path.write_bytes(eol.join(lines).encode())
+    return path
+
+
+def _origin_files(directory: Path) -> list[str]:
+    return [
+        "--cert", str(_pem(directory, "origin.pem", "CERTIFICATE")),
+        "--key", str(_pem(directory, "origin.key", "PRIVATE KEY")),
+        "--ca", str(_pem(directory, "pull-ca.pem", "CERTIFICATE")),
+    ]  # fmt: skip
+
+
+def _assert_nothing_secret_in(
+    out: pytest.CaptureFixture[str], env_file: Path, *files: Path
+) -> None:
+    """No value from .env.fly and no PEM content in what was printed."""
+    printed = "".join(out.readouterr())
+    values = secrets_cli.parse_env(secrets_cli.read_env_file(env_file))
+    bodies = [
+        line
+        for f in files
+        for line in f.read_text().splitlines()
+        if line and not line.startswith("-----")
+    ]
+    # A URL's secret part is its password, checked on its own; the rest
+    # (host, app names) is printed legitimately.
+    plain = [v for k, v in values.items() if not k.endswith("_URL")]
+    secrets = [*plain, *bodies]
+    # Any 16-character piece counts: a leak need not print a whole value.
+    pieces = {
+        secret[i : i + LEAK_WINDOW]
+        for secret in secrets
+        for i in range(max(1, len(secret) - LEAK_WINDOW + 1))
+    }
+    assert not [piece for piece in pieces if piece in printed]
+
+
+def test_origin_tls_adds_the_web_secrets_and_push_sends_them(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    env_file = tmp_path / ".env.fly"
+    assert secrets_cli.main(["init", "--env-file", str(env_file)]) == 0
+    capsys.readouterr()
+    files = _origin_files(tmp_path)
+    paths = [Path(p) for p in files[1::2]]
+    args = ["--env-file", str(env_file), *files]
+    assert secrets_cli.main(["origin-tls", *args]) == 0
+    _assert_nothing_secret_in(capsys, env_file, *paths)
+    assert stat.S_IMODE(env_file.stat().st_mode) == 0o600
+    assert secrets_cli.main(["origin-tls", *args]) == 1
+    assert "already in .env.fly" in capsys.readouterr().err
+    values = secrets_cli.parse_env(secrets_cli.read_env_file(env_file))
+    calls: list[tuple[list[str], str]] = []
+    secrets_cli.push(
+        values,
+        [secrets_cli.WEB_APP],
+        flyctl="flyctl",
+        dry_run=False,
+        runner=lambda command, stdin: calls.append((command, stdin)),
+    )
+    _assert_nothing_secret_in(capsys, env_file, *paths)
+    for action in (["check"], ["push", "--dry-run"]):
+        assert secrets_cli.main([*action, "--env-file", str(env_file)]) == 0
+        _assert_nothing_secret_in(capsys, env_file, *paths)
+    ((command, stdin),) = calls
+    assert command[command.index("--app") + 1] == "hotel-curator"
+    assert [line.split("=", 1)[0] for line in stdin.splitlines()] == list(
+        secrets_cli.ORIGIN_SECRETS
+    )
+    assert all(v in stdin for k, v in values.items() if "ORIGIN" in k)
+
+
+def test_origin_tls_handles_hand_edited_files(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    env_file = tmp_path / ".env.fly"
+    secrets_cli.write_env_file(env_file, secrets_cli.generate())
+    env_file.write_text(env_file.read_text().rstrip("\n"))  # no final \n
+    crlf = [
+        "--cert", str(_pem(tmp_path, "c.pem", "CERTIFICATE", "\r\n")),
+        "--key", str(_pem(tmp_path, "k.pem", "EC PRIVATE KEY", "\r\n")),
+        "--ca", str(_pem(tmp_path, "ca.pem", "CERTIFICATE", "\r\n")),
+    ]  # fmt: skip
+    origin = ["origin-tls", "--env-file", str(env_file), *crlf]
+    assert secrets_cli.main(origin) == 0, capsys.readouterr().err
+    assert secrets_cli.main(["check", "--env-file", str(env_file)]) == 0
+    assert list(tmp_path.glob(".*.new")) == []
+    shared = tmp_path / "shared.env"
+    secrets_cli.write_env_file(shared, secrets_cli.generate())
+    shared.chmod(0o644)
+    origin = ["origin-tls", "--env-file", str(shared), *_origin_files(tmp_path)]
+    assert secrets_cli.main(origin) == 1
+    assert "readable by others" in capsys.readouterr().err
+    assert "ORIGIN" not in shared.read_text()
+
+
+def test_push_includes_the_web_app_only_with_its_secrets(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    env_file = tmp_path / ".env.fly"
+    secrets_cli.write_env_file(env_file, secrets_cli.generate())
+    dry = ["push", "--dry-run", "--env-file", str(env_file)]
+    assert secrets_cli.main(dry) == 0
+    assert "--app hotel-curator " not in capsys.readouterr().out
+    assert secrets_cli.main([*dry, "--app", "hotel-curator"]) == 1
+    assert "no origin secrets" in capsys.readouterr().err
+    origin = ["origin-tls", "--env-file", str(env_file)]
+    assert secrets_cli.main([*origin, *_origin_files(tmp_path)]) == 0
+    assert secrets_cli.main(dry) == 0
+    assert "--app hotel-curator --stage" in capsys.readouterr().out
+
+
+def test_origin_tls_refuses_swapped_or_partial_files(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    env_file = tmp_path / ".env.fly"
+    secrets_cli.write_env_file(env_file, secrets_cli.generate())
+    before = env_file.read_text()
+    files = _origin_files(tmp_path)
+    files[1], files[3] = files[3], files[1]  # key given as the certificate
+    assert (
+        secrets_cli.main(["origin-tls", "--env-file", str(env_file), *files])
+        == 1
+    )
+    err = capsys.readouterr().err
+    assert "CURATOR_ORIGIN_CERT_B64: not a PEM certificate" in err
+    assert "MIIBfake" not in err
+    assert env_file.read_text() == before
+    same = _origin_files(tmp_path)
+    same[5] = same[1]  # the certificate given again as the CA
+    origin = ["origin-tls", "--env-file", str(env_file), *same]
+    assert secrets_cli.main(origin) == 1
+    assert "are the same file" in capsys.readouterr().err
+    partial = _with(CURATOR_ORIGIN_CERT_B64="bm90IGEgcGVt")
+    assert secrets_cli.problems_in(partial) == [
+        "the three origin secrets go together; missing "
+        "CURATOR_ORIGIN_KEY_B64, CURATOR_ORIGIN_PULL_CA_B64"
+    ]
+
+
+def test_cloudflare_mode_deploys_the_cloudflare_config_for_one_domain(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    args = ["deploy", "web", "--edge", "cloudflare", "--domain", "a.example"]
+    assert deploy_cli.main([*args, "--dry-run"]) == 0
+    line = capsys.readouterr().out.strip()
+    root = deploy_cli.ROOT
+    assert f"--config {root / 'web/fly.cloudflare.toml'} " in line
+    assert line.endswith("--env 'CURATOR_SERVER_NAMES=a.example www.a.example'")
+    for bad in (["--domain", "A.example"], ["--domain", "a.example; rm"]):
+        with pytest.raises(SystemExit):
+            deploy_cli.main([*args[:4], *bad, "--dry-run"])
+    for bad_args in (
+        ["deploy", "api", "--edge", "cloudflare", "--domain", "a.example"],
+        ["deploy", "web", "--edge", "cloudflare"],
+        ["deploy", "web", "--domain", "a.example"],
+        ["status", "--edge", "fly"],
+        ["deploy", "web", "--edge", "cloudflare", "--domain", "a" * 98 + ".io"],
+    ):
+        with pytest.raises(SystemExit):
+            deploy_cli.main(bad_args)
+
+
+CLOUDFLARE_MACHINES = {
+    "machine list --app hotel-curator": [
+        {"id": "m1", "config": {"env": {"CURATOR_EDGE": "cloudflare"}}}
+    ]
+}
+
+
+def _deployed_configs(fake: FakeFly) -> list[str]:
+    return [
+        cmd[cmd.index("--config") + 1]
+        for cmd in fake.commands
+        if cmd[0] == "deploy"
+    ]
+
+
+def test_a_redeploy_keeps_cloudflare_mode_unless_told_otherwise() -> None:
+    fake = FakeFly(CLOUDFLARE_MACHINES)
+    fly = deploy_cli.Fly("flyctl", dry_run=False, runner=fake)
+    with pytest.raises(SystemExit, match="runs in Cloudflare mode"):
+        deploy_cli.deploy_apps(fly, ["web"], None, None)
+    assert fake.commands == []
+    deploy_cli.deploy_apps(fly, ["web"], "cloudflare", "a.example")
+    deploy_cli.deploy_apps(fly, ["web"], "fly", None)  # an explicit switch
+    assert _deployed_configs(fake) == [
+        str(deploy_cli.ROOT / "web/fly.cloudflare.toml"),
+        str(deploy_cli.ROOT / "web/fly.toml"),
+    ]
+
+
+def test_fly_mode_and_new_apps_deploy_without_flags() -> None:
+    for machines in (
+        {"machine list --app hotel-curator": []},
+        {
+            "machine list --app hotel-curator": [
+                {"config": {"env": {"CURATOR_EDGE": "fly"}}}
+            ]
+        },
+    ):
+        fake = FakeFly(machines)
+        fly = deploy_cli.Fly("flyctl", dry_run=False, runner=fake)
+        deploy_cli.deploy_apps(fly, ["web"], None, None)
+        assert _deployed_configs(fake) == [
+            str(deploy_cli.ROOT / "web/fly.toml")
+        ]
+
+
+def test_a_refusal_comes_before_any_deploy(tmp_path: Path) -> None:
+    fake = FakeFly(CLOUDFLARE_MACHINES)
+    fly = deploy_cli.Fly("flyctl", dry_run=False, runner=fake)
+    with pytest.raises(SystemExit, match="runs in Cloudflare mode"):
+        deploy_cli.deploy_apps(fly, ["db", "web"], None, None)
+    assert fake.commands == []
+    with pytest.raises(SystemExit):
+        deploy_cli.main(
+            ["deploy", "--edge", "cloudflare", "--domain", "Example.com"]
+        )
+
+
+@pytest.mark.parametrize(
+    "machine",
+    [{}, {"config": None}, {"config": {"env": []}}, {"config": {"env": {}}}],
+)
+def test_a_machine_listing_of_another_shape_stops(
+    machine: dict[str, object],
+) -> None:
+    fake = FakeFly({"machine list --app hotel-curator": [machine]})
+    fly = deploy_cli.Fly("flyctl", dry_run=False, runner=fake)
+    with pytest.raises(SystemExit, match="unexpected answer"):
+        deploy_cli.deploy_apps(fly, ["web"], None, None)
+
+
+def test_a_failing_flyctl_listing_stops_without_a_traceback() -> None:
+    def failing(command: list[str]) -> str:
+        raise subprocess.CalledProcessError(1, command)
+
+    fly = deploy_cli.Fly("flyctl", dry_run=False, runner=failing)
+    with pytest.raises(SystemExit, match="machine list --app hotel-curator"):
+        deploy_cli.web_edge_now(fly)
+
+
+def test_machines_that_disagree_stop_the_deploy() -> None:
+    fake = FakeFly(
+        {
+            "machine list --app hotel-curator": [
+                {"config": {"env": {"CURATOR_EDGE": "fly"}}},
+                {"config": {"env": {"CURATOR_EDGE": "cloudflare"}}},
+            ]
+        }
+    )
+    fly = deploy_cli.Fly("flyctl", dry_run=False, runner=fake)
+    with pytest.raises(SystemExit, match="disagree"):
+        deploy_cli.deploy_apps(fly, ["web"], None, None)
+
+
+def test_origin_tls_refuses_links_strays_and_encrypted_keys(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    env_file = tmp_path / ".env.fly"
+    secrets_cli.write_env_file(env_file, secrets_cli.generate())
+    files = _origin_files(tmp_path)
+    link = tmp_path / "link.env"
+    link.symlink_to(env_file)
+    hard = tmp_path / "hard.env"
+    hard.hardlink_to(env_file)
+    for path in (link, hard):
+        origin = ["origin-tls", "--env-file", str(path), *files]
+        assert secrets_cli.main(origin) == 1
+        assert "is a link" in capsys.readouterr().err
+    hard.unlink()  # the hard link also made .env.fly itself a link
+    stray = tmp_path / "..env.fly.new"  # what a crashed run leaves
+    stray.write_text("")
+    origin = ["origin-tls", "--env-file", str(env_file), *files]
+    assert secrets_cli.main(origin) == 1
+    assert "in progress" in capsys.readouterr().err
+    assert stray.exists()
+    stray.unlink()
+    encrypted = _pem(tmp_path, "enc.key", "ENCRYPTED PRIVATE KEY")
+    openssh = _pem(tmp_path, "ssh.key", "OPENSSH PRIVATE KEY")
+    origin = ["origin-tls", "--env-file", str(env_file)]
+    for key, message in ((encrypted, "encrypted"), (openssh, "not a PEM")):
+        files[3] = str(key)
+        assert secrets_cli.main([*origin, *files]) == 1
+        assert message in capsys.readouterr().err
+    files = _origin_files(tmp_path)
+    folder = tmp_path / "folder.env"
+    folder.mkdir()
+    folder_args = ["origin-tls", "--env-file", str(folder), *files]
+    assert secrets_cli.main(folder_args) == 1
+    assert "not a regular file" in capsys.readouterr().err
+    assert "ORIGIN" not in env_file.read_text()
+
+
+def test_the_ca_may_not_be_the_certificate_in_other_line_endings(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    env_file = tmp_path / ".env.fly"
+    secrets_cli.write_env_file(env_file, secrets_cli.generate())
+    cert = _pem(tmp_path, "c.pem", "CERTIFICATE")
+    ca = tmp_path / "ca.pem"
+    ca.write_bytes(cert.read_bytes().replace(b"\n", b"\r\n"))
+    key = _pem(tmp_path, "k.pem", "PRIVATE KEY")
+    origin = ["origin-tls", "--env-file", str(env_file)]
+    files = ["--cert", str(cert), "--key", str(key), "--ca", str(ca)]
+    assert secrets_cli.main([*origin, *files]) == 1
+    assert "are the same file" in capsys.readouterr().err

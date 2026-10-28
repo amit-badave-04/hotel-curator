@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 from hotel_curator.api.app import create_app
 from hotel_curator.cli.db import GRACEFUL_SHUTDOWN_SECONDS
@@ -15,6 +16,9 @@ from tests.helpers import load_script
 ROOT = Path(__file__).resolve().parents[2]
 API = ROOT / "fly.toml"
 WEB = ROOT / "web" / "fly.toml"
+WEB_CLOUDFLARE = ROOT / "web" / "fly.cloudflare.toml"
+TLS_PORT = 8443
+HEALTH_PORT = 8080
 DB = ROOT / "deploy" / "postgres" / "fly.toml"
 EXPOSE = re.compile(r"^EXPOSE (\d+)$", re.MULTILINE)
 PINNED_FROM = re.compile(r"^FROM \S+@sha256:[0-9a-f]{64}", re.MULTILINE)
@@ -30,7 +34,7 @@ def _exposed(dockerfile: Path) -> int:
     return int(match.group(1))
 
 
-@pytest.mark.parametrize("path", [API, WEB, DB])
+@pytest.mark.parametrize("path", [API, WEB, WEB_CLOUDFLARE, DB])
 def test_every_app_runs_in_lhr_on_one_small_machine(path: Path) -> None:
     config = _toml(path)
     assert config["primary_region"] == "lhr"
@@ -85,8 +89,52 @@ def test_web_is_the_public_app_and_drains_on_sigquit() -> None:
     assert service["auto_stop_machines"] == "off"
     assert service["min_machines_running"] == 1
     assert config["kill_signal"] == "SIGQUIT"
+    assert config["env"]["CURATOR_EDGE"] == "fly"
     upstream = config["env"]["CURATOR_API_UPSTREAM"]
     assert upstream == f"{_toml(API)['app']}.flycast:8000"
+
+
+def test_cloudflare_mode_passes_tls_through_and_checks_health_privately() -> (
+    None
+):
+    fly, cloudflare = _toml(WEB), _toml(WEB_CLOUDFLARE)
+    assert cloudflare["app"] == fly["app"]
+    assert "http_service" not in cloudflare
+    assert cloudflare["env"] == {**fly["env"], "CURATOR_EDGE": "cloudflare"}
+    (service,) = cloudflare["services"]
+    assert service["protocol"] == "tcp"
+    assert service["internal_port"] == TLS_PORT
+    assert service["ports"] == [{"port": 443, "handlers": ["proxy_proto"]}]
+    assert service["auto_stop_machines"] == "off"
+    (check,) = cloudflare["checks"].values()
+    assert (check["port"], check["path"]) == (HEALTH_PORT, "/healthz")
+    # The secrets and the server names never sit in the file.
+    text = WEB_CLOUDFLARE.read_text()
+    assert "CURATOR_SERVER_NAMES =" not in text and "B64 =" not in text
+
+
+def test_nginx_templates_listen_where_the_fly_configs_point() -> None:
+    nginx = ROOT / "web" / "nginx"
+    fly = (nginx / "site-fly.conf.template").read_text()
+    cloudflare = (nginx / "site-cloudflare.conf.template").read_text()
+    assert f"listen {_toml(WEB)['http_service']['internal_port']};" in fly
+    assert f"listen {TLS_PORT} ssl default_server proxy_protocol;" in cloudflare
+    assert f"listen {HEALTH_PORT};" in cloudflare
+
+
+def test_compose_and_fly_trust_x_real_ip_only_from_nginx(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
+    services = compose["services"]
+    web_ip = services["web"]["networks"]["frontend"]["ipv4_address"]
+    api_env = services["api"]["environment"]
+    assert api_env["CURATOR_FORWARDED_ALLOW_IPS"] == web_ip
+    assert services["web"]["environment"]["CURATOR_EDGE"] == "local"
+    assert _toml(API)["env"]["CURATOR_FORWARDED_ALLOW_IPS"] == "*"
+    settings = Settings(forwarded_allow_ips="*")
+    assert settings.forwarded_allow_ips == "*"
 
 
 def test_database_is_private_and_keeps_its_data_on_the_volume() -> None:

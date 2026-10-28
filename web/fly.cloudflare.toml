@@ -1,0 +1,53 @@
+# Fly.io config for the web app in "Cloudflare mode" (after the DNS cutover;
+# ADR 011). Same app as fly.toml, different edge:
+# Fly passes TLS through on 443 with a PROXY protocol header, and nginx
+# terminates it with the Cloudflare Origin Certificate, requires Cloudflare's
+# origin-pull client certificate, and believes CF-Connecting-IP only from
+# Cloudflare's ranges. Port 80 is not served: Cloudflare connects on 443.
+# Before the first deploy in this mode, stage the three origin secrets
+# (scripts/push_fly_secrets.py origin-tls ...). Deploy with
+#   python scripts/deploy.py deploy web --edge cloudflare --domain <domain>
+# which sets CURATOR_SERVER_NAMES to "<domain> www.<domain>".
+app = "hotel-curator"
+primary_region = "lhr"
+kill_signal = "SIGQUIT"
+kill_timeout = 30
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  CURATOR_EDGE = "cloudflare"
+  CURATOR_API_UPSTREAM = "hotel-curator-api.flycast:8000"
+
+[[services]]
+  protocol = "tcp"
+  internal_port = 8443
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 443
+    handlers = ["proxy_proto"]
+
+  [services.concurrency]
+    type = "connections"
+    soft_limit = 200
+    hard_limit = 250
+
+# Health only, on a port no public service maps to (nginx answers
+# /healthz there and 404 for everything else).
+[checks]
+  [checks.web]
+    type = "http"
+    port = 8080
+    method = "get"
+    path = "/healthz"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

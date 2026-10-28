@@ -17,6 +17,7 @@ from limits.storage import MemoryStorage
 from limits.strategies import MovingWindowRateLimiter
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from hotel_curator.api.clientip import UNKNOWN, rate_limit_key
 from hotel_curator.api.middleware import send_error
 
 TOO_MANY = "Too many requests; try again later."
@@ -43,9 +44,10 @@ class RateRule:
 class RateLimitMiddleware:
     """Refuse requests over any matching rule with 429 and ``Retry-After``.
 
-    CORS preflights (``OPTIONS``) are not counted. The client is the ASGI
-    peer, which uvicorn sets from ``X-Forwarded-For`` only for trusted
-    proxies (``CURATOR_FORWARDED_ALLOW_IPS``).
+    CORS preflights (``OPTIONS``) are not counted. The client is the
+    address :class:`~hotel_curator.api.middleware.RequestContextMiddleware`
+    put in the scope state: ``X-Real-IP`` from a trusted proxy, otherwise
+    the TCP peer (:mod:`hotel_curator.api.clientip`).
     """
 
     def __init__(
@@ -71,8 +73,11 @@ class RateLimitMiddleware:
         if scope["type"] != "http" or scope.get("method") == "OPTIONS":
             await self.app(scope, receive, send)
             return
-        peer = scope.get("client")
-        client = peer[0] if peer else "unknown"
+        address = scope.get("state", {}).get("client")
+        if address is None:
+            peer = scope.get("client")
+            address = peer[0] if peer else UNKNOWN
+        client = rate_limit_key(address)
         for rule in (r for r in self.rules if r.applies(scope["path"])):
             if not self.limiter.hit(rule.item, rule.group, client):
                 retry = str(self._retry_after(rule, client)).encode()

@@ -1,0 +1,36 @@
+# Cloudflare's edge ranges in web/nginx/cloudflare-ips.conf decide when nginx
+# believes CF-Connecting-IP (Cloudflare mode, ADR 011). This compares them
+# with the list Cloudflare publishes, weekly and whenever the file changes,
+# so a new range shows up here instead of as visitors sharing a bucket.
+name: cloudflare-ips
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - web/nginx/cloudflare-ips.conf
+      - .github/workflows/cloudflare-ips.yml
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Committed ranges match https://www.cloudflare.com/ips/
+        run: |
+          {
+            curl -sSf https://www.cloudflare.com/ips-v4
+            echo
+            curl -sSf https://www.cloudflare.com/ips-v6
+            echo
+          } | grep -E '^[0-9a-f.:]+/[0-9]+$' | sort > published.txt
+          grep -oE '^[0-9a-f.:]+/[0-9]+' web/nginx/cloudflare-ips.conf \
+            | sort > committed.txt
+          test -s published.txt
+          diff -u committed.txt published.txt

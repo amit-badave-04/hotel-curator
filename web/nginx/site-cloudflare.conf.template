@@ -1,0 +1,77 @@
+# Edge mode "cloudflare" (after the DNS cutover; web/fly.cloudflare.toml).
+# Fly passes TLS through on 443 with a PROXY protocol header, so nginx sees
+# the connecting address, terminates TLS with the Cloudflare Origin
+# Certificate and requires Cloudflare's origin-pull client certificate
+# (Authenticated Origin Pulls). CF-Connecting-IP is believed only when the
+# connection came from Cloudflare's published ranges; Fly-Client-IP is
+# never believed in this mode. Rendered by 15-curator-site.sh.
+include curator/http.conf;
+
+upstream curator_api {
+    server ${CURATOR_API_UPSTREAM};
+}
+
+# $remote_addr is the PROXY protocol source here (real_ip below).
+geo $curator_from_cloudflare {
+    default 0;
+    include curator/cloudflare-ips.conf;
+}
+
+map $curator_from_cloudflare $curator_client_ip {
+    1       $http_cf_connecting_ip;
+    default $remote_addr;
+}
+
+ssl_protocols TLSv1.2 TLSv1.3;
+ssl_prefer_server_ciphers off;
+ssl_session_cache shared:curator_tls:1m;
+ssl_session_tickets off;
+
+# Any other name (or none) in the TLS handshake: no handshake at all. A
+# request whose Host names another site after a valid handshake also lands
+# here: 421 Misdirected Request.
+server {
+    listen 8443 ssl default_server proxy_protocol;
+    listen [::]:8443 ssl default_server proxy_protocol;
+    ssl_reject_handshake on;
+    access_log /dev/stdout curator;
+    return 421;
+}
+
+server {
+    listen 8443 ssl;
+    listen [::]:8443 ssl;
+    server_name ${CURATOR_SERVER_NAMES};
+
+    # Only Fly's proxy connects to this port, so its PROXY header is the
+    # connecting address.
+    set_real_ip_from 0.0.0.0/0;
+    set_real_ip_from ::/0;
+    real_ip_header proxy_protocol;
+
+    ssl_certificate ${CURATOR_TLS_DIR}/origin.pem;
+    ssl_certificate_key ${CURATOR_TLS_DIR}/origin.key;
+    ssl_client_certificate ${CURATOR_TLS_DIR}/origin-pull-ca.pem;
+    ssl_verify_client on;
+
+    # A connection from outside Cloudflare's ranges, even with a valid
+    # client certificate.
+    if ($curator_from_cloudflare = 0) {
+        return 403;
+    }
+    include curator/site.conf;
+}
+
+# Fly's health check only; no public service maps to this port.
+server {
+    listen 8080;
+    listen [::]:8080;
+    access_log off;
+    location = /healthz {
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+    location / {
+        return 404;
+    }
+}

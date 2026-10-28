@@ -23,7 +23,7 @@ flowchart LR
     sock[/db-socket volume<br/>mounted by db and api only/]
     data[/db-data volume/]
   end
-  web -->|HTTP, X-Forwarded-For| api
+  web -->|HTTP, X-Real-IP, X-Request-ID| api
   api -->|role curator: not a superuser,<br/>owns the curator database| sock
   sock --- db
   db --- data
@@ -32,7 +32,7 @@ flowchart LR
 | Boundary | What crosses it | Controls |
 |---|---|---|
 | Browser to web | static app; `/api/*` | ports bound to 127.0.0.1; Content-Security-Policy `default-src 'self'` and no inline script; `X-Frame-Options DENY`, `nosniff`, `Referrer-Policy no-referrer`, `Permissions-Policy`; request bodies over 64 KB refused |
-| web to api | proxied `/api/*` requests | the API trusts `X-Forwarded-For` only from `172.28.0.10` (`CURATOR_FORWARDED_ALLOW_IPS`); request id, CORS allow-list, rate limits per client (120 a minute under `/v1`, 30 a minute on `/v1/analyze`), checked before any body is read; a 64,000-byte body limit (refused on `Content-Length` before reading; a chunked body is cut off once it passes the limit); strict path and query patterns; one error shape |
+| web to api | proxied `/api/*` requests | nginx overwrites `X-Real-IP` with the client address and blanks `X-Forwarded-For`; the API reads `X-Real-IP` (and nginx's `X-Request-ID`) only from `172.28.0.10` (`CURATOR_FORWARDED_ALLOW_IPS`); request id, CORS allow-list, rate limits per client (120 a minute under `/v1`, 30 a minute on `/v1/analyze`), checked before any body is read; a 64,000-byte body limit (refused on `Content-Length` before reading; a chunked body is cut off once it passes the limit); strict path and query patterns; one error shape |
 | api to db | SQL over a Unix socket | the database has no network at all; over the socket the role `curator` connects with trust and the superuser `postgres` only by peer authentication, that is from inside the db container (`docker compose exec -u postgres db psql curator`); `curator` is not a superuser (no `COPY ... PROGRAM`, no server files); bound parameters only |
 | Containers to host | volumes; the web and db root filesystems | the API's root filesystem is read-only (tmpfs `/tmp`); web and db have writable root filesystems; `no-new-privileges` on all three; the API (uid 10001) and web (uid 101) run as non-root, and Postgres's entrypoint starts as root and drops to its own user; the API image has no pip and no training libraries |
 
@@ -41,12 +41,12 @@ Postgres runs only when it initialises an empty data volume. A `db-data`
 volume created by an earlier version of the compose file keeps its old
 roles; recreate it with `docker compose down -v`.
 
-Rate limits key on the client address. In laptop compose the Docker gateway
-rewrites client addresses, so every client on the host shares one bucket.
-Behind another reverse proxy, clients get separate buckets only if that
-proxy's address is also added to `CURATOR_FORWARDED_ALLOW_IPS`; otherwise
-they all share the proxy's (security review, section 5). Never publish
-`:8000` beyond localhost.
+Rate limits key on the client address that nginx puts in `X-Real-IP`. In
+laptop compose the Docker gateway rewrites client addresses, so every
+client on the host shares one bucket. On Fly, nginx takes the address from
+`Fly-Client-IP` or, behind Cloudflare, from `CF-Connecting-IP`, so each
+client has its own bucket (ADR 011; security review, section 5). Never
+publish `:8000` beyond localhost.
 
 ## Start-up
 

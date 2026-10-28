@@ -8,6 +8,12 @@ import structlog
 from fastapi import HTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from hotel_curator.api.clientip import (
+    REQUEST_ID_HEADER,
+    TrustedProxies,
+    client_address,
+    forwarded_request_id,
+)
 from hotel_curator.api.errors import STATUS_CODES
 
 logger = structlog.get_logger("hotel_curator.access")
@@ -18,7 +24,6 @@ SECURITY_HEADERS = (
     (b"x-frame-options", b"DENY"),
     (b"cache-control", b"no-store"),
 )
-REQUEST_ID_HEADER = b"x-request-id"
 TOO_LARGE = "The request body is too large."
 
 
@@ -59,8 +64,11 @@ class RequestContextMiddleware:
     send a response without the request id and security headers.
     """
 
-    def __init__(self, app: ASGIApp) -> None:
+    def __init__(
+        self, app: ASGIApp, trusted: TrustedProxies | None = None
+    ) -> None:
         self.app = app
+        self.trusted = trusted or TrustedProxies()
 
     async def __call__(
         self, scope: Scope, receive: Receive, send: Send
@@ -69,8 +77,13 @@ class RequestContextMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        request_id = uuid.uuid4().hex
-        scope.setdefault("state", {})["request_id"] = request_id
+        request_id = (
+            forwarded_request_id(scope, self.trusted) or uuid.uuid4().hex
+        )
+        state = scope.setdefault("state", {})
+        state["request_id"] = request_id
+        # Read by the rate limiter; never logged (an address is personal).
+        state["client"] = client_address(scope, self.trusted)
         started = time.perf_counter()
         status: int | None = None
 
@@ -78,7 +91,11 @@ class RequestContextMiddleware:
             nonlocal status
             if message["type"] == "http.response.start":
                 status = message["status"]
-                headers = list(message.get("headers", []))
+                headers = [
+                    (name, value)
+                    for name, value in message.get("headers", [])
+                    if name.lower() != REQUEST_ID_HEADER
+                ]
                 headers.append((REQUEST_ID_HEADER, request_id.encode()))
                 headers.extend(SECURITY_HEADERS)
                 message["headers"] = headers

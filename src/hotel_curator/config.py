@@ -11,7 +11,13 @@ from pathlib import Path
 from typing import Literal, Self
 from urllib.parse import parse_qs, urlsplit
 
-from pydantic import Field, SecretStr, computed_field, model_validator
+from pydantic import (
+    Field,
+    SecretStr,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 MAX_PAGE_SIZE = 100
@@ -94,10 +100,19 @@ class Settings(BaseSettings):
     )
     forwarded_allow_ips: str | None = Field(
         default=None,
-        description="Proxy addresses whose X-Forwarded-For is trusted for "
-        "client identity (rate limits). Unset: use the TCP peer.",
+        description="Proxies (addresses, CIDR ranges, or * for any peer) "
+        "whose X-Real-IP and X-Request-ID are believed; X-Forwarded-For "
+        "never is. Unset: the client is the TCP peer.",
     )
     seed: int = 20261024
+
+    @field_validator("forwarded_allow_ips")
+    @classmethod
+    def _proxies_parse(cls, value: str | None) -> str | None:
+        from hotel_curator.api.clientip import TrustedProxies
+
+        TrustedProxies.parse(value)  # raises ValueError on a bad entry
+        return value
 
     @model_validator(mode="after")
     def _production_needs_postgres_over_tls(self) -> Self:

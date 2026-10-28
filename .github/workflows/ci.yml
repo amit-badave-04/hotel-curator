@@ -1,7 +1,8 @@
 # Continuous integration: Python (lint, types, tests, coverage), web (lint,
 # types, unit tests, build, API-client drift, npm audit), security (gitleaks,
-# pip-audit, bandit), the Fly database image over TLS, end-to-end browser
-# tests, and container builds. Actions are pinned to commit SHAs.
+# pip-audit, bandit), the Fly database image over TLS, nginx in each edge
+# mode, end-to-end browser tests, and container builds. Actions are pinned
+# to commit SHAs.
 name: ci
 
 on:
@@ -149,6 +150,31 @@ jobs:
       - name: Stop
         if: always()
         run: docker rm -f db
+
+  # nginx in each edge mode (web/nginx, ADR 011) in front of a stub API:
+  # which client address reaches the API, which headers are dropped, one
+  # HSTS value, and in Cloudflare mode origin pulls, the PROXY protocol
+  # source check and refused names.
+  edge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.32"
+          enable-cache: true
+      - name: Install nginx, envsubst and the test tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends nginx gettext-base
+          uv sync --extra dev
+      - name: Edge modes against real nginx
+        env:
+          CURATOR_TEST_EDGE_REQUIRED: "1"
+        run: |
+          nginx -v
+          uv run pytest tests/edge -v
 
   e2e:
     runs-on: ubuntu-latest

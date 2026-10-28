@@ -76,6 +76,7 @@ to `flyctl secrets import` on stdin and prints only their names.
 |---|---|---|
 | `hotel-curator-db` | `POSTGRES_PASSWORD`, `CURATOR_OWNER_PASSWORD`, `CURATOR_APP_PASSWORD` | before the first database deploy (init fails without them) |
 | `hotel-curator-api` | `CURATOR_DATABASE_URL`, `CURATOR_MIGRATION_DATABASE_URL` | before the first API deploy |
+| `hotel-curator` | `CURATOR_ORIGIN_CERT_B64`, `CURATOR_ORIGIN_KEY_B64`, `CURATOR_ORIGIN_PULL_CA_B64` | Cloudflare mode only (`origin-tls`) |
 
 The same, by hand. Placeholders are in angle brackets. These commands
 leave the values in your shell history, so prefer the script.
@@ -133,9 +134,39 @@ uv run python scripts/deploy.py setup         # recreates pg_data
 uv run python scripts/deploy.py deploy db
 ```
 
+## The web app's edge mode
+
+nginx's site is rendered at start for `CURATOR_EDGE`: `fly` in
+`web/fly.toml` (the client address is `Fly-Client-IP`), `local` in docker
+compose. After the Cloudflare cutover the web app is deployed in
+`cloudflare` mode instead:
+
+```sh
+uv run python scripts/push_fly_secrets.py origin-tls \
+  --cert origin.pem --key origin.key --ca origin-pull-ca.pem
+uv run python scripts/push_fly_secrets.py push --app hotel-curator
+uv run python scripts/deploy.py deploy web --edge cloudflare --domain <domain>
+```
+
+The three files are the Cloudflare Origin Certificate and its key, and the
+CA that signs Cloudflare's origin-pull client certificate. They go into
+`.env.fly` as base64 and reach the machine as secrets; nginx writes them to
+a directory only its user can read.
+
 ## Deploying again
 
 `make fly-deploy` redeploys all three apps.
 `uv run python scripts/deploy.py deploy api` (or `db`, `web`) deploys
 one. A database redeploy restarts Postgres on the same volume; the data
 stays.
+
+A web deploy keeps the edge mode its machines run in. Once the web app is
+in Cloudflare mode, a deploy without `--edge` stops with a message instead
+of quietly switching back to Fly mode (which would drop the origin
+certificate, origin pulls and the client-address rule). Pass the mode each
+time:
+
+```sh
+make fly-deploy FLY_DEPLOY_ARGS="--edge cloudflare --domain <domain>"
+uv run python scripts/deploy.py deploy web --edge fly   # switch back
+```
