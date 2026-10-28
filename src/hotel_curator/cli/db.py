@@ -9,6 +9,12 @@ from hotel_curator.config import get_settings
 
 app = typer.Typer(help="Database migrations and demo data.")
 
+GRACEFUL_SHUTDOWN_SECONDS = 20
+"""How long uvicorn lets in-flight requests finish after SIGTERM.
+
+Fly's ``kill_timeout`` for the API must be longer (fly.toml).
+"""
+
 
 @app.command("upgrade")
 def upgrade_cmd(
@@ -16,12 +22,11 @@ def upgrade_cmd(
 ) -> None:
     """Apply Alembic migrations up to ``revision``."""
     from hotel_curator.db.migrate import upgrade
+    from hotel_curator.db.release import ensure_sqlite_dir
 
-    settings = get_settings()
-    if settings.database_url.startswith("sqlite:///"):
-        db_file = Path(settings.database_url.removeprefix("sqlite:///"))
-        db_file.parent.mkdir(parents=True, exist_ok=True)
-    upgrade(settings.database_url, revision)
+    url = get_settings().migration_db_url()
+    ensure_sqlite_dir(url)
+    upgrade(url, revision)
     typer.echo(f"database at {revision}")
 
 
@@ -43,10 +48,40 @@ def seed_cmd(
 
     settings = get_settings()
     source = path or settings.demo_dir / DEMO_RESULTS
-    engine = make_engine(settings.database_url)
+    engine = make_engine(settings.migration_db_url())
     with session_scope(make_session_factory(engine)) as session:
         loaded = seed(session, source)
     engine.dispose()
+    typer.echo(
+        f"loaded {loaded} hotels from {source}" if loaded else "up to date"
+    )
+
+
+@app.command("release")
+def release_cmd(
+    if_enabled: Annotated[
+        bool,
+        typer.Option(
+            "--if-enabled",
+            help="Do nothing unless CURATOR_MIGRATE_ON_START is true "
+            "(used by the container entrypoint).",
+        ),
+    ] = False,
+) -> None:
+    """Migrate, then load the committed results, under a database lock.
+
+    Idempotent and safe to run on every deploy (Fly's release command).
+    Uses CURATOR_MIGRATION_DATABASE_URL when set.
+    """
+    from hotel_curator.cli.score import DEMO_RESULTS
+    from hotel_curator.db.release import release
+
+    settings = get_settings()
+    if if_enabled and not settings.migrate_on_start:
+        typer.echo("release skipped: CURATOR_MIGRATE_ON_START is false")
+        return
+    source = settings.demo_dir / DEMO_RESULTS
+    loaded = release(settings.migration_db_url(), source)
     typer.echo(
         f"loaded {loaded} hotels from {source}" if loaded else "up to date"
     )
@@ -70,4 +105,5 @@ def serve(
         proxy_headers=trusted is not None,
         forwarded_allow_ips=trusted or "127.0.0.1",
         server_header=False,
+        timeout_graceful_shutdown=GRACEFUL_SHUTDOWN_SECONDS,
     )

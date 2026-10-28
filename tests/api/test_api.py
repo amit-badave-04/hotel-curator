@@ -52,9 +52,9 @@ def _settings(tmp_path: Path, **overrides: object) -> Settings:
 
 
 def _client(settings: Settings, results: Path | None) -> TestClient:
-    upgrade(settings.database_url)
+    upgrade(settings.db_url())
     if results is not None:
-        engine = make_engine(settings.database_url)
+        engine = make_engine(settings.db_url())
         with session_scope(make_session_factory(engine)) as session:
             seed(session, results)
         engine.dispose()
@@ -362,8 +362,8 @@ def test_cors_allow_list(client: TestClient) -> None:
 
 def test_seed_is_idempotent(tmp_path: Path, results_file: Path) -> None:
     settings = _settings(tmp_path)
-    upgrade(settings.database_url)
-    engine = make_engine(settings.database_url)
+    upgrade(settings.db_url())
+    engine = make_engine(settings.db_url())
     factory = make_session_factory(engine)
     with session_scope(factory) as session:
         assert seed(session, results_file) == 5
@@ -419,7 +419,7 @@ def test_unexpected_errors_keep_the_error_shape_and_headers(
     tmp_path: Path, results_file: Path
 ) -> None:
     settings = _settings(tmp_path)
-    upgrade(settings.database_url)
+    upgrade(settings.db_url())
     app = create_app(settings)
 
     @app.get("/v1/boom")

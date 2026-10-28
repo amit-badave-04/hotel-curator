@@ -1,6 +1,8 @@
 """Synthetic data shared by tests: hotels scored by the real pipeline."""
 
+import importlib.util
 from pathlib import Path
+from types import ModuleType
 
 import numpy as np
 import pandas as pd
@@ -12,6 +14,17 @@ from hotel_curator.scoring.policy import TierPolicy
 from hotel_curator.taxonomy import LABELS
 
 POLICY_PATH = Path(__file__).parents[1] / "config" / "tier_policy.yaml"
+SCRIPTS = Path(__file__).parents[1] / "scripts"
+
+
+def load_script(name: str) -> ModuleType:
+    """Import ``scripts/<name>.py``, which is not part of a package."""
+    spec = importlib.util.spec_from_file_location(name, SCRIPTS / f"{name}.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
 
 # (hotel id, name, city, reviews, cleanliness polarity, noisy)
 HOTELS = [

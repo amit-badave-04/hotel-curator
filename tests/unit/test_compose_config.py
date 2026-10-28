@@ -29,8 +29,13 @@ def test_compose_api_environment_is_valid_settings(
     assert all(key.startswith("CURATOR_") for key in env)
     for key, value in env.items():
         monkeypatch.setenv(key, value)
+    # The API image sets CURATOR_ENVIRONMENT=production (Dockerfile).
+    dockerfile = (ROOT / "Dockerfile").read_text()
+    baked = re.search(r"^ENV CURATOR_ENVIRONMENT=(\w+)$", dockerfile, re.M)
+    assert baked is not None and baked.group(1) == "production"
+    monkeypatch.setenv("CURATOR_ENVIRONMENT", baked.group(1))
     settings = Settings()
-    assert settings.database_url.startswith("postgresql+psycopg://")
+    assert settings.db_url().startswith("postgresql+psycopg://")
     assert settings.forwarded_allow_ips == env["CURATOR_FORWARDED_ALLOW_IPS"]
     known = {f"CURATOR_{name.upper()}" for name in Settings.model_fields}
     assert set(env) <= known, set(env) - known

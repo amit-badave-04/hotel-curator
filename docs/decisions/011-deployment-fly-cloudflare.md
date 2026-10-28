@@ -156,7 +156,7 @@ interface an attacker could reach.
 | App | Secret | Used by |
 |---|---|---|
 | `hotel-curator-api` | `CURATOR_DATABASE_URL` (`curator_app`) | serving |
-| `hotel-curator-api` | `CURATOR_MIGRATION_DATABASE_URL` (`curator_owner`) | the release command only |
+| `hotel-curator-api` | `CURATOR_MIGRATION_DATABASE_URL` (`curator_owner`) | the release command only. Fly puts every secret into every machine of the app, so the API's entrypoint unsets it (in any spelling) before `curator serve` starts. That keeps it out of the server's environment but is not a hard boundary: Fly's in-machine API and an `ssh console` session still reach it. A separate release app holding only this secret would be one. |
 | `hotel-curator-api` | `CURATOR_SENTRY_DSN` (optional) | error reports |
 | `hotel-curator-db` | `POSTGRES_PASSWORD`, `CURATOR_OWNER_PASSWORD`, `CURATOR_APP_PASSWORD` | first initialisation of the volume |
 | `hotel-curator` | `CURATOR_ORIGIN_CERT`, `CURATOR_ORIGIN_KEY` | Cloudflare mode only |
@@ -203,7 +203,7 @@ owner's refit project already runs there.
 | A1 | Fly's edge sets `Fly-Client-IP` from the connection and replaces a client-sent value | send `Fly-Client-IP: 203.0.113.9` to `https://hotel-curator.fly.dev/api/v1/hotels`; nginx's log shows the real address |
 | A2 | `hotel-curator-api.flycast:8000` reaches the API after a private IPv6 is allocated | `scripts/smoke.py` gets analyze 200 through the web app |
 | A3 | An app with only a private address and `[[services]]` gets no public IP | `flyctl ips list -a hotel-curator-api` and `-a hotel-curator-db` list no public address |
-| A4 | `release_command` runs once per deploy on a temporary machine with the app's secrets | `flyctl releases -a hotel-curator-api` and the release log line "seed: up to date" or "loaded 1494 hotels" |
+| A4 | `release_command` runs once per deploy on a temporary machine with the app's secrets | `flyctl releases -a hotel-curator-api` and the release log line "up to date" or "loaded 1494 hotels from …" |
 | A5 | `kill_signal` and `kill_timeout` are honoured | the deploy log shows "Application shutdown complete" before the machine stops |
 | A6 | Top-level `[checks]` may target a port without a public service | `flyctl checks list` shows the checks passing |
 | A7 | A TCP service with `handlers = ["proxy_proto"]` passes TLS through with a PROXY header | after cutover, nginx's log shows a Cloudflare address as the proxy-protocol peer and the visitor's address as the client |

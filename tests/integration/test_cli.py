@@ -24,14 +24,39 @@ from tests.helpers import invoke_cli, synthetic_results, toy_label_set
 
 
 def test_db_upgrade_and_seed_are_idempotent(home: Path) -> None:
+    _write_demo(home)
+    invoke_cli("db", "upgrade")
+    assert "loaded 5 hotels" in invoke_cli("db", "seed")
+    assert "up to date" in invoke_cli("db", "seed")
+
+
+def _write_demo(home: Path) -> None:
     demo = home / "data" / "demo"
     demo.mkdir(parents=True)
     payload = [r.model_dump(mode="json") for r in synthetic_results()]
     with gzip.open(demo / "hotel_results.json.gz", "wt") as handle:
         json.dump(payload, handle)
-    invoke_cli("db", "upgrade")
-    assert "loaded 5 hotels" in invoke_cli("db", "seed")
-    assert "up to date" in invoke_cli("db", "seed")
+
+
+def test_db_release_migrates_then_seeds_once(home: Path) -> None:
+    _write_demo(home)
+    assert not (home / "var").exists()
+    assert "loaded 5 hotels" in invoke_cli("db", "release")
+    assert "up to date" in invoke_cli("db", "release")
+    assert "up to date" in invoke_cli("db", "release", "--if-enabled")
+
+
+def test_db_release_if_enabled_skips_when_migrate_on_start_is_off(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from hotel_curator.config import get_settings
+
+    _write_demo(home)
+    monkeypatch.setenv("CURATOR_MIGRATE_ON_START", "false")
+    get_settings.cache_clear()
+    assert "release skipped" in invoke_cli("db", "release", "--if-enabled")
+    assert not (home / "var" / "cli.db").exists()
+    assert "loaded 5 hotels" in invoke_cli("db", "release")
 
 
 def _split(prefix: str, seed: int) -> LabeledParts:

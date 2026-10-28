@@ -1,7 +1,7 @@
 # Continuous integration: Python (lint, types, tests, coverage), web (lint,
 # types, unit tests, build, API-client drift, npm audit), security (gitleaks,
-# pip-audit, bandit), end-to-end browser tests, and container builds. Actions
-# are pinned to commit SHAs.
+# pip-audit, bandit), the Fly database image over TLS, end-to-end browser
+# tests, and container builds. Actions are pinned to commit SHAs.
 name: ci
 
 on:
@@ -103,6 +103,52 @@ jobs:
           uvx pip-audit==2.10.1 --strict --no-deps -r requirements-audit.txt
       - name: Python SAST (bandit)
         run: uvx bandit==1.9.4 -r src -q
+
+  # The Fly database image (deploy/postgres) started the way Fly starts it:
+  # TLS on, two non-superuser roles, pg_hba refusing plain connections and
+  # the superuser over TCP. Two release commands then race against it.
+  postgres-tls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.32"
+          enable-cache: true
+      - name: Install (API, Postgres driver, test tools)
+        run: uv sync --extra dev --extra postgres
+      - name: Start the database image with throwaway passwords
+        # Passwords reach docker by name (-e NAME), never on a command line.
+        run: |
+          docker build -t hotel-curator-db:ci deploy/postgres
+          gen() { python3 -c 'import secrets; print(secrets.token_urlsafe(32))'; }
+          export POSTGRES_PASSWORD="$(gen)" CURATOR_OWNER_PASSWORD="$(gen)" \
+            CURATOR_APP_PASSWORD="$(gen)"
+          for pw in "$POSTGRES_PASSWORD" "$CURATOR_OWNER_PASSWORD" "$CURATOR_APP_PASSWORD"; do
+            echo "::add-mask::$pw"
+          done
+          docker run -d --name db -p 127.0.0.1:5432:5432 -e POSTGRES_DB=curator \
+            -e POSTGRES_PASSWORD -e CURATOR_OWNER_PASSWORD -e CURATOR_APP_PASSWORD \
+            hotel-curator-db:ci
+          # TCP answers only after initialisation, once the real server runs.
+          timeout 60 sh -c 'until docker exec db pg_isready -q -h 127.0.0.1; do sleep 1; done'
+          base="127.0.0.1:5432/curator?sslmode=require"
+          {
+            echo "CURATOR_TEST_POSTGRES_OWNER_URL=postgresql+psycopg://curator_owner:${CURATOR_OWNER_PASSWORD}@${base}"
+            echo "CURATOR_TEST_POSTGRES_APP_URL=postgresql+psycopg://curator_app:${CURATOR_APP_PASSWORD}@${base}"
+          } >> "$GITHUB_ENV"
+      - name: Roles, TLS and concurrent releases
+        env:
+          # Missing URLs fail the job instead of skipping every test.
+          CURATOR_TEST_POSTGRES_REQUIRED: "1"
+        run: uv run pytest tests/postgres -v
+      - name: Database log on failure
+        if: failure()
+        run: docker logs db
+      - name: Stop
+        if: always()
+        run: docker rm -f db
 
   e2e:
     runs-on: ubuntu-latest

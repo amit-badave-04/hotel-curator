@@ -49,6 +49,10 @@ RUN rm -rf ./artifacts/models/v1-roberta-base \
     && if [ "$REQUIRE_MODEL" = "1" ]; then curator model verify-served; fi \
     && chmod 0755 /usr/local/bin/api-entrypoint.sh \
     && mkdir -p /app/var && chown curator:curator /app/var
+# Set after the build-time check above (which runs on the default SQLite
+# settings): from here on the app refuses to start without Postgres over TLS
+# or a Unix socket.
+ENV CURATOR_ENVIRONMENT=production
 USER curator
 EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=5 \

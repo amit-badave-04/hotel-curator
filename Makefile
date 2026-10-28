@@ -98,6 +98,23 @@ db: ## Create/upgrade the local database and load the demo data
 serve: db ## Run the API on http://127.0.0.1:8000 (docs at /docs)
 	$(RUN) curator serve
 
+# --- deploy (Fly.io; docs/deploy/fly.md) -----------------------------------
+.PHONY: fly-plan fly-secrets fly-setup fly-deploy fly-status
+fly-plan: ## Print every flyctl command a first deploy runs (runs nothing)
+	$(RUN) python scripts/deploy.py plan
+
+fly-secrets: ## Check .env.fly, then stage it as Fly secrets (values on stdin)
+	$(RUN) python scripts/push_fly_secrets.py push
+
+fly-setup: ## Create the three apps, the database volume, the API private IP
+	$(RUN) python scripts/deploy.py setup
+
+fly-deploy: ## Deploy database, API, web, in that order
+	$(RUN) python scripts/deploy.py deploy
+
+fly-status: ## Machines of each app; fails if the API or database is public
+	$(RUN) python scripts/deploy.py status
+
 # --- quality ---------------------------------------------------------------
 .PHONY: lint format typecheck test test-fast cov check
 lint: ## Ruff lint + format check

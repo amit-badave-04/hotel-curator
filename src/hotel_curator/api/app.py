@@ -68,7 +68,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        engine = make_engine(settings.database_url)
+        engine = make_engine(settings.db_url())
         app.state.curator = AppState(
             settings=settings,
             engine=engine,
