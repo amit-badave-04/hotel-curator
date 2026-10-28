@@ -139,14 +139,19 @@ uv run python scripts/deploy.py deploy db
 nginx's site is rendered at start for `CURATOR_EDGE`: `fly` in
 `web/fly.toml` (the client address is `Fly-Client-IP`), `local` in docker
 compose. After the Cloudflare cutover the web app is deployed in
-`cloudflare` mode instead:
+`cloudflare` mode instead. The whole cutover, in order, is in
+[cloudflare.md](cloudflare.md); its Fly side is:
 
 ```sh
 uv run python scripts/push_fly_secrets.py origin-tls \
   --cert origin.pem --key origin.key --ca origin-pull-ca.pem
 uv run python scripts/push_fly_secrets.py push --app hotel-curator
+uv run python scripts/deploy.py setup --edge cloudflare   # dedicated IPv4
 uv run python scripts/deploy.py deploy web --edge cloudflare --domain <domain>
 ```
+
+Do these only as part of the checklist: Cloudflare must already require
+origin pulls when nginx starts requiring them.
 
 The three files are the Cloudflare Origin Certificate and its key, and the
 CA that signs Cloudflare's origin-pull client certificate. They go into
@@ -168,5 +173,7 @@ time:
 
 ```sh
 make fly-deploy FLY_DEPLOY_ARGS="--edge cloudflare --domain <domain>"
-uv run python scripts/deploy.py deploy web --edge fly   # switch back
 ```
+
+Switching back to Fly mode needs Fly certificates for the domain first;
+follow [the rollback](cloudflare.md#rolling-back-to-fly-mode).

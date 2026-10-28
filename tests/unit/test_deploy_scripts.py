@@ -364,12 +364,31 @@ def _pem(directory: Path, name: str, label: str, eol: str = "\n") -> Path:
     return path
 
 
-def _origin_files(directory: Path) -> list[str]:
-    return [
-        "--cert", str(_pem(directory, "origin.pem", "CERTIFICATE")),
-        "--key", str(_pem(directory, "origin.key", "PRIVATE KEY")),
-        "--ca", str(_pem(directory, "pull-ca.pem", "CERTIFICATE")),
-    ]  # fmt: skip
+def _self_signed(directory: Path, name: str) -> tuple[Path, Path]:
+    """A real EC certificate and key, as OpenSSL (and nginx) load them."""
+    cert, key = directory / f"{name}.pem", directory / f"{name}.key"
+    subprocess.run(
+        [
+            "openssl", "req", "-x509", "-newkey", "ec", "-pkeyopt",
+            "ec_paramgen_curve:prime256v1", "-nodes", "-days", "1",
+            "-subj", f"/CN={name}", "-keyout", str(key), "-out", str(cert),
+        ],
+        check=True,
+        capture_output=True,
+    )  # fmt: skip
+    return cert, key
+
+
+def _origin_files(directory: Path, eol: str = "\n") -> list[str]:
+    """--cert, --key and --ca for a matching origin pair and a pull CA."""
+    folder = directory / f"pki-{len(list(directory.glob('pki-*')))}"
+    folder.mkdir()
+    cert, key = _self_signed(folder, "origin")
+    ca, _ = _self_signed(folder, "pull-ca")
+    if eol != "\n":
+        for path in (cert, key, ca):
+            path.write_bytes(path.read_bytes().replace(b"\n", eol.encode()))
+    return ["--cert", str(cert), "--key", str(key), "--ca", str(ca)]
 
 
 def _assert_nothing_secret_in(
@@ -438,11 +457,7 @@ def test_origin_tls_handles_hand_edited_files(
     env_file = tmp_path / ".env.fly"
     secrets_cli.write_env_file(env_file, secrets_cli.generate())
     env_file.write_text(env_file.read_text().rstrip("\n"))  # no final \n
-    crlf = [
-        "--cert", str(_pem(tmp_path, "c.pem", "CERTIFICATE", "\r\n")),
-        "--key", str(_pem(tmp_path, "k.pem", "EC PRIVATE KEY", "\r\n")),
-        "--ca", str(_pem(tmp_path, "ca.pem", "CERTIFICATE", "\r\n")),
-    ]  # fmt: skip
+    crlf = _origin_files(tmp_path, eol="\r\n")
     origin = ["origin-tls", "--env-file", str(env_file), *crlf]
     assert secrets_cli.main(origin) == 0, capsys.readouterr().err
     assert secrets_cli.main(["check", "--env-file", str(env_file)]) == 0
@@ -486,7 +501,17 @@ def test_origin_tls_refuses_swapped_or_partial_files(
     )
     err = capsys.readouterr().err
     assert "CURATOR_ORIGIN_CERT_B64: not a PEM certificate" in err
-    assert "MIIBfake" not in err
+    assert "BEGIN" not in err
+    assert env_file.read_text() == before
+    other = _origin_files(tmp_path)
+    mismatched = [*_origin_files(tmp_path)]
+    mismatched[3] = other[3]  # a key from another certificate
+    swapped = [*_origin_files(tmp_path)]
+    swapped[1], swapped[5] = swapped[5], swapped[1]  # cert and CA swapped
+    for files in (mismatched, swapped):
+        origin = ["origin-tls", "--env-file", str(env_file), *files]
+        assert secrets_cli.main(origin) == 1
+        assert "does not belong to the certificate" in capsys.readouterr().err
     assert env_file.read_text() == before
     same = _origin_files(tmp_path)
     same[5] = same[1]  # the certificate given again as the CA
@@ -517,6 +542,7 @@ def test_cloudflare_mode_deploys_the_cloudflare_config_for_one_domain(
         ["deploy", "web", "--edge", "cloudflare"],
         ["deploy", "web", "--domain", "a.example"],
         ["status", "--edge", "fly"],
+        ["setup", "--edge", "cloudflare", "--domain", "a.example"],
         ["deploy", "web", "--edge", "cloudflare", "--domain", "a" * 98 + ".io"],
     ):
         with pytest.raises(SystemExit):
@@ -668,3 +694,37 @@ def test_the_ca_may_not_be_the_certificate_in_other_line_endings(
     files = ["--cert", str(cert), "--key", str(key), "--ca", str(ca)]
     assert secrets_cli.main([*origin, *files]) == 1
     assert "are the same file" in capsys.readouterr().err
+
+
+def test_cloudflare_setup_adds_a_dedicated_ipv4_once() -> None:
+    shared = FakeFly({"ips list --app hotel-curator": [{"Type": "shared_v4"}]})
+    deploy_cli.setup_cloudflare(
+        deploy_cli.Fly("flyctl", dry_run=False, runner=shared)
+    )
+    assert shared.commands == [
+        ["ips", "allocate-v4", "--app", "hotel-curator", "--yes"]
+    ]
+    dedicated = FakeFly({"ips list --app hotel-curator": [{"Type": "v4"}]})
+    deploy_cli.setup_cloudflare(
+        deploy_cli.Fly("flyctl", dry_run=False, runner=dedicated)
+    )
+    assert dedicated.commands == []
+
+
+def test_origin_tls_replace_swaps_the_secrets_in_place(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    env_file = tmp_path / ".env.fly"
+    secrets_cli.write_env_file(env_file, secrets_cli.generate())
+    origin = ["origin-tls", "--env-file", str(env_file)]
+    assert secrets_cli.main([*origin, *_origin_files(tmp_path)]) == 0
+    first = secrets_cli.parse_env(secrets_cli.read_env_file(env_file))
+    again = [*origin, *_origin_files(tmp_path)]
+    assert secrets_cli.main(again) == 1
+    assert "--replace swaps them" in capsys.readouterr().err
+    assert secrets_cli.main([*again, "--replace"]) == 0
+    second = secrets_cli.parse_env(secrets_cli.read_env_file(env_file))
+    assert len(second) == len(first)
+    changed = {k for k in first if first[k] != second[k]}
+    assert changed == set(secrets_cli.ORIGIN_SECRETS)
+    assert secrets_cli.main(["check", "--env-file", str(env_file)]) == 0

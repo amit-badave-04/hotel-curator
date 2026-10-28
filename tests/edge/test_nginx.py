@@ -9,7 +9,9 @@ most distributions; everything used here exists in both.
 """
 
 import base64
+import contextlib
 import http.client
+import importlib.util
 import json
 import os
 import re
@@ -19,10 +21,11 @@ import ssl
 import subprocess
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -53,6 +56,19 @@ if os.environ.get("CURATOR_TEST_EDGE_REQUIRED") and not all(
     shutil.which(tool) for tool in TOOLS
 ):
     raise RuntimeError(f"{', '.join(TOOLS)} are required here")
+
+
+def load_script(name: str) -> object:
+    """Import scripts/<name>.py (kept apart from tests.helpers, whose
+    imports need the data extras this job does not install)."""
+    path = ROOT / "scripts" / f"{name}.py"
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 pytestmark = pytest.mark.skipif(
     not all(shutil.which(tool) for tool in TOOLS),
     reason="needs nginx, envsubst and openssl",
@@ -99,10 +115,21 @@ class Edge:
     tls_port: int
 
 
+def _free_ports(count: int) -> list[int]:
+    """Distinct free ports: all sockets stay open until every one is bound,
+    so the OS cannot hand out the same port twice."""
+    sockets = [socket.socket() for _ in range(count)]
+    try:
+        for sock in sockets:
+            sock.bind(("127.0.0.1", 0))
+        return [int(sock.getsockname()[1]) for sock in sockets]
+    finally:
+        for sock in sockets:
+            sock.close()
+
+
 def _free_port() -> int:
-    with socket.socket() as sock:
-        sock.bind(("127.0.0.1", 0))
-        return int(sock.getsockname()[1])
+    return _free_ports(1)[0]
 
 
 def _ipv6() -> bool:
@@ -193,7 +220,9 @@ def start(tmp_path: Path, api: str) -> Iterator[object]:
     """Render a mode, check it with nginx -t, run it; stop it afterwards."""
     running: list[subprocess.Popen[bytes]] = []
 
-    def _start(mode: str, **env: str) -> Edge:
+    def _start(
+        mode: str, _edit: Callable[[str], str] | None = None, **env: str
+    ) -> Edge:
         conf = tmp_path / "conf"
         rendered = render(
             conf,
@@ -205,8 +234,11 @@ def start(tmp_path: Path, api: str) -> Iterator[object]:
             },
         )
         assert rendered.returncode == 0, rendered.stderr
-        edge = Edge(_free_port(), _free_port())
-        _move_ports(conf / "conf.d" / "default.conf", edge)
+        edge = Edge(*_free_ports(2))
+        site = conf / "conf.d" / "default.conf"
+        if _edit is not None:
+            site.write_text(_edit(site.read_text()))
+        _move_ports(site, edge)
         _serve_from(conf / "curator" / "site.conf", _web_root(tmp_path))
         main = _main_conf(tmp_path)
         command = ["nginx", "-p", str(tmp_path), "-c", str(main)]
@@ -635,3 +667,132 @@ def test_a_long_domain_still_starts(start: object, pki: Pki) -> None:
         **pki.secrets,
     )
     assert get(edge.http_port, "/healthz").status == 200
+
+
+class ProxyRelay:
+    """Stands in for Fly's proxy_proto handler: prepends a PROXY v1 header
+    with ``source`` to every connection and pipes the bytes both ways."""
+
+    def __init__(self, target: int, source: str) -> None:
+        self.target, self.source = target, source
+        self.listener = socket.create_server(("127.0.0.1", 0))
+        self.port = int(self.listener.getsockname()[1])
+        threading.Thread(target=self._accept, daemon=True).start()
+
+    def _accept(self) -> None:
+        while True:
+            try:
+                client, _ = self.listener.accept()
+            except OSError:
+                return
+            upstream = socket.create_connection(("127.0.0.1", self.target))
+            header = f"PROXY TCP4 {self.source} 127.0.0.1 40000 443\r\n"
+            upstream.sendall(header.encode())
+            for a, b in ((client, upstream), (upstream, client)):
+                threading.Thread(
+                    target=self._pipe, args=(a, b), daemon=True
+                ).start()
+
+    @staticmethod
+    def _pipe(src: socket.socket, dst: socket.socket) -> None:
+        try:
+            while data := src.recv(65536):
+                dst.sendall(data)
+        except OSError:
+            pass
+        finally:
+            for sock in (src, dst):
+                with contextlib.suppress(OSError):
+                    sock.shutdown(socket.SHUT_RDWR)
+
+    def close(self) -> None:
+        self.listener.close()
+
+
+def _origin_results(port: int) -> tuple[list[str], list[object]]:
+    check: Any = load_script("check_edge")
+    names = ("hotel-curator.fly.dev", "evil.test", "curator.test")
+    seen = [check.origin_probe("127.0.0.1", name, port) for name in names]
+    results = check.check_origin(
+        lambda address, sni: check.origin_probe(address, sni, port),
+        "hotel-curator.fly.dev",
+        "curator.test",
+        resolve=lambda _host: [("IPv4", "127.0.0.1")],
+    )
+    return seen, results
+
+
+def test_check_edge_sees_the_cloudflare_origin_locked(
+    cloudflare: Edge,
+) -> None:
+    """Through a Fly-like relay, from outside Cloudflare's ranges."""
+    relay = ProxyRelay(cloudflare.tls_port, OUTSIDER)
+    try:
+        seen, results = _origin_results(relay.port)
+    finally:
+        relay.close()
+    refused = "handshake refused: TLSV1_UNRECOGNIZED_NAME"
+    assert seen == [refused, refused, "HTTP 400"]
+    assert [r.ok for r in results] == [True, True]  # type: ignore[attr-defined]
+
+
+def test_check_edge_fails_an_origin_that_skips_the_certificate(
+    start: object, pki: Pki
+) -> None:
+    """If nginx stopped requiring the certificate, the IP gate's 403 alone
+    must not count as locked."""
+    edge = start(  # type: ignore[operator]
+        "cloudflare",
+        _edit=lambda site: site.replace(
+            "ssl_verify_client on;", "ssl_verify_client optional;"
+        ),
+        CURATOR_SERVER_NAMES=NAMES,
+        **pki.secrets,
+    )
+    relay = ProxyRelay(edge.tls_port, OUTSIDER)
+    try:
+        seen, results = _origin_results(relay.port)
+    finally:
+        relay.close()
+    assert seen[2] == "HTTP 403"
+    assert [r.ok for r in results] == [True, False]  # type: ignore[attr-defined]
+
+
+def test_check_edge_fails_an_origin_it_cannot_prove(cloudflare: Edge) -> None:
+    """Without the PROXY header nginx drops the connection: not proof."""
+    _, results = _origin_results(cloudflare.tls_port)
+    assert [r.ok for r in results] == [False, False]  # type: ignore[attr-defined]
+
+
+def test_check_edge_reads_the_status_of_an_open_origin(pki: Pki) -> None:
+    """A TLS origin that answers 200 to anyone is reported as open."""
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    pem = base64.b64decode(pki.secrets["CURATOR_ORIGIN_CERT_B64"])
+    key = base64.b64decode(pki.secrets["CURATOR_ORIGIN_KEY_B64"])
+    folder = Path(pki.origin_ca).parent
+    (folder / "open.pem").write_bytes(pem)
+    (folder / "open.key").write_bytes(key)
+    context.load_cert_chain(folder / "open.pem", folder / "open.key")
+    listener = socket.create_server(("127.0.0.1", 0))
+    port = listener.getsockname()[1]
+
+    def serve() -> None:
+        connection, _ = listener.accept()
+        with context.wrap_socket(connection, server_side=True) as tls:
+            tls.recv(1024)
+            tls.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
+
+    thread = threading.Thread(target=serve, daemon=True)
+    thread.start()
+    check: Any = load_script("check_edge")
+    seen = check.origin_probe("127.0.0.1", "curator.test", port)
+    thread.join(timeout=5)
+    listener.close()
+    assert seen == "HTTP 200"
+    results = check.check_origin(
+        lambda *_: seen,
+        "a.test",
+        "b.test",
+        resolve=lambda _host: [("IPv4", "127.0.0.1")],
+    )
+    assert [r.ok for r in results] == [False, False]

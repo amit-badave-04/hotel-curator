@@ -3,6 +3,7 @@
     python scripts/deploy.py plan                # print the commands only
     python scripts/deploy.py setup [--org ORG]   # apps, volume, private IP
     python scripts/deploy.py deploy [db|api|web]  # default: all, in order
+    python scripts/deploy.py setup --edge cloudflare  # + dedicated IPv4
     python scripts/deploy.py deploy web --edge cloudflare --domain DOMAIN
     python scripts/deploy.py status
 
@@ -39,6 +40,8 @@ DB_VOLUME = "pg_data"
 DB_VOLUME_GB = 1
 LFS_POINTER_PREFIX = b"version https://git-lfs.github.com/spec/v1"
 PRIVATE_IP_TYPE = "private_v6"
+DEDICATED_IPV4_TYPE = "v4"
+"""flyctl's type for a dedicated IPv4; a shared one is "shared_v4"."""
 SKIPPED_MODELS = frozenset({"v1-roberta-base"})
 """Model folders the API image deletes (Dockerfile), so never checked."""
 
@@ -159,6 +162,21 @@ def setup(fly: Fly, org: str) -> None:
         print(f"# {api}: private IPv6 exists")
     else:
         fly.run("ips", "allocate-v6", "--private", "--app", api)
+
+
+def setup_cloudflare(fly: Fly) -> None:
+    """Give the web app a dedicated IPv4 for Cloudflare mode.
+
+    Its TCP passthrough service (web/fly.cloudflare.toml) is not one Fly
+    can route on a shared IPv4 (ADR 011, assumption A14). A dedicated IPv4
+    is billed monthly.
+    """
+    web = APP_BY_KEY["web"].name
+    ips = fly.query("ips", "list", "--app", web)
+    if any(field(ip, "type") == DEDICATED_IPV4_TYPE for ip in ips):
+        print(f"# {web}: dedicated IPv4 exists")
+    else:
+        fly.run("ips", "allocate-v4", "--app", web, "--yes")
 
 
 def lfs_pointers(models_dir: Path) -> list[Path]:
@@ -310,12 +328,15 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     unknown = set(args.apps) - APP_BY_KEY.keys()
     if unknown or (args.apps and args.action != "deploy"):
         parser.error(f"app names go after deploy only: {sorted(args.apps)}")
-    if (args.edge == "cloudflare") != (args.domain is not None):
+    deploying = args.action == "deploy"
+    if deploying and (args.edge == "cloudflare") != (args.domain is not None):
         parser.error("--edge cloudflare and --domain go together")
     if args.edge and args.apps and "web" not in args.apps:
         parser.error("--edge applies to the web app: include web")
-    if args.edge and args.action != "deploy":
-        parser.error("--edge goes with deploy")
+    if args.edge and args.action not in {"deploy", "setup"}:
+        parser.error("--edge goes with deploy or setup")
+    if args.action == "setup" and args.domain is not None:
+        parser.error("setup takes --edge cloudflare without --domain")
     if args.domain is not None and not DOMAIN_PATTERN.fullmatch(args.domain):
         parser.error(f"--domain must be a lower-case DNS name: {args.domain!r}")
     return args
@@ -340,6 +361,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     fly = Fly(args.flyctl, dry_run=args.dry_run)
     if args.action == "setup":
         setup(fly, args.org)
+        if args.edge == "cloudflare":
+            setup_cloudflare(fly)
     elif args.action == "deploy":
         deploy_apps(fly, args.apps, args.edge, args.domain)
     else:

@@ -61,7 +61,7 @@ Browser
 | | Fly mode (launch on `hotel-curator.fly.dev`) | Cloudflare mode (after DNS cutover) |
 |---|---|---|
 | Who terminates browser TLS | Fly's edge (`[http_service]`, `force_https`) | Cloudflare's edge |
-| Fly service | HTTP service on 80/443 to nginx's plain port 8080 | TCP service on 443 with `handlers = ["proxy_proto"]`, passed through to nginx's TLS port 8443 (unverified here) |
+| Fly service | HTTP service on 80/443 to nginx's plain port 8080 | TCP service on 443 with `handlers = ["proxy_proto"]`, passed through to nginx's TLS port 8443, on a dedicated IPv4 (unverified here; A7, A14) |
 | Origin TLS | none past Fly's edge | Cloudflare Origin Certificate in nginx; SSL mode Full (strict) |
 | Origin lock | none (the fly.dev hostname is the site) | nginx requires Cloudflare's origin-pull client certificate (Authenticated Origin Pulls) and closes requests for any other `Host` |
 | Client IP for rate limits | `Fly-Client-IP`, set by Fly's edge from the connection | `CF-Connecting-IP`, trusted only because the client-certificate handshake proved the request came through Cloudflare |
@@ -225,6 +225,7 @@ owner's refit project already runs there.
 | A11 | Rocket Loader, Email Obfuscation, Web Analytics injection and Zaraz are off | `scripts/check_edge.py` finds the CSP unchanged and no injected script |
 | A12 | Traffic between Fly hosts on the private network is encrypted | Fly's documentation at deploy time; recorded here |
 | A13 | Fly's proxy passes `X-Real-IP` unchanged on the Flycast hop from nginx to the API | two clients through the web app get separate 429s from `/api/v1/analyze`; the API's log shows the visitors' request ids |
+| A14 | Fly routes the Cloudflare-mode TCP passthrough service only on a dedicated IPv4, not a shared one | `scripts/deploy.py setup --edge cloudflare` allocates one before the cutover; `scripts/check_edge.py <domain>` probes every address the origin name resolves to, IPv4 and IPv6, and each must refuse as expected (an address that cannot route the service fails) |
 
 ## Controls: compose versus Fly
 

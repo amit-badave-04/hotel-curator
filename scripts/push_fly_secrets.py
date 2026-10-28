@@ -5,7 +5,7 @@
     python scripts/push_fly_secrets.py push --dry-run  # names only
     python scripts/push_fly_secrets.py push [--app hotel-curator-db]
     python scripts/push_fly_secrets.py origin-tls --cert origin.pem \
-        --key origin.key --ca origin-pull-ca.pem   # Cloudflare mode only
+        --key origin.key --ca origin-pull-ca.pem [--replace]  # Cloudflare
 
 CREDENTIALS: this script handles the database passwords and, for
 Cloudflare mode, the origin certificate's private key. Values reach
@@ -24,6 +24,7 @@ import binascii
 import os
 import re
 import secrets
+import ssl
 import stat
 import subprocess  # nosec B404 - runs flyctl only
 import sys
@@ -299,17 +300,35 @@ def push(
         runner(command, payload)
 
 
+def tls_problem(cert: Path, key: Path, ca: Path) -> str | None:
+    """What would stop nginx loading these files, as OpenSSL sees them."""
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    try:
+        context.load_cert_chain(cert, key)
+    except (ssl.SSLError, OSError):
+        return "the key does not belong to the certificate (see --cert, --key)"
+    try:
+        context.load_verify_locations(cafile=ca)
+    except (ssl.SSLError, OSError):
+        return "the CA file is not a certificate OpenSSL can load"
+    return None
+
+
 def origin_tls_values(cert: Path, key: Path, ca: Path) -> Secrets:
-    """Base64 of the three PEM files, checked like the pushed values.
+    """Base64 of the three PEM files, checked like the pushed values and
+    loaded the way nginx will load them.
 
     Raises:
-        ValueError: Naming the file that is not the expected PEM type.
+        ValueError: Naming what is wrong, never file content.
     """
     values = {
         name: base64.b64encode(path.read_bytes()).decode("ascii")
         for name, path in zip(ORIGIN_SECRETS, (cert, key, ca), strict=True)
     }
     problems = _origin_problems(values)
+    if not problems:
+        problem = tls_problem(cert, key, ca)
+        problems = [problem] if problem else []
     if problems:
         raise ValueError("; ".join(problems))
     return values
@@ -331,7 +350,9 @@ def _check_owned_file(path: Path) -> None:
         raise ValueError(f"{path.name} is readable by others: chmod 600 it")
 
 
-def append_env_lines(path: Path, values: Secrets) -> None:
+def append_env_lines(
+    path: Path, values: Secrets, *, replace: bool = False
+) -> None:
     """Add ``KEY=VALUE`` lines to an existing env file, keys not yet in it.
 
     A temporary 0600 file beside it is created first and doubles as a
@@ -340,9 +361,11 @@ def append_env_lines(path: Path, values: Secrets) -> None:
     failure the old file stays as it was. A missing final newline is
     supplied.
 
+    With ``replace``, lines for these keys are dropped first.
+
     Raises:
-        ValueError: If a key is already there, or the file is a link, not
-            the user's own, or readable by anyone else.
+        ValueError: If a key is already there (without ``replace``), or the
+            file is a link, not the user's own, or readable by anyone else.
         FileExistsError: If another run holds the temporary file.
     """
     _check_owned_file(path)
@@ -351,9 +374,18 @@ def append_env_lines(path: Path, values: Secrets) -> None:
     fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
         text = read_env_file(path)
+        if replace:
+            text = "\n".join(
+                line
+                for line in text.split("\n")
+                if line.partition("=")[0].strip() not in values
+            )
         clash = sorted(values.keys() & parse_env(text).keys())
         if clash:
-            raise ValueError(f"already in {path.name}: {', '.join(clash)}")
+            raise ValueError(
+                f"already in {path.name}: {', '.join(clash)} "
+                "(--replace swaps them)"
+            )
         if text and not text.endswith("\n"):
             text += "\n"
         text += "".join(f"{k}={v}\n" for k, v in values.items())
@@ -382,6 +414,11 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument("--flyctl", default=os.environ.get("FLYCTL", "flyctl"))
     for name in ("cert", "key", "ca"):
         parser.add_argument(f"--{name}", type=Path)
+    parser.add_argument(
+        "--replace",
+        action="store_true",
+        help="origin-tls: replace origin secrets already in the file",
+    )
     return parser.parse_args(argv)
 
 
@@ -401,7 +438,7 @@ def _origin_tls(args: argparse.Namespace) -> int:
         return 1
     try:
         values = origin_tls_values(args.cert, args.key, args.ca)
-        append_env_lines(args.env_file, values)
+        append_env_lines(args.env_file, values, replace=args.replace)
     except FileExistsError:
         print(
             "error: another origin-tls run is in progress (or remove the "
@@ -412,7 +449,8 @@ def _origin_tls(args: argparse.Namespace) -> int:
     except (OSError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
-    print(f"added {', '.join(values)} to {args.env_file}")
+    done = "replaced" if args.replace else "added"
+    print(f"{done} {', '.join(values)} in {args.env_file}")
     return 0
 
 
