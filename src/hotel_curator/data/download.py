@@ -10,31 +10,30 @@ renamed into place only after the digest matches, so a half-written or
 tampered file never sits at the final path.
 """
 
-import hashlib
 import logging
 import re
 from pathlib import Path
 
 import httpx
 
+from hotel_curator.checksums import CHUNK_SIZE, sha256_file
+
+__all__ = [
+    "CHUNK_SIZE",
+    "ChecksumMismatchError",
+    "InsecureRedirectError",
+    "download_file",
+    "sha256_file",
+]
+
 logger = logging.getLogger(__name__)
 
-CHUNK_SIZE = 1 << 20
 TIMEOUT_SECONDS = 60.0
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 class ChecksumMismatchError(RuntimeError):
     """The downloaded bytes do not match the pinned SHA-256 digest."""
-
-
-def sha256_file(path: Path) -> str:
-    """Return the hex SHA-256 digest of a file, read in 1 MiB chunks."""
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(CHUNK_SIZE), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 class InsecureRedirectError(ValueError):

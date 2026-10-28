@@ -1,7 +1,9 @@
 """Behaviour gates for the promoted model (``pytest -m eval``, plan §3.6).
 
 They read committed artifacts: the promotion decision and the served ONNX
-package. They are skipped, not passed, when those artifacts are absent.
+package. They are skipped, not passed, while the weights are not committed
+(docs/BLOCKERS.md B8), and they fail when the weights are committed but only
+a Git LFS pointer was checked out.
 The thresholds were fixed before the promoted model was run on the
 fixture: each label must be found in at least one of its two clear-cut
 examples, at least 80% of all expected labels must be found, and at least
@@ -26,7 +28,6 @@ FIXTURE = Path(__file__).with_name("clear_cut_parts.jsonl")
 MIN_LABEL_RECALL = 0.5
 MIN_OVERALL_RECALL = 0.8
 MIN_PRECISION = 0.7
-LFS_POINTER = b"version https://git-lfs"
 
 
 def _promotion() -> dict[str, Any]:
@@ -52,23 +53,23 @@ def test_promoted_model_beats_v1_by_rule_1() -> None:
 
 
 def _published() -> Path:
+    from hotel_curator.inference.verify import is_lfs_pointer
+
     package_dir = ROOT / "artifacts" / "models" / _promotion()["winner"]
     model = package_dir / "model.onnx"
-    if not model.is_file() or model.read_bytes()[:40].startswith(LFS_POINTER):
-        pytest.skip("promoted package not published (or Git LFS not pulled)")
+    if not model.is_file():
+        pytest.skip("promoted weights not committed yet (BLOCKERS B8)")
+    if is_lfs_pointer(model):
+        pytest.fail("model.onnx is a Git LFS pointer: run git lfs pull")
     return package_dir
 
 
 def test_published_files_are_the_ones_promotion_judged() -> None:
-    from hotel_curator.data.download import sha256_file
-    from hotel_curator.inference.package import PACKAGE_FILES
+    from hotel_curator.inference.verify import check_served_package
 
-    decision = _promotion()
-    package_dir = _published()
-    row = next(r for r in decision["rows"] if r["name"] == decision["winner"])
-    judged = {f["file"]: f["sha256"] for f in row["package"]["files_sha256"]}
-    for name in PACKAGE_FILES:
-        assert sha256_file(package_dir / name) == judged[name], name
+    _published()
+    served = check_served_package(ROOT / "artifacts")
+    assert served.ok, served.problems
 
 
 def test_promoted_package_finds_clear_cut_opinions() -> None:

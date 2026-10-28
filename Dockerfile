@@ -21,6 +21,10 @@ RUN --mount=type=secret,id=extra_ca,required=false \
     with-extra-ca uv sync --frozen --no-dev --extra postgres --no-editable
 
 FROM python:3.12-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704
+# Production builds pass REQUIRE_MODEL=1: the image then cannot be built
+# unless the served weights are present and are exactly the files the
+# promotion rule judged (files_sha256 in promotion.json; BLOCKERS B8).
+ARG REQUIRE_MODEL=0
 ENV PATH=/opt/venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -42,6 +46,7 @@ COPY artifacts/evals/promotion.json ./artifacts/evals/promotion.json
 COPY artifacts/models ./artifacts/models
 COPY docker/api-entrypoint.sh /usr/local/bin/api-entrypoint.sh
 RUN rm -rf ./artifacts/models/v1-roberta-base \
+    && if [ "$REQUIRE_MODEL" = "1" ]; then curator model verify-served; fi \
     && chmod 0755 /usr/local/bin/api-entrypoint.sh \
     && mkdir -p /app/var && chown curator:curator /app/var
 USER curator

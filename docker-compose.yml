@@ -40,6 +40,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # 1 = refuse to build without the served weights (CI sets it once
+        # they are in Git LFS; BLOCKERS B8).
+        REQUIRE_MODEL: ${REQUIRE_MODEL:-0}
     environment:
       CURATOR_DATABASE_URL: postgresql+psycopg://curator@/curator?host=/var/run/postgresql
       # Rate limits key on the client address; trust X-Forwarded-For only

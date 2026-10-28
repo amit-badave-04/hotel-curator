@@ -90,7 +90,9 @@ def _check_package_outputs_and_publish(home: Path, package: Path) -> None:
     metadata.write_text(original.replace(RUNG, "tampered"))
     refused = CliRunner().invoke(cli_app, ["model", "publish"])
     assert refused.exit_code != 0
-    assert "metadata.json differ" in refused.output
+    # The CLI wraps long messages inside a box; compare the words only.
+    words = " ".join(refused.output.replace("\u2502", " ").split())
+    assert "metadata.json: SHA-256 differs" in words
     metadata.write_text(original)
 
 

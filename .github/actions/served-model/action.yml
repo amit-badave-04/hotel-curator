@@ -1,0 +1,32 @@
+name: Served model weights
+description: >-
+  Pull the served model's weights from Git LFS, cached by object id, and
+  report whether they are tracked yet (docs/BLOCKERS.md B8). The frozen v1
+  checkpoint is never pulled.
+outputs:
+  tracked:
+    description: "'true' when artifacts/models/*/model.onnx is in Git LFS"
+    value: ${{ steps.ids.outputs.tracked }}
+runs:
+  using: composite
+  steps:
+    - id: ids
+      shell: bash
+      run: |
+        oids=$(git lfs ls-files --long --include="artifacts/models/*/model.onnx" \
+          | awk '{print $1}' | sort | paste -sd- -)
+        if [ -n "$oids" ]; then
+          echo "tracked=true" >> "$GITHUB_OUTPUT"
+          echo "key=lfs-served-$oids" >> "$GITHUB_OUTPUT"
+        else
+          echo "tracked=false" >> "$GITHUB_OUTPUT"
+          echo "::notice::Served model weights are not in Git LFS yet (docs/BLOCKERS.md B8); /v1/analyze answers 503."
+        fi
+    - if: steps.ids.outputs.tracked == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: .git/lfs/objects
+        key: ${{ steps.ids.outputs.key }}
+    - if: steps.ids.outputs.tracked == 'true'
+      shell: bash
+      run: git lfs pull --include="artifacts/models/*/model.onnx"
