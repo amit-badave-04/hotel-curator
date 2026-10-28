@@ -19,3 +19,4 @@ by question.
 | What is blocked or needs the owner? | [BLOCKERS.md](BLOCKERS.md) |
 | What do the terms mean? | [GLOSSARY.md](GLOSSARY.md) |
 | What was delivered, verified, and left open? | [V2_REPORT.md](V2_REPORT.md) |
+| What stands between `main` and a public deployment, and in which order is it closed? | [deploy/gap-audit.md](deploy/gap-audit.md) |
