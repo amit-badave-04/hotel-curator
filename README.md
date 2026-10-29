@@ -1,7 +1,6 @@
 # hotel-curator
 
-**Live site: [hotel-curator.fly.dev](https://hotel-curator.fly.dev)** (online
-once the first deploy has run; see [Deploy](#deploy))
+**Live site: [hotel-curator.fly.dev](https://hotel-curator.fly.dev)**
 
 **Hotel quality tiers from guest reviews, with the evidence behind every
 tier.** hotel-curator reads what guests wrote about 1,494 European city hotels
@@ -99,10 +98,9 @@ cd web && npm ci && npm run dev   # web app on http://localhost:5173
 
 ## Deploy
 
-The public site is meant to run at **https://hotel-curator.fly.dev**, and
-later on its own domain behind Cloudflare. It is not live yet: the first
-deploy needs the owner's Fly.io account ([BLOCKERS](docs/BLOCKERS.md) B9).
-The API image carries the model weights from Git LFS, and every Fly build
+The public site runs at **https://hotel-curator.fly.dev** (live since
+2026-10-29), later on its own domain behind Cloudflare. The API image
+carries the model weights from Git LFS, and every Fly build
 checks them against the promotion record.
 
 It runs as three Fly.io apps in `lhr`: the web app (nginx and the React

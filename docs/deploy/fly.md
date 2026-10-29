@@ -21,6 +21,11 @@ reports) is in the [runbook](../RUNBOOK.md).
   build unless the weights match `artifacts/evals/promotion.json`, and
   `scripts/deploy.py` stops before uploading if they are LFS pointers.
 - `make setup`, so `uv run` works.
+- On Windows, work in Ubuntu on WSL (`wsl --install -d Ubuntu`) and clone
+  there, not in a Windows folder: Git for Windows usually checks files out
+  with Windows line endings, which changes the model package's JSON files,
+  and the API build then refuses them; the scripts and `make` also expect
+  Linux. The first deploy was run this way.
 
 ## First deploy
 

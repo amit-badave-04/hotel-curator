@@ -409,7 +409,8 @@ added).
   short excerpts of some of them, with month and traveller type, but the
   public repository republishes them whole (NOTICE says so). Dropping those
   fields would need the labelling records rebuilt, and history rewritten
-  to take them out of past commits: the owner's decision (BLOCKERS B10).
+  to take them out of past commits; the owner decided to keep them as
+  they are (BLOCKERS B10).
 - **Checks that stay manual.** The deploy workflow does not re-check that
   the API and database have no public address (its tokens are scoped to
   one app each; `make fly-status` does). The `production` environment's
@@ -480,5 +481,7 @@ service, an extraction path or an HTML injector; and personal data in the
 ### 7.7 Not done yet
 
 - The owner's own red-team procedure (BLOCKERS B7).
-- The first-deploy checks of A1 to A22, and the owner's settings (BLOCKERS
-  B9).
+- The first-deploy checks of ADR 011's assumptions. The first deploy, by
+  hand on 2026-10-29, confirmed A3, A4 and A22 (BLOCKERS B9); the others,
+  A1 and A13 above all, are still to check. Deploys from GitHub wait on
+  the owner's settings (`docs/deploy/fly.md`, steps 1 to 4).
