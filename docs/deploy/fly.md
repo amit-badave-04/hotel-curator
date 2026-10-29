@@ -118,6 +118,8 @@ password first, then the secrets:
 flyctl ssh console --app hotel-curator-db
 su postgres -c 'psql -d postgres'     # superuser: local socket only
 \password curator_app                 # prompts; nothing in history
+ALTER ROLE curator_app RESET ALL;     # undoes any session defaults it set
+ALTER ROLE curator_app IN DATABASE curator RESET ALL;
 ```
 
 The superuser connects to `postgres`, not `curator`, because `curator` is
@@ -198,6 +200,11 @@ To roll the API back to an earlier image, deploy that image
 command leaves a schema that a newer image migrated further as it is, with
 a warning in the release log: migrations are additive, so the earlier code
 still runs on it (`src/hotel_curator/db/migrate.py`).
+It also loads that image's hotel results, so an earlier image brings back
+anything removed since, such as a review excerpt taken down on request.
+After such a rollback, deploy the current results again as soon as the
+API is fixed; or, instead of the earlier image, build the earlier commit
+with the current `data/demo/hotel_results.json.gz` and deploy that.
 
 ## Deploying from GitHub
 
@@ -222,10 +229,11 @@ open the CI run of `main`'s latest commit and re-run its `deploy` job. To
 deploy one app, or from a machine with `flyctl`, use `scripts/deploy.py`
 as above. The database app is never deployed from GitHub.
 
-Set up once, in the repository's settings, **before** this workflow
-reaches `main`. A run that names an environment that does not exist yet
-creates it without a reviewer or branch rule; if `production` already
-exists, open it and add both. The served weights are in Git LFS, and the
+Set up once, in the repository's settings. CI's deploy job is skipped
+until the repository variable `CURATOR_DEPLOY` is `true` (step 4): a run
+that names an environment that does not exist yet would create it without
+a reviewer or branch rule. If `production` already exists, open it and add
+both. The served weights are in Git LFS, and the
 workflow pulls them; a commit without them stops at the check step,
 before anything is deployed.
 
@@ -258,6 +266,9 @@ before anything is deployed.
    really runs in: a value is applied as given. While the site is parked,
    a run without them stops at its check step; resume it first
    (`make fly-start`).
+4. **Turn deploys on**, after steps 1 and 2: Settings, Secrets and
+   variables, Actions, Variables, repository variable `CURATOR_DEPLOY` =
+   `true`. Delete it to stop deploying from GitHub.
 
 flyctl comes from its official image, pinned by tag and digest in
 [`deploy/tools/flyctl/Dockerfile`](../../deploy/tools/flyctl/Dockerfile)

@@ -30,6 +30,7 @@ import {
 } from '@/lib/domain';
 import {
   activeFilterCount,
+  cleanQuery,
   DEFAULT_FILTERS,
   explorerHref,
   filtersToSearchParams,
@@ -83,11 +84,7 @@ function FiltersForm({ filters, update, clear }: FiltersProps) {
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const value = new FormData(event.currentTarget).get('q');
-    update({
-      q: String(value ?? '')
-        .trim()
-        .slice(0, MAX_QUERY_LENGTH),
-    });
+    update({ q: cleanQuery(String(value ?? '')) });
   };
 
   const attributeGroup = (

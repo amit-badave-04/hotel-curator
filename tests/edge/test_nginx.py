@@ -600,6 +600,20 @@ def test_cloudflare_mode_refuses_everything_else(
         via_cloudflare(port, pki, client=pull, sni="evil.test")
 
 
+def test_cloudflare_mode_drops_idle_direct_connections_quickly(
+    cloudflare: Edge,
+) -> None:
+    # Anyone can reach the origin directly and send nothing after Fly's
+    # PROXY line; each such connection holds one of Fly's connection slots.
+    raw = socket.create_connection(("127.0.0.1", cloudflare.tls_port), 30)
+    raw.sendall(f"PROXY TCP4 {OUTSIDER} 127.0.0.1 40000 443\r\n".encode())
+    started = time.monotonic()
+    assert raw.recv(1) == b""
+    held = time.monotonic() - started
+    raw.close()
+    assert held < 15
+
+
 def test_cloudflare_mode_health_port_serves_nothing_else(
     cloudflare: Edge,
 ) -> None:

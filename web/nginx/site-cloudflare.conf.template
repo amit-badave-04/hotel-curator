@@ -22,6 +22,13 @@ map $curator_from_cloudflare $curator_client_ip {
     default $remote_addr;
 }
 
+# Only Cloudflare should connect, and it sends its handshake and request at
+# once. Anyone can open connections to the origin address and send nothing;
+# each holds one of Fly's connection slots (hard_limit) until nginx gives up
+# on the PROXY header, handshake or request: 10 s here, not the default 60 s
+# (security review 7.5).
+client_header_timeout 10s;
+
 ssl_protocols TLSv1.2 TLSv1.3;
 ssl_prefer_server_ciphers off;
 ssl_session_cache shared:curator_tls:1m;

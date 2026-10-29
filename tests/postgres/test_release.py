@@ -186,17 +186,26 @@ def test_concurrent_releases_load_once_then_stay_up_to_date() -> None:
 
 
 def _lock_is_free() -> bool:
-    """Whether another session could take the release lock right now."""
+    """Whether no session holds the release lock right now.
+
+    Read from pg_locks: only pg_advisory_lock is granted to the owner role.
+    A bigint key is stored as its high and low 32 bits (objsubid 1).
+    """
     engine = _engine(OWNER)
-    key = {"key": RELEASE_LOCK_ID}
     with engine.connect() as conn:
-        free = conn.execute(
-            text("SELECT pg_try_advisory_lock(:key)"), key
+        held = conn.execute(
+            text(
+                "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory'"
+                " AND objsubid = 1 AND classid::bigint = :high"
+                " AND objid::bigint = :low AND granted"
+            ),
+            {
+                "high": RELEASE_LOCK_ID >> 32,
+                "low": RELEASE_LOCK_ID & 0xFFFFFFFF,
+            },
         ).scalar_one()
-        if free:
-            conn.execute(text("SELECT pg_advisory_unlock(:key)"), key)
     engine.dispose()
-    return bool(free)
+    return int(held) == 0
 
 
 def test_the_release_lock_is_held_until_the_release_ends() -> None:
@@ -231,6 +240,60 @@ def test_serving_role_reads_but_cannot_write() -> None:
             conn.execute(text(statement))
     engine.dispose()
     assert _count_as_app() == _hotel_count()
+
+
+def test_serving_role_cannot_take_the_release_lock_or_store_objects() -> None:
+    # Ways to change state that every role has by default: a held release
+    # lock stops every deploy, and large objects can fill the volume.
+    engine = _engine(APP)
+    try:
+        for statement in (
+            f"SELECT pg_advisory_lock({RELEASE_LOCK_ID})",
+            f"SELECT pg_try_advisory_lock({RELEASE_LOCK_ID})",
+            f"SELECT pg_advisory_lock_shared({RELEASE_LOCK_ID})",
+            f"SELECT pg_advisory_xact_lock({RELEASE_LOCK_ID})",
+            "SELECT pg_advisory_lock(1, 2)",
+            "SELECT lo_from_bytea(0, 'x')",
+            "SELECT lo_creat(-1)",
+        ):
+            with (
+                pytest.raises(ProgrammingError, match="permission denied"),
+                engine.begin() as conn,
+            ):
+                conn.execute(text(statement))
+    finally:
+        # Closing the connections releases any lock a failure left held.
+        engine.dispose()
+    owner = _engine(OWNER)
+    with owner.connect() as conn:
+        limit, config = conn.execute(
+            text(
+                "SELECT rolconnlimit, rolconfig FROM pg_roles"
+                " WHERE rolname = :r"
+            ),
+            {"r": "curator_app"},
+        ).one()
+    owner.dispose()
+    assert limit == 20
+    assert config == ["temp_file_limit=64MB"]
+
+
+def test_a_stuck_release_lock_fails_the_release_with_a_clear_message() -> None:
+    key = {"key": RELEASE_LOCK_ID}
+    holder, engine = _engine(OWNER), _engine(OWNER)
+    with holder.connect() as conn:
+        conn.execute(text("SELECT pg_advisory_lock(:key)"), key)
+        try:
+            with (
+                pytest.raises(RuntimeError, match="held the release lock"),
+                release_lock(engine, wait_seconds=1),
+            ):
+                pass
+        finally:
+            conn.execute(text("SELECT pg_advisory_unlock(:key)"), key)
+    holder.dispose()
+    engine.dispose()
+    assert _lock_is_free()
 
 
 def _count_as_app() -> int:

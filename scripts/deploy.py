@@ -302,7 +302,30 @@ def _machine_edge(machine: dict[str, Any]) -> str:
             "(machines from before the edge modes?): pass --edge fly or "
             "--edge cloudflare --domain <domain>"
         )
+    if edge not in MODE_SETTINGS:
+        # Not echoed: machine settings come from whoever can deploy.
+        raise SystemExit(
+            f"a web machine has an unknown {EDGE_SETTING}: redeploy it with "
+            "scripts/deploy.py deploy web --edge <mode> [--domain <domain>]"
+        )
     return edge
+
+
+def _recorded_domain(value: object, setting: str) -> str:
+    """A domain read back from the web machines, checked before it is put
+    into a command the owner may copy and run: anyone holding the web app's
+    deploy token can change machine settings. Never echoed when wrong.
+
+    Raises:
+        SystemExit: If ``value`` is not a lower-case DNS name.
+    """
+    if not isinstance(value, str) or not DOMAIN_PATTERN.fullmatch(value):
+        raise SystemExit(
+            f"a web machine's {setting} is not a lower-case DNS name: "
+            "redeploy it with scripts/deploy.py deploy web --edge <mode> "
+            "[--domain <domain>]"
+        )
+    return value
 
 
 def _one(values: set[Any], setting: str) -> Any:
@@ -335,6 +358,8 @@ def web_now(fly: Fly) -> tuple[str | None, str | None]:
         (_machine_env(machine) or {}).get(PUBLIC_HOST_SETTING) or None
         for machine in machines
     }
+    for host in hosts - {None}:
+        _recorded_domain(host, PUBLIC_HOST_SETTING)
     return _one(edges, EDGE_SETTING), _one(hosts, PUBLIC_HOST_SETTING)
 
 
@@ -359,7 +384,7 @@ def web_redeploy_flags(fly: Fly) -> list[str] | None:
                 "it lost the settings its deploy passed; redeploy it with "
                 "scripts/deploy.py deploy web --edge <mode> [--domain <domain>]"
             )
-        domain = value.split()[0]
+        domain = _recorded_domain(value.split()[0], setting)
         if edge == "fly" and domain == fly_host():
             found.add(("--edge", "fly"))
         else:

@@ -96,7 +96,7 @@ def _web(env: dict[str, str]) -> dict[str, list[dict[str, Any]]]:
         ({}, "no CURATOR_EDGE"),
         ({"CURATOR_EDGE": "fly"}, "has no CURATOR_PUBLIC_HOST"),
         ({"CURATOR_EDGE": "cloudflare"}, "has no CURATOR_SERVER_NAMES"),
-        ({"CURATOR_EDGE": "other", "X": "y"}, "has no mode"),
+        ({"CURATOR_EDGE": "$(touch owned)", "X": "y"}, "unknown CURATOR_EDGE"),
     ],
 )
 def test_start_fails_when_the_web_machine_lost_its_deploy_settings(
@@ -105,6 +105,28 @@ def test_start_fails_when_the_web_machine_lost_its_deploy_settings(
     fake = FakeFly({**_db("started"), **_web(env)})
     with pytest.raises(SystemExit, match=message):
         ops.start(_fly(ops, fake))
+
+
+@pytest.mark.parametrize(
+    "env",
+    [
+        {
+            "CURATOR_EDGE": "cloudflare",
+            "CURATOR_SERVER_NAMES": "$(touch${IFS}owned)x.org www.x.org",
+        },
+        {"CURATOR_EDGE": "fly", "CURATOR_PUBLIC_HOST": "`touch owned`.org"},
+    ],
+)
+def test_stop_never_prints_a_command_from_settings_it_cannot_trust(
+    ops: ModuleType, capsys: pytest.CaptureFixture[str], env: dict[str, str]
+) -> None:
+    # Anyone with the web app's deploy token can set machine settings; the
+    # printed command is one the owner is told to keep and run.
+    fake = FakeFly({**_db("started"), **_web(env)})
+    with pytest.raises(SystemExit, match="not a lower-case DNS name") as stop:
+        ops.stop(_fly(ops, fake))
+    assert "owned" not in str(stop.value) + capsys.readouterr().out
+    assert not fake.commands
 
 
 @pytest.mark.parametrize(

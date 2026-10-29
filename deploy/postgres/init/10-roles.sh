@@ -55,4 +55,27 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO curator_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE curator_owner IN SCHEMA public
     GRANT SELECT ON TABLES TO curator_app;
+-- Any role may call these by default, which would give the serving role
+-- ways to change state after all: large objects fill the volume, and a
+-- lock on the release key stops every release. Only the owner role takes
+-- the release lock. A connection limit keeps the serving role from using
+-- up the server's slots (each API worker pools at most 10).
+REVOKE EXECUTE ON FUNCTION lo_creat(integer), lo_create(oid),
+    lo_from_bytea(oid, bytea), lo_put(oid, bigint, bytea),
+    lowrite(integer, bytea) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION pg_advisory_lock(bigint),
+    pg_advisory_lock_shared(bigint), pg_try_advisory_lock(bigint),
+    pg_try_advisory_lock_shared(bigint), pg_advisory_xact_lock(bigint),
+    pg_advisory_xact_lock_shared(bigint), pg_try_advisory_xact_lock(bigint),
+    pg_try_advisory_xact_lock_shared(bigint), pg_advisory_lock(int, int),
+    pg_advisory_lock_shared(int, int), pg_try_advisory_lock(int, int),
+    pg_try_advisory_lock_shared(int, int), pg_advisory_xact_lock(int, int),
+    pg_advisory_xact_lock_shared(int, int),
+    pg_try_advisory_xact_lock(int, int),
+    pg_try_advisory_xact_lock_shared(int, int) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION pg_advisory_lock(bigint) TO curator_owner;
+ALTER ROLE curator_app CONNECTION LIMIT 20;
+-- Only a superuser can change this one, so the role cannot fill the volume
+-- with temporary files either; the API's queries never spill.
+ALTER ROLE curator_app SET temp_file_limit = '64MB';
 SQL

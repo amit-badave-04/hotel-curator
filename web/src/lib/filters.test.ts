@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   activeFilterCount,
+  cleanQuery,
   DEFAULT_FILTERS,
   explorerHref,
   filtersToSearchParams,
@@ -41,6 +42,14 @@ describe('explorer filters', () => {
     expect(filters.sort).toBe('best');
     expect(filters.page).toBe(1);
     expect(filters.q).toHaveLength(80);
+  });
+
+  it('turns control characters in a search term into spaces', () => {
+    // The API refuses them (Postgres cannot store a NUL), so a pasted tab
+    // would otherwise turn the results into an error.
+    expect(cleanQuery(' Grand\tHotel\u0000Paris\n')).toBe('Grand Hotel Paris');
+    expect(parseFilters(new URLSearchParams('q=a%09b%00')).q).toBe('a b');
+    expect(cleanQuery('Café "Rosé" 100% d_é')).toBe('Café "Rosé" 100% d_é');
   });
 
   it('treats the two "not enough" tiers as one choice', () => {

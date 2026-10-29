@@ -285,10 +285,14 @@ jobs:
 
   # A push to main that passed every job above deploys to Fly.io
   # (.github/workflows/deploy.yml: approval in the "production" environment,
-  # then the API, the web app and a smoke test).
+  # then the API, the web app and a smoke test), once the owner has set up
+  # the environment and turned deploys on (repository variable
+  # CURATOR_DEPLOY = true; docs/deploy/fly.md). Until then it is skipped.
   deploy:
     needs: [python, web, security, postgres-tls, edge, e2e, containers]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main'
+      && vars.CURATOR_DEPLOY == 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/deploy.yml

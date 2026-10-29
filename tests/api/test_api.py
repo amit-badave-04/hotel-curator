@@ -146,6 +146,8 @@ def test_pagination(client: TestClient) -> None:
         {"sort": "price; DROP TABLE hotels"},
         {"city": "Paris'; DROP TABLE hotels;--"},
         {"q": "x" * 81},
+        {"q": "a\x00b"},
+        {"q": "tab\there"},
         {"strong": "pool"},
     ],
 )

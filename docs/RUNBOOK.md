@@ -237,6 +237,7 @@ data again. Fly also keeps daily volume snapshots (assumption A9;
 | Everyone gets 429 at once | nginx's `client` field | every request seems to come from one address, so the rate limits share one bucket: check assumptions A1 and A13 |
 | The API restarts under load | `process_resident_memory_bytes`, "Out of memory" in the logs | raise `memory` in `fly.toml` to 2 GB and redeploy |
 | A deploy stops with an edge-mode message | the message | `scripts/deploy.py` refuses to change the web app's mode quietly; pass the mode it names |
+| A deploy stops at its release with "Another session has held the release lock" | the release log line | a release takes seconds, so the lock is stuck. As the superuser (`flyctl ssh console --app hotel-curator-db`, then `su postgres -c 'psql -d postgres'`, as in [fly.md](deploy/fly.md)), find the session in `pg_locks` (`locktype = 'advisory'`), end it with `pg_terminate_backend(pid)`, then deploy again |
 | The deploy workflow fails with "unauthorized" | the failed step | an expired deploy token: see above |
 | No metrics in Grafana | the API's logs for "Metrics listener not started" | the port was taken, or the bind address does not work there (assumptions A10, A18) |
 

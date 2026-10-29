@@ -100,8 +100,11 @@ def test_ci_deploys_after_every_other_job_on_a_push_to_main() -> None:
     deploy = CI["jobs"]["deploy"]
     others = set(CI["jobs"]) - {"deploy"}
     assert set(deploy["needs"]) == others
+    # Skipped until the owner has set up the environment and turned deploys
+    # on: a run would otherwise create "production" without its reviewer.
     assert deploy["if"] == (
         "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        " && vars.CURATOR_DEPLOY == 'true'"
     )
     assert deploy["uses"] == "./.github/workflows/deploy.yml"
     assert "secrets" not in deploy  # the environment holds them

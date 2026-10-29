@@ -1,5 +1,8 @@
 # hotel-curator
 
+**Live site: [hotel-curator.fly.dev](https://hotel-curator.fly.dev)** (online
+once the first deploy has run; see [Deploy](#deploy))
+
 **Hotel quality tiers from guest reviews, with the evidence behind every
 tier.** hotel-curator reads what guests wrote about 1,494 European city hotels
 (515,212 Booking.com reviews, 2015-2017), works out which of eight things each
@@ -105,8 +108,8 @@ checks them against the promotion record.
 It runs as three Fly.io apps in `lhr`: the web app (nginx and the React
 app, the only public one), the API (private, reached over Fly's private
 network) and Postgres (private, TLS only). After the first deploy by hand,
-every push to `main` that passes CI deploys once the owner approves it,
-then smoke-tests the public site.
+every push to `main` that passes CI deploys once the owner has turned
+deploys on and approves each one, then smoke-tests the public site.
 
 ```bash
 make fly-plan                                  # print every command a first deploy runs

@@ -284,6 +284,34 @@ def test_network_errors_are_answers_not_crashes(truncating_server: str) -> None:
     assert b"IncompleteRead" in cut.body
 
 
+def test_a_redirect_is_an_answer_and_is_never_followed() -> None:
+    # base_url() vets only the first address; a redirect could send the
+    # runner anywhere and echo what it finds into the job log.
+    hits: list[str] = []
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            hits.append(self.path)
+            self.send_response(302)
+            self.send_header("Location", f"{site}/elsewhere")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        def log_message(self, *_args: object) -> None:
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    site = f"http://127.0.0.1:{server.server_address[1]}"
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        answer = smoke.fetch("GET", f"{site}/api/readyz")
+    finally:
+        server.shutdown()
+    assert answer.status == 302
+    assert hits == ["/api/readyz"]
+
+
 @pytest.mark.parametrize(
     "url",
     [

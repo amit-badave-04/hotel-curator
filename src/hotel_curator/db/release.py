@@ -16,6 +16,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from sqlalchemy import Engine, text
+from sqlalchemy.exc import OperationalError
 
 from hotel_curator.db.migrate import revisions_ahead, upgrade
 from hotel_curator.db.seed import seed
@@ -29,12 +30,24 @@ logger = logging.getLogger(__name__)
 
 RELEASE_LOCK_ID = 2026_10_28_011
 """Advisory-lock key; any constant works as long as every release uses it."""
+RELEASE_LOCK_WAIT_SECONDS = 120
+"""How long a release waits for another one. A release takes seconds, so a
+lock held longer is stuck, and the deploy fails with a message that says
+so instead of waiting for Fly to give up on the release command."""
 SQLITE_PREFIX = "sqlite:///"
+LOCK_NOT_AVAILABLE = "55P03"
+"""SQLSTATE of a lock wait that ran into lock_timeout."""
 
 
 @contextmanager
-def release_lock(engine: Engine) -> Iterator[None]:
-    """Hold the release lock on Postgres; a no-op on SQLite (one process)."""
+def release_lock(
+    engine: Engine, wait_seconds: int = RELEASE_LOCK_WAIT_SECONDS
+) -> Iterator[None]:
+    """Hold the release lock on Postgres; a no-op on SQLite (one process).
+
+    Raises:
+        RuntimeError: another session held the lock for ``wait_seconds``.
+    """
     if engine.dialect.name != "postgresql":
         yield
         return
@@ -44,7 +57,22 @@ def release_lock(engine: Engine) -> Iterator[None]:
     with engine.connect().execution_options(
         isolation_level="AUTOCOMMIT"
     ) as conn:
-        conn.execute(text("SELECT pg_advisory_lock(:key)"), key)
+        conn.execute(
+            text("SELECT set_config('lock_timeout', :wait, false)"),
+            {"wait": f"{wait_seconds}s"},
+        )
+        try:
+            conn.execute(text("SELECT pg_advisory_lock(:key)"), key)
+        except OperationalError as exc:
+            # Only a timed-out wait means a held lock; anything else (a
+            # dropped connection, say) is passed on as it is.
+            if getattr(exc.orig, "sqlstate", None) != LOCK_NOT_AVAILABLE:
+                raise
+            raise RuntimeError(
+                f"Another session has held the release lock "
+                f"({RELEASE_LOCK_ID}) for {wait_seconds} s; find it in "
+                f"pg_locks (locktype advisory) and end it, then deploy again"
+            ) from exc
         try:
             yield
         finally:

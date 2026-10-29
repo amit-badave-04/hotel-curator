@@ -88,8 +88,17 @@ Fetch = Callable[[str, str, bytes | None], Answer]
 """(method, url, JSON body or None) -> Answer."""
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *_args: object, **_kwargs: object) -> None:
+        return None
+
+
 def fetch(method: str, url: str, body: bytes | None = None) -> Answer:
-    """One request; HTTP errors are answers, network errors status 0."""
+    """One request; HTTP errors are answers, network errors status 0.
+
+    Redirects are answers too, never followed: base_url() vets only the
+    first address, and a redirect could name any host or scheme.
+    """
     headers = {"User-Agent": "hotel-curator-smoke"}
     if body is not None:
         headers["Content-Type"] = "application/json"
@@ -98,8 +107,10 @@ def fetch(method: str, url: str, body: bytes | None = None) -> Answer:
     )
     try:
         try:
-            # base_url() admits only https, or http on this machine.
-            with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as r:  # noqa: S310  # nosec B310
+            # base_url() admits only https, or http on this machine, and
+            # no redirect is followed elsewhere.
+            opener = urllib.request.build_opener(_NoRedirect)
+            with opener.open(request, timeout=TIMEOUT_SECONDS) as r:
                 status, raw, data = r.status, r.headers, r.read()
         except urllib.error.HTTPError as error:
             # Reading the body can fail too; the outer handler takes that.

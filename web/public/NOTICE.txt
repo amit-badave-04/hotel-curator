@@ -15,7 +15,12 @@ domain) is a free, non-commercial demo, published before the data licence
 below has had a legal review. This project is not affiliated with or
 endorsed by Booking.com or TripAdvisor. To request a correction or the
 removal of a review excerpt, open an issue at
-https://github.com/amit-badave-04/hotel-curator/issues.
+https://github.com/amit-badave-04/hotel-curator/issues; you can name the
+hotel page and month instead of quoting the text. A removal takes the
+excerpt off the site (rolling the site back to an earlier release can show
+it again until the current data is deployed). It stays in the public
+source dataset and in this repository: in its history and, for a review
+among the annotation samples below, in the current sample files.
 
 Data sources
 ------------
@@ -27,9 +32,14 @@ Data sources
    states that the content was originally owned by Booking.com. This could not
    be confirmed first-hand from the build environment.
    Used for: training, evaluation, and display of short review excerpts.
-   The raw data are not redistributed in this repository. Derived files that
-   are committed (annotation samples, label files, the demo dataset) contain
-   short review excerpts.
+   The full source file is not redistributed in this repository, but parts
+   of it are: the annotation samples (data/labels/*/sample.parquet) hold
+   9,800 whole reviews, unredacted (staff names included), with the
+   source's reviewer fields (nationality, date, reviewer score, the
+   reviewer's review count, trip and traveller type, room type, length of
+   stay, pet and mobile flags). The demo dataset holds the short excerpts
+   the site shows, some of them from sampled reviews; the site shows only
+   an excerpt's month and traveller type, never the other reviewer fields.
    Obtain a legal review before any commercial use.
 
 2. Evaluation-only source (never committed, never used for training):

@@ -2144,6 +2144,7 @@
         {
          "maxLength": 80,
          "minLength": 1,
+         "pattern": "^[^\\x00-\\x1f\\x7f]+$",
          "type": "string"
         },
         {

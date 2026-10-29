@@ -739,6 +739,19 @@ def test_a_machine_listing_of_another_shape_stops(
         deploy_cli.deploy_apps(fly, ["web"], None, None)
 
 
+def test_a_recorded_host_that_is_not_a_domain_is_never_echoed() -> None:
+    # It would be printed in the "pass --edge fly --domain ..." hint, or in
+    # the message when two machines disagree.
+    env = {"CURATOR_EDGE": "fly", "CURATOR_PUBLIC_HOST": "$(touch owned).org"}
+    other = {"CURATOR_EDGE": "fly", "CURATOR_PUBLIC_HOST": "x.org"}
+    machines = [{"config": {"env": env}}, {"config": {"env": other}}]
+    fake = FakeFly({"machine list --app hotel-curator": machines})
+    fly = deploy_cli.Fly("flyctl", dry_run=False, runner=fake)
+    with pytest.raises(SystemExit, match="not a lower-case DNS") as refused:
+        deploy_cli.deploy_apps(fly, ["web"], None, None)
+    assert "owned" not in str(refused.value)
+
+
 def test_a_failing_flyctl_listing_stops_without_a_traceback() -> None:
     def failing(command: list[str]) -> str:
         raise subprocess.CalledProcessError(1, command)

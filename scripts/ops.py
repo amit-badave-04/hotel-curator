@@ -27,6 +27,7 @@ import argparse
 import functools
 import os
 import re
+import shlex
 import sys
 from collections.abc import Sequence
 
@@ -83,10 +84,8 @@ def stop(fly: Fly) -> None:
     flags = web_redeploy_flags(fly)
     if flags:
         # Once the machines are gone, nothing on Fly records the mode.
-        print(
-            "# while parked, deploy the web app with: "
-            f"scripts/deploy.py deploy web {' '.join(flags)}"
-        )
+        command = ["scripts/deploy.py", "deploy", "web", *flags]
+        print(f"# while parked, deploy the web app with: {shlex.join(command)}")
     for key in SCALED:
         name = APP_BY_KEY[key].name
         fly.run("scale", "count", "0", "--app", name, "--yes")
@@ -112,7 +111,7 @@ def start(fly: Fly) -> None:
     if fly.dry_run:
         return
     flags = web_redeploy_flags(fly)
-    print(f"# {APP_BY_KEY['web'].name} restored: {' '.join(flags or ['-'])}")
+    print(f"# {APP_BY_KEY['web'].name} restored: {shlex.join(flags or ['-'])}")
 
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
