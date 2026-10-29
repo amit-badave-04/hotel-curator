@@ -1,4 +1,4 @@
 # Never built. The deploy workflow and scripts/flyctl_docker.sh run the
 # image named here (flyctl's official image, pinned by digest); keeping the
 # pin in a Dockerfile lets Dependabot propose updates to it.
-FROM flyio/flyctl:v0.4.115@sha256:02243808c2886dfbb2f64f0c4c5b8e47665c0af2162bc66a04e6f0f374e0adeb
+FROM flyio/flyctl:v1.0.1@sha256:0775d417a80cfd730af3eb71b1fc211babdd5e3aa2562f046890f4d9e9b07312
