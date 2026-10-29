@@ -1,8 +1,8 @@
 # Continuous integration: Python (lint, types, tests, coverage), web (lint,
 # types, unit tests, build, API-client drift, npm audit), security (gitleaks,
-# pip-audit, bandit), the Fly database image over TLS, nginx in each edge
-# mode, end-to-end browser tests, and container builds. Actions are pinned
-# to commit SHAs.
+# pip-audit, bandit, workflow lint), the Fly database image over TLS, nginx
+# in each edge mode, end-to-end browser tests, container builds with an
+# image scan, and on main the deploy. Actions are pinned to commit SHAs.
 name: ci
 
 on:
@@ -13,9 +13,13 @@ on:
 permissions:
   contents: read
 
+# Elsewhere a newer push cancels the run in progress. On main every commit
+# gets its own run, never cancelled: the run ends with a deploy, which
+# waits for approval and must not stop half way (deploy.yml then deploys
+# only main's newest commit, one at a time).
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   UV_FROZEN: "1"
@@ -26,7 +30,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # Credentials stay: the served-model step pulls from Git LFS.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7 # zizmor: ignore[artipacked]
       # Only the served model from Git LFS, cached by object id; once it is
       # tracked, the eval gates run on it and fail on an unpulled pointer.
       - uses: ./.github/actions/served-model
@@ -57,6 +62,8 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: "22"
@@ -80,6 +87,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          persist-credentials: false
           fetch-depth: 0 # the full history of the commit under test
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
@@ -104,6 +112,15 @@ jobs:
           uvx pip-audit==2.10.1 --strict --no-deps -r requirements-audit.txt
       - name: Python SAST (bandit)
         run: uvx bandit==1.9.4 -r src -q
+      # Syntax and expressions (actionlint), and security mistakes such as
+      # template injection, unpinned actions or excessive permissions
+      # (zizmor, offline). zizmor fails on medium or high findings.
+      - name: Workflow lint (actionlint, zizmor)
+        run: |
+          # GitHub's runners have shellcheck; actionlint runs it on every
+          # script and fails on any finding.
+          uvx --from actionlint-py==1.7.12.25 actionlint -shellcheck="$(command -v shellcheck)"
+          uvx zizmor==1.31.1 --offline --min-severity medium .github/workflows
 
   # The Fly database image (deploy/postgres) started the way Fly starts it:
   # TLS on, two non-superuser roles, pg_hba refusing plain connections and
@@ -113,6 +130,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           version: "0.11.32"
@@ -124,8 +143,10 @@ jobs:
         run: |
           docker build -t hotel-curator-db:ci deploy/postgres
           gen() { python3 -c 'import secrets; print(secrets.token_urlsafe(32))'; }
-          export POSTGRES_PASSWORD="$(gen)" CURATOR_OWNER_PASSWORD="$(gen)" \
-            CURATOR_APP_PASSWORD="$(gen)"
+          POSTGRES_PASSWORD=$(gen)
+          CURATOR_OWNER_PASSWORD=$(gen)
+          CURATOR_APP_PASSWORD=$(gen)
+          export POSTGRES_PASSWORD CURATOR_OWNER_PASSWORD CURATOR_APP_PASSWORD
           for pw in "$POSTGRES_PASSWORD" "$CURATOR_OWNER_PASSWORD" "$CURATOR_APP_PASSWORD"; do
             echo "::add-mask::$pw"
           done
@@ -160,6 +181,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           version: "0.11.32"
@@ -182,6 +205,8 @@ jobs:
     needs: [python, web]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           version: "0.11.32"
@@ -206,7 +231,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # Credentials stay: the served-model step pulls from Git LFS.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7 # zizmor: ignore[artipacked]
       - id: model
         uses: ./.github/actions/served-model
       # Once the weights are tracked, the API image must contain exactly the
@@ -216,6 +242,21 @@ jobs:
         env:
           REQUIRE_MODEL: ${{ steps.model.outputs.tracked == 'true' && '1' || '0' }}
         run: docker compose build
+      # Known vulnerabilities in both images: a CRITICAL one with a fix
+      # available fails the job; HIGH ones with a fix are listed for review.
+      # Trivy's image is pinned by digest in deploy/tools/trivy/Dockerfile.
+      - name: Scan the images (Trivy)
+        run: |
+          image=$(sed -n 's/^FROM //p' deploy/tools/trivy/Dockerfile)
+          trivy() {
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              -v trivy-cache:/root/.cache/ "$image" "$@"
+          }
+          for image in hotel-curator-api:local hotel-curator-web:local; do
+            trivy image --no-progress --ignore-unfixed --severity HIGH,CRITICAL "$image"
+            trivy image --no-progress --ignore-unfixed --severity CRITICAL \
+              --skip-db-update --exit-code 1 "$image"
+          done
       - name: Start the stack and check it answers
         env:
           REQUIRE_MODEL: ${{ steps.model.outputs.tracked == 'true' && '1' || '0' }}
@@ -241,3 +282,13 @@ jobs:
       - name: Stop
         if: always()
         run: docker compose down -v
+
+  # A push to main that passed every job above deploys to Fly.io
+  # (.github/workflows/deploy.yml: approval in the "production" environment,
+  # then the API, the web app and a smoke test).
+  deploy:
+    needs: [python, web, security, postgres-tls, edge, e2e, containers]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/deploy.yml

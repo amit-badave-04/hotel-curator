@@ -13,8 +13,8 @@ cutover comes later; until then the site is `https://hotel-curator.fly.dev`.
 
 ## Before the first deploy
 
-- Install `flyctl` and log in: `flyctl auth login`. A CI job uses a
-  `FLY_API_TOKEN` instead.
+- Install `flyctl` and log in: `flyctl auth login`. The deploy workflow
+  uses app-scoped tokens instead ([Deploying from GitHub](#deploying-from-github)).
 - Fetch the served model weights: `git lfs pull`. The API image refuses to
   build unless the weights match `artifacts/evals/promotion.json`, and
   `scripts/deploy.py` stops before uploading if they are LFS pointers.
@@ -59,7 +59,16 @@ curl -sS https://hotel-curator.fly.dev/api/readyz
 
 A local release of the same data answers
 `{"status":"ready","hotels":1494,"model":"roberta-base-ft-train2"}`; the
-deployed API should answer the same.
+deployed API should answer the same. For the whole site:
+
+```sh
+uv run python scripts/smoke.py https://hotel-curator.fly.dev
+```
+
+It waits up to three minutes for readiness, then checks the pages, the
+hashed script's cache lifetime, the API's readiness, metadata, search and
+a hotel, an analyze call answered by the model, and robots.txt; any FAIL
+exits 1.
 
 ## Secrets
 
@@ -184,3 +193,73 @@ To roll the API back to an earlier image, deploy that image
 command leaves a schema that a newer image migrated further as it is, with
 a warning in the release log: migrations are additive, so the earlier code
 still runs on it (`src/hotel_curator/db/migrate.py`).
+
+## Deploying from GitHub
+
+After the first deploy, deploys can run from GitHub Actions. On every push
+to `main`, once every CI job has passed, CI's last job runs
+[`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) for
+that commit: it waits for your approval, checks that both deploys can go
+ahead (the weights are there; the web app's mode and domain match, as
+`scripts/deploy.py` decides), then deploys the API (its release command
+migrates and seeds), then the web app, then runs `scripts/smoke.py`
+against the public address. A refusal at the check leaves both apps as
+they were. Only the commit `main`
+points at when the job starts is deployed: approving the run for an older
+commit, after a newer push, deploys nothing. Each commit on `main` gets its
+own CI run, so an approval left waiting never holds up the tests of later
+pushes; deploys run one at a time, and a newer one replaces one still
+waiting.
+
+There is no separate manual trigger, so every deploy has passed CI for its
+commit. To deploy again (after a failed deploy, or a rejected approval),
+open the CI run of `main`'s latest commit and re-run its `deploy` job. To
+deploy one app, or from a machine with `flyctl`, use `scripts/deploy.py`
+as above. The database app is never deployed from GitHub.
+
+Set up once, in the repository's settings, **before** this workflow
+reaches `main`. A run that names an environment that does not exist yet
+creates it without a reviewer or branch rule; if `production` already
+exists, open it and add both. Deploys also need the served weights in Git
+LFS (`docs/BLOCKERS.md`, B8): without them every run stops at its check
+step, before anything is deployed.
+
+1. **Environment.** Settings, Environments, New environment, `production`.
+   Add yourself as a required reviewer, so every deploy waits for your
+   approval, and limit deployment branches to `main`.
+2. **Deploy tokens**, one per app, each valid for one app only. Create
+   each and pipe it straight into the environment secret, so it never
+   appears on screen or in shell history:
+
+   ```sh
+   flyctl tokens create deploy --app hotel-curator-api --expiry 2160h \
+     | gh secret set FLY_API_TOKEN_API --env production
+   flyctl tokens create deploy --app hotel-curator --expiry 2160h \
+     | gh secret set FLY_API_TOKEN_WEB --env production
+   ```
+
+   2160 hours is 90 days: repeat this before they expire. A failed deploy
+   step that says "unauthorized" usually means an expired token.
+3. **Variables**, only once the web app leaves its default mode (Settings,
+   Environments, `production`, Environment variables):
+   - after the Cloudflare cutover: `CURATOR_EDGE` = `cloudflare` and
+     `CURATOR_DOMAIN` = the domain;
+   - after a rollback to Fly mode on the domain: `CURATOR_EDGE` = `fly` and
+     `CURATOR_DOMAIN` = the domain.
+
+   With neither set, the workflow passes no mode and `scripts/deploy.py`
+   keeps the one the machines run in, or stops if they run in Cloudflare
+   mode or at a recorded domain. Set them only to the mode the web app
+   really runs in: a value is applied as given.
+
+flyctl comes from its official image, pinned by tag and digest in
+[`deploy/tools/flyctl/Dockerfile`](../../deploy/tools/flyctl/Dockerfile)
+(never built; Dependabot proposes updates to the pin, like Trivy's in
+`deploy/tools/trivy/`). The first step checks that the image reports the
+pinned tag's version, so an image that does not behave as expected stops
+the run before anything is deployed (ADR 011, A15).
+
+If the smoke test fails, the new version is already live: read its
+output, then fix forward with a new commit, or roll back by hand (the API:
+"Deploying again" above; the web app: `scripts/deploy.py deploy web` from
+a checkout of the previous commit).

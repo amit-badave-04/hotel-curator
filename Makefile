@@ -99,7 +99,7 @@ serve: db ## Run the API on http://127.0.0.1:8000 (docs at /docs)
 	$(RUN) curator serve
 
 # --- deploy (Fly.io; docs/deploy/fly.md) -----------------------------------
-.PHONY: fly-plan fly-secrets fly-setup fly-deploy fly-status
+.PHONY: fly-plan fly-secrets fly-setup fly-deploy fly-status smoke
 fly-plan: ## Print every flyctl command a first deploy runs (runs nothing)
 	$(RUN) python scripts/deploy.py plan
 
@@ -114,6 +114,9 @@ fly-deploy: ## Deploy database, API, web, in that order (FLY_DEPLOY_ARGS="--edge
 
 fly-status: ## Machines of each app; fails if the API or database is public
 	$(RUN) python scripts/deploy.py status
+
+smoke: ## Smoke-test a deployed site (SMOKE_URL=https://hotel-curator.fly.dev)
+	$(RUN) python scripts/smoke.py $(or $(SMOKE_URL),https://hotel-curator.fly.dev)
 
 # --- quality ---------------------------------------------------------------
 .PHONY: lint format typecheck test test-fast cov check

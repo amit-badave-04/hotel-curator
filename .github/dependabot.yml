@@ -1,0 +1,45 @@
+# Weekly update pull requests for GitHub Actions (pinned by commit SHA),
+# the Python lock file (uv), the web app (npm), the base images in the
+# Dockerfiles and docker-compose.yml, and the flyctl and Trivy images
+# (pinned by digest in deploy/tools/*/Dockerfile). A release must be two
+# weeks old before it is proposed, so a compromised release has time to be
+# noticed. Minor and patch updates of an ecosystem come as one pull
+# request; CI runs on each. Not covered, updated by hand: the tools CI
+# runs at a pinned version through uvx or curl (gitleaks, pip-audit,
+# bandit, actionlint, zizmor) and uv itself.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directories: ["/", "/.github/actions/*"]
+    schedule: { interval: weekly }
+    cooldown: { default-days: 14 }
+    groups:
+      actions: { patterns: ["*"] }
+
+  - package-ecosystem: uv
+    directory: "/"
+    schedule: { interval: weekly }
+    cooldown: { default-days: 14 }
+    open-pull-requests-limit: 5
+    groups:
+      python-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: "/web"
+    schedule: { interval: weekly }
+    cooldown: { default-days: 14 }
+    open-pull-requests-limit: 5
+    groups:
+      web-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directories: ["/", "/web", "/deploy/postgres", "/deploy/tools/*"]
+    schedule: { interval: weekly }
+    cooldown: { default-days: 14 }
+
+  - package-ecosystem: docker-compose
+    directory: "/"
+    schedule: { interval: weekly }
+    cooldown: { default-days: 14 }

@@ -147,6 +147,38 @@ interface an attacker could reach.
   `POST /v1/analyze` answers 503 without it, and `/v1/meta` says whether
   analyze is available.
 
+### Deploy pipeline
+
+- `ci.yml` ends with a `deploy` job that runs only for a push to `main`
+  and only after every other job passed. It calls the reusable
+  `.github/workflows/deploy.yml`, which has no other trigger: every deploy
+  is of a commit that passed CI, in that commit's own run, and nothing
+  from a fork or a pull request can start it. Re-running that job deploys
+  again.
+- The job runs in the GitHub environment `production`. Its required
+  reviewer (the owner) approves each run, and only it holds the two
+  app-scoped deploy tokens, `FLY_API_TOKEN_API` and `FLY_API_TOKEN_WEB`,
+  each passed to the one step that needs it.
+- flyctl runs from its official image pinned by tag and digest in
+  `deploy/tools/flyctl/Dockerfile` (`scripts/flyctl_docker.sh`); the first
+  step checks it reports the pinned version. No binary is downloaded.
+- Order: a dry run of both deploys (missing weights or a web mode or
+  domain that does not match refuse here, before anything moves), the API
+  (its release command migrates and seeds), the web app, then
+  `scripts/smoke.py` against the public address. The database app is
+  deployed by hand.
+- On `main`, CI runs once per commit and is never cancelled, so a deploy
+  waiting for approval holds up no later tests. Deploys run one at a
+  time: a running one is never cancelled, a newer one replaces one still
+  waiting, and a job whose commit is no longer `main`'s newest deploys
+  nothing.
+- CI scans both images with Trivy (pinned by digest in
+  `deploy/tools/trivy/Dockerfile`): a CRITICAL vulnerability with a fix
+  fails the build. Dependabot proposes weekly updates for actions, the
+  Python lock file, npm, the base images and the two tool images, each
+  release at least two weeks old; the CLI tools CI runs at pinned
+  versions through uvx or curl are updated by hand.
+
 ### Sizing, idle policy and cost
 
 - **API.** Measured on the build machine with the int8 model warm, after 30
@@ -207,6 +239,17 @@ owner's refit project already runs there.
 - **Fly TLS plus an allow-list of Cloudflare's IP ranges.** Header- and
   list-based, needs list upkeep, and does not prove the request came
   through Cloudflare.
+- **A deploy workflow triggered by `workflow_run` after CI** (the gap
+  audit's first plan, D19). It runs with secrets in the default branch's
+  context for any completed CI run, including runs for forks, so every
+  condition guarding it has to be right. Calling the deploy from CI's own
+  run on a push to `main` needs none of them.
+- **A manual "Run workflow" trigger for deploys.** It would deploy
+  `main`'s head whether or not CI passed for it; re-running the `deploy`
+  job of the commit's CI run gives the same control with the gate kept.
+- **flyctl downloaded as a release archive and checked against a pinned
+  SHA-256.** Equivalent, but the archive's checksum could not be read from
+  the build environment; the image digest could.
 
 ## Unverified provider assumptions and how each is checked
 
@@ -226,6 +269,8 @@ owner's refit project already runs there.
 | A12 | Traffic between Fly hosts on the private network is encrypted | Fly's documentation at deploy time; recorded here |
 | A13 | Fly's proxy passes `X-Real-IP` unchanged on the Flycast hop from nginx to the API | two clients through the web app get separate 429s from `/api/v1/analyze`; the API's log shows the visitors' request ids |
 | A14 | Fly routes the Cloudflare-mode TCP passthrough service only on a dedicated IPv4, not a shared one | `scripts/deploy.py setup --edge cloudflare` allocates one before the cutover; `scripts/check_edge.py <domain>` probes every address the origin name resolves to, IPv4 and IPv6, and each must refuse as expected (an address that cannot route the service fails) |
+| A15 | The `flyio/flyctl` image's entrypoint is flyctl, so `docker run <image> <args>` runs flyctl | the deploy workflow's first step: `flyctl version` must report the pinned version, before anything is deployed |
+| A16 | An app-scoped deploy token can deploy with Fly's remote builder and list that app's machines | the first deploy run: its check step lists the web machines with the web token before anything is deployed |
 
 ## Controls: compose versus Fly
 
@@ -238,7 +283,7 @@ owner's refit project already runs there.
 | Ports | bound to `127.0.0.1` | only the web app has public addresses |
 | Rate limits | per client, but one shared bucket for host clients (accepted risk) | per real client through one trusted header |
 | CSP and security headers | nginx | nginx, unchanged, plus HSTS |
-| Pinned images and actions | digests and SHAs | the same, plus flyctl pinned by version and checksum |
+| Pinned images and actions | digests and SHAs | the same, plus flyctl's image pinned by digest and its version checked |
 
 ## Consequences
 

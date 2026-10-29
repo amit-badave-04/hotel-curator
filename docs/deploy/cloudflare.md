@@ -137,7 +137,10 @@ requiring them (step 11).
     --domain <domain>"`); `deploy.py` refuses a web deploy that would
     silently go back to Fly mode. It also builds the web image with
     `VITE_PUBLIC_ORIGIN=https://<domain>`, so link previews, canonical
-    links, `robots.txt` and the sitemap name the domain.
+    links, `robots.txt` and the sitemap name the domain. For deploys from
+    GitHub, set the `production` environment's variables `CURATOR_EDGE` =
+    `cloudflare` and `CURATOR_DOMAIN` = `<domain>`
+    ([fly.md](fly.md#deploying-from-github)).
 12. **Check the result** (see [Check the result](#check-the-result)).
 
 ## Check the result
@@ -178,7 +181,8 @@ In this order, so the site never stops answering:
    (the domain keeps link previews and the sitemap on `<domain>`). The
    domain is recorded on the web machines, so later web deploys need the
    same two flags; without them `deploy.py` stops instead of moving the
-   site's own links back to `hotel-curator.fly.dev`.
+   site's own links back to `hotel-curator.fly.dev`. For deploys from
+   GitHub, set `CURATOR_EDGE` to `fly` and keep `CURATOR_DOMAIN`.
    Cloudflare in Full (strict) accepts Fly's certificate, so the site keeps
    answering through Cloudflare. In this state nginx keys rate limits on
    `Fly-Client-IP`, which is now a Cloudflare address, so visitors share

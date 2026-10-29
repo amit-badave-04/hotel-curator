@@ -28,6 +28,7 @@ from sqlalchemy import Engine, inspect, text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
 from hotel_curator.config import Settings, normalise_database_url
+from hotel_curator.db.release import RELEASE_LOCK_ID, release_lock
 from hotel_curator.db.seed import read_results
 from hotel_curator.db.session import make_engine
 
@@ -182,6 +183,35 @@ def test_concurrent_releases_load_once_then_stay_up_to_date() -> None:
     assert sum("up to date" in out for out in outputs) == 1, outputs
     again = _release()
     assert "up to date" in again.communicate(timeout=300)[0]
+
+
+def _lock_is_free() -> bool:
+    """Whether another session could take the release lock right now."""
+    engine = _engine(OWNER)
+    key = {"key": RELEASE_LOCK_ID}
+    with engine.connect() as conn:
+        free = conn.execute(
+            text("SELECT pg_try_advisory_lock(:key)"), key
+        ).scalar_one()
+        if free:
+            conn.execute(text("SELECT pg_advisory_unlock(:key)"), key)
+    engine.dispose()
+    return bool(free)
+
+
+def test_the_release_lock_is_held_until_the_release_ends() -> None:
+    engine = _engine(OWNER)
+    with release_lock(engine):
+        assert not _lock_is_free()
+    assert _lock_is_free()
+    # A failed release must not leave the next deploy waiting forever.
+    with (
+        pytest.raises(RuntimeError, match="migration failed"),
+        release_lock(engine),
+    ):
+        raise RuntimeError("migration failed")
+    assert _lock_is_free()
+    engine.dispose()
 
 
 def test_serving_role_reads_but_cannot_write() -> None:

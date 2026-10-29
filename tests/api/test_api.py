@@ -91,6 +91,20 @@ def test_not_ready_without_data(tmp_path: Path) -> None:
     assert response.status_code == 503
 
 
+def test_not_ready_when_the_database_fails(
+    tmp_path: Path, results_file: Path
+) -> None:
+    settings = _settings(tmp_path)
+    with _client(settings, results_file) as c:
+        engine = make_engine(settings.db_url())
+        with engine.begin() as conn:
+            conn.exec_driver_sql("ALTER TABLE hotels RENAME TO hotels_gone")
+        engine.dispose()
+        response = c.get("/readyz")
+    assert response.status_code == 503
+    assert response.json() == {"status": "database unavailable"}
+
+
 def test_search_defaults_to_best_first(client: TestClient) -> None:
     page = client.get("/v1/hotels").json()
     assert page["total"] == 5
