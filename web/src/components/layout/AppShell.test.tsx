@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { renderApp } from '@/test/render';
@@ -17,14 +17,17 @@ describe('App shell', () => {
     );
   });
 
-  it('toggles the theme and remembers the choice', async () => {
-    const { user } = renderApp('/');
+  it('toggles the theme and remembers the choice', () => {
+    renderApp('/');
     const html = document.documentElement;
     expect(html.dataset.theme).toBe('light');
-    await user.click(screen.getByRole('button', { name: 'Use dark theme' }));
+    // The tooltip's code arrives after the first render and replaces the
+    // button's node (ThemeTooltipFocus.test.tsx covers that); finding and
+    // clicking in one synchronous step never targets the replaced node.
+    fireEvent.click(screen.getByRole('button', { name: 'Use dark theme' }));
     expect(html.dataset.theme).toBe('dark');
     expect(window.localStorage.getItem('hotel-curator:theme')).toBe('dark');
-    await user.click(screen.getByRole('button', { name: 'Use light theme' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use light theme' }));
     expect(html.dataset.theme).toBe('light');
   });
 
@@ -39,7 +42,7 @@ describe('App shell', () => {
     expect(within(main).getByRole('link', { name: 'the home page' })).toHaveAttribute('href', '/');
   });
 
-  it('links Explore to /explore and the footer to the source, NOTICE and issues', async () => {
+  it('links Explore to /explore and the footer to the source, licences and issues', async () => {
     renderApp('/about');
     const nav = await screen.findByRole('navigation', { name: 'Main' });
     expect(within(nav).getByRole('link', { name: 'Explore' })).toHaveAttribute('href', '/explore');
@@ -48,6 +51,7 @@ describe('App shell', () => {
     const href = (name: RegExp) => within(footer).getByRole('link', { name }).getAttribute('href');
     expect(href(/Source code on GitHub/)).toBe('https://github.com/amit-badave-04/hotel-curator');
     expect(href(/NOTICE/)).toBe('/NOTICE.txt');
+    expect(href(/Third-party licences/)).toBe('/THIRD-PARTY-NOTICES.txt');
     expect(href(/Report a mistake/)).toBe('https://github.com/amit-badave-04/hotel-curator/issues');
     expect(href(/API documentation/)).toBe('/api/docs');
     // Without the query string; the origin is the build's (seo.ts default).

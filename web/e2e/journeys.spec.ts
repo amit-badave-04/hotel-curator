@@ -396,6 +396,8 @@ test.describe('J0: the landing page', () => {
     expect(await sitemap.text()).toContain('<loc>https://hotel-curator.fly.dev/explore</loc>');
     const notice = await request.get('/NOTICE.txt');
     expect(await notice.text()).toContain('Booking.com');
+    const thirdParty = await request.get('/THIRD-PARTY-NOTICES.txt');
+    expect(await thirdParty.text()).toContain('\nreact ');
     for (const path of ['/favicon.ico', '/apple-touch-icon.png', '/og-image.png']) {
       const response = await request.get(path);
       expect(response.headers()['content-type'], path).toMatch(/^image\//);

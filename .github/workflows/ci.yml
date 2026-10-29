@@ -247,15 +247,15 @@ jobs:
       # Trivy's image is pinned by digest in deploy/tools/trivy/Dockerfile.
       - name: Scan the images (Trivy)
         run: |
-          image=$(sed -n 's/^FROM //p' deploy/tools/trivy/Dockerfile)
+          scanner=$(sed -n 's/^FROM //p' deploy/tools/trivy/Dockerfile)
           trivy() {
             docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-              -v trivy-cache:/root/.cache/ "$image" "$@"
+              -v trivy-cache:/root/.cache/ "$scanner" "$@"
           }
-          for image in hotel-curator-api:local hotel-curator-web:local; do
-            trivy image --no-progress --ignore-unfixed --severity HIGH,CRITICAL "$image"
+          for target in hotel-curator-api:local hotel-curator-web:local; do
+            trivy image --no-progress --ignore-unfixed --severity HIGH,CRITICAL "$target"
             trivy image --no-progress --ignore-unfixed --severity CRITICAL \
-              --skip-db-update --exit-code 1 "$image"
+              --skip-db-update --exit-code 1 "$target"
           done
       - name: Start the stack and check it answers
         env:

@@ -5,7 +5,7 @@ its logs and metrics, set up alerts and error reports, and handle what
 goes wrong. First-time setup and deploys are in
 [docs/deploy/fly.md](deploy/fly.md); the Cloudflare cutover is in
 [docs/deploy/cloudflare.md](deploy/cloudflare.md); the design and its
-unverified provider assumptions (A1 to A20) are in
+unverified provider assumptions (A1 to A22) are in
 [ADR 011](decisions/011-deployment-fly-cloudflare.md).
 
 Commands run from the repository root, with `flyctl` logged in
@@ -29,7 +29,7 @@ analyze requests are answered and forgotten.
 
 ```sh
 make fly-status                                       # machines, and no public address on the API or database
-make smoke SMOKE_URL=https://hotel-curator.fly.dev    # 9 checks from outside, as the deploy workflow runs them
+make smoke SMOKE_URL=https://hotel-curator.fly.dev    # 10 checks from outside, as the deploy workflow runs them
 flyctl checks list --app hotel-curator-api            # Fly's liveness and readiness checks
 ```
 
@@ -85,7 +85,7 @@ forward or roll back.
 
 ```sh
 flyctl logs --app hotel-curator-api    # the API: one JSON object per line
-flyctl logs --app hotel-curator        # nginx: one JSON object per request
+flyctl logs --app hotel-curator        # nginx: one JSON object per request (in Fly mode, Fly's check of / every 30 s too)
 flyctl logs --app hotel-curator-db     # Postgres
 ```
 
@@ -112,7 +112,10 @@ flyctl logs --app hotel-curator-api --no-tail | grep '<request_id>'
 ```
 
 What the logs never hold: submitted review text, query strings (search
-terms), request bodies, or local variables in tracebacks. A database
+terms), request bodies, or local variables in tracebacks. nginx's own
+error log is limited to critical errors, because its messages quote the
+request line; a failed request shows in the access log instead (status
+502 or 504, with `upstream_ms`). A database
 error names its SQL but not the values bound into it (the engines hide
 them), so a failed search does not log its terms. nginx's `client`
 field is the visitor's address, kept because the rate limits key on it;
@@ -227,7 +230,7 @@ data again. Fly also keeps daily volume snapshots (assumption A9;
 | Symptom | Look at | Likely cause and fix |
 |---|---|---|
 | The site does not load | `make fly-status` | parked or crashed web machine: `make fly-start`, or the web app's logs |
-| Pages load, data does not (502 or 504 on `/api`) | the API's logs and checks | the API is down or restarting: one machine, so a deploy or crash means seconds of errors; a crash loop shows in the logs |
+| Pages load, data does not (502, 503 or 504 on `/api`) | the API's logs and checks | the API is down or restarting: one machine, so a deploy or crash means seconds of errors; a crash loop shows in the logs |
 | `/api/readyz` says "database unavailable" | `flyctl machine list --app hotel-curator-db`, the database's logs | database stopped or starting: `flyctl machine start <id> --app hotel-curator-db` |
 | `/api/readyz` says "no hotel data loaded" | `flyctl releases --app hotel-curator-api` | the release command failed: its log line says why; redeploy the API |
 | Analyze answers 503 | API log line "Model unavailable: …" | the image has no weights (Git LFS pointers): rebuild once `docs/BLOCKERS.md` B8 is resolved |

@@ -2,7 +2,8 @@
 
 _Branch `v2`, pull request
 [amit-badave-04/hotel-curator#1](https://github.com/amit-badave-04/hotel-curator/pull/1)
-(open, not merged). Every number below
+(merged into `main`; the public deployment that followed is planned in
+`docs/deploy/gap-audit.md`). Every number below
 comes from a command that was run; the command or the file that records it
 is named next to it. Anything not done or not verified says so._
 
@@ -98,7 +99,8 @@ Not done:
 - A dedicated inference thread pool (plan §7.2 abuse cases): not built;
   rate limits and size caps bound `analyze` instead.
 - trufflehog, osv-scanner, semgrep and the image scan are not in CI; they
-  ran locally for the security review.
+  ran locally for the security review. (The deployment branch later added
+  a Trivy image scan, workflow linting and Dependabot to CI.)
 - The owner's own `/red-team` procedure (B7) was not run here; an
   equivalent red-team exercise was (section 4).
 

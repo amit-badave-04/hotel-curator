@@ -25,6 +25,9 @@ PAGE = (
 )
 HOTEL = "h_00000000a1"
 SCRIPT = f"GET {BASE}/assets/index-abc123.js"
+NOTICE = f"GET {BASE}/NOTICE.txt"
+THIRD_PARTY = f"GET {BASE}/THIRD-PARTY-NOTICES.txt"
+CHECKS = 10
 
 
 def _answer(status: int = 200, body: object = b"", **headers: str) -> object:
@@ -72,6 +75,8 @@ def _site(model: str | None = "m1", **changes: object) -> dict[str, object]:
         f"GET {BASE}/robots.txt": _answer(
             200, f"Sitemap: {BASE}/sitemap.xml\n".encode()
         ),
+        NOTICE: _answer(200, b"hotel-curator\n" + smoke.NOTICE_MARK),
+        THIRD_PARTY: _answer(200, smoke.THIRD_PARTY_MARK + b"\n"),
     }
     site.update(changes)
     return site
@@ -91,7 +96,7 @@ def _failed(outcome: dict[str, bool]) -> set[str]:
 
 def test_a_healthy_site_passes_every_check() -> None:
     outcome = _run(_site())
-    assert len(outcome) == 9
+    assert len(outcome) == CHECKS
     assert all(outcome.values()), outcome
 
 
@@ -116,6 +121,7 @@ KEYS = {
     "hotel page": f"GET {BASE}/api/v1/hotels/{HOTEL}",
     "analyze": f"POST {BASE}/api/v1/analyze",
     "robots.txt": ROBOTS,
+    "attribution files": NOTICE,
 }
 ONE_CHANGE = {
     "home page": [
@@ -160,6 +166,10 @@ ONE_CHANGE = {
         _answer(200, b"Sitemap: https://other.example/sitemap.xml\n"),
         _answer(200, f"Sitemap: {BASE}/sitemap.xml.bak\n".encode()),
     ],
+    "attribution files": [
+        _answer(404, smoke.NOTICE_MARK),
+        _answer(200, b"<!doctype html>"),  # the app's fallback page
+    ],
 }
 CASES = [
     pytest.param(check, answer, id=f"{check}-{i}")
@@ -178,6 +188,17 @@ def test_one_broken_thing_fails_its_own_check(
     # without the count and model they compare against.
     if check != "API ready":
         assert failed == {check}
+
+
+@pytest.mark.parametrize(
+    "answer", [_answer(404, b""), _answer(200, b"<!doctype html>")]
+)
+def test_a_missing_third_party_file_fails_the_attribution_check(
+    answer: object,
+) -> None:
+    assert _failed(_run(_site(**{THIRD_PARTY: answer}))) == {
+        "attribution files"
+    }
 
 
 def test_search_needs_exactly_one_hotel_with_a_proper_id() -> None:
@@ -317,7 +338,7 @@ def test_main_reports_and_exits_with_the_outcome(
         lambda base, expect, wait: REAL_RUN(base, expect, wait, fetch),
     )
     assert smoke.main([BASE, "--wait", "0"]) == 0
-    assert "9 of 9 checks passed" in capsys.readouterr().out
+    assert f"{CHECKS} of {CHECKS} checks passed" in capsys.readouterr().out
     site[ROBOTS] = _answer(404, b"")
     assert smoke.main([BASE, "--wait", "0"]) == 1
     assert "FAIL  robots.txt" in capsys.readouterr().out

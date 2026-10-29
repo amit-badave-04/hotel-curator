@@ -178,6 +178,44 @@ def test_tool_images_are_pinned_by_digest_where_dependabot_sees_them(
     assert "--exit-code 1" in scan["run"]
 
 
+def test_the_trivy_step_runs_the_pinned_scanner_on_both_images(
+    tmp_path: Path,
+) -> None:
+    # Run the step's own script with a docker that only records its calls.
+    step = next(
+        s
+        for s in CI["jobs"]["containers"]["steps"]
+        if "Trivy" in s.get("name", "")
+    )
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    docker = bin_dir / "docker"
+    docker.write_text('#!/bin/sh\necho "CALL $*"\n')
+    docker.chmod(0o755)
+    env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    out = subprocess.run(
+        ["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", step["run"]],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    calls = [line.split()[1:] for line in out.splitlines()]
+    scanner = _pinned_image("trivy")
+    assert len(calls) == 4
+    for call in calls:
+        assert call[call.index("trivy-cache:/root/.cache/") + 1] == scanner
+    targets = [call[-1] for call in calls]
+    assert targets == [
+        "hotel-curator-api:local",
+        "hotel-curator-api:local",
+        "hotel-curator-web:local",
+        "hotel-curator-web:local",
+    ]
+    assert ["--exit-code", "1"] == calls[1][-3:-1] == calls[3][-3:-1]
+
+
 def test_dependabot_covers_every_ecosystem_and_the_tool_images() -> None:
     config = yaml.safe_load((ROOT / ".github" / "dependabot.yml").read_text())
     ecosystems = {u["package-ecosystem"] for u in config["updates"]}

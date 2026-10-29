@@ -8,7 +8,7 @@ import { compareHref, useCompare } from '@/lib/compare';
 import { formatCount } from '@/lib/domain';
 import { EXPLORER_PATH } from '@/lib/filters';
 import { formatPeriod } from '@/lib/policy';
-import { ISSUES_URL, NOTICE_PATH, PUBLIC_ORIGIN, REPO_URL } from '@/lib/site';
+import { ISSUES_URL, NOTICE_PATH, PUBLIC_ORIGIN, REPO_URL, THIRD_PARTY_PATH } from '@/lib/site';
 import { cn } from '@/lib/utils';
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -172,6 +172,9 @@ export function AppShell() {
             </li>
             <li>
               <FooterLink href={NOTICE_PATH}>Data sources and attribution (NOTICE)</FooterLink>
+            </li>
+            <li>
+              <FooterLink href={THIRD_PARTY_PATH}>Third-party licences</FooterLink>
             </li>
             <li>
               <FooterLink href={ISSUES_URL} external>

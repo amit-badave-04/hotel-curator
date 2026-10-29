@@ -18,7 +18,9 @@ has just started may need a moment, then checks once:
   that hotel's own page;
 - POST /api/v1/analyze: labels from the same model, or 503 when no model
   is expected;
-- robots.txt names this address's sitemap.
+- robots.txt names this address's sitemap;
+- /NOTICE.txt and /THIRD-PARTY-NOTICES.txt (the data, model and code
+  attribution the footer links) are served.
 
 Each check prints PASS or FAIL with what it saw; the exit code is 1 if any
 check fails. It needs only the standard library.
@@ -311,6 +313,25 @@ def check_robots(answer: Answer, base: str) -> Result:
     return Result("robots.txt", ok, f"HTTP {answer.status}, {want!r} expected")
 
 
+NOTICE_MARK = b"Booking.com"
+THIRD_PARTY_MARK = b"Third-party software in the hotel-curator web app"
+
+
+def check_attribution(notice: Answer, third_party: Answer) -> Result:
+    """The attribution files the footer links are served."""
+    ok = (
+        notice.status == 200
+        and NOTICE_MARK in notice.body
+        and third_party.status == 200
+        and THIRD_PARTY_MARK in third_party.body
+    )
+    detail = (
+        f"NOTICE HTTP {notice.status}, "
+        f"third-party licences HTTP {third_party.status}"
+    )
+    return Result("attribution files", ok, detail)
+
+
 def run(
     base: str,
     expect: ModelExpectation = "required",
@@ -341,6 +362,9 @@ def run(
         *check_search(get, base, hotels),
         check_analyze(analyze, model, expect),
         check_robots(get(f"{base}/robots.txt"), base),
+        check_attribution(
+            get(f"{base}/NOTICE.txt"), get(f"{base}/THIRD-PARTY-NOTICES.txt")
+        ),
     ]
 
 

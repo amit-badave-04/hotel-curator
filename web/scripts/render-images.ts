@@ -3,7 +3,7 @@
  * og-image.png (1200 x 630, link previews) from scripts/og-image.html, and
  * apple-touch-icon.png (180 x 180) and favicon.ico (32 x 32) from
  * public/favicon.svg. Run `npm run images` after changing a source; builds
- * use the committed files and need no browser, and test/images.test.ts
+ * use the committed files and need no browser, and test/public-files.test.ts
  * checks their sizes. Text uses the fonts of the machine that runs this
  * (Inter when installed), so another machine gives slightly different
  * pixels. Set PLAYWRIGHT_CHROMIUM_PATH to use a specific Chromium.

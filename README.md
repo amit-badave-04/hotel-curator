@@ -93,6 +93,37 @@ make serve      # SQLite database + demo data, API on http://127.0.0.1:8000
 cd web && npm ci && npm run dev   # web app on http://localhost:5173
 ```
 
+## Deploy
+
+The public site is meant to run at **https://hotel-curator.fly.dev**, and
+later on its own domain behind Cloudflare. It is not live yet: the
+production API image cannot be built without the model weights, which are
+not in git yet ([BLOCKERS](docs/BLOCKERS.md) B8), and the first deploy
+needs the owner's Fly.io account.
+
+It runs as three Fly.io apps in `lhr`: the web app (nginx and the React
+app, the only public one), the API (private, reached over Fly's private
+network) and Postgres (private, TLS only). After the first deploy by hand,
+every push to `main` that passes CI deploys once the owner approves it,
+then smoke-tests the public site.
+
+```bash
+make fly-plan                                  # print every command a first deploy runs
+make fly-secrets                               # check .env.fly, stage it as Fly secrets
+make fly-setup                                 # apps, database volume, the API's private address
+make fly-deploy                                # database, API, web, in that order
+make fly-status                                # machines; fails if the API or database is public
+make smoke SMOKE_URL=https://hotel-curator.fly.dev
+make fly-stop                                  # park the site; make fly-start resumes it
+```
+
+| You want to | Read |
+|---|---|
+| Deploy for the first time, handle secrets, redeploy, deploy from GitHub | [docs/deploy/fly.md](docs/deploy/fly.md) |
+| Move the site behind Cloudflare, check it, roll back | [docs/deploy/cloudflare.md](docs/deploy/cloudflare.md) |
+| Run it: status, parking, logs, metrics, alerts, incidents | [docs/RUNBOOK.md](docs/RUNBOOK.md) |
+| Know why it is built this way, and what is still unverified on Fly | [ADR 011](docs/decisions/011-deployment-fly-cloudflare.md) |
+
 ## How it works
 
 ```mermaid
@@ -137,11 +168,11 @@ flowchart LR
 
 | You want to | Go to |
 |---|---|
-| Find a clean, quiet hotel in Paris and see why it is listed | Explorer (`/`), filters "Strong in" and "Avoid weak" |
+| Find a clean, quiet hotel in Paris and see why it is listed | Explorer (`/explore`), filters "Strong in" and "Not weak in" |
 | Know whether one hotel is good, why, and how sure that is | Hotel page: verdict, grades with likely ranges, quotes for and against, what changed, who it suits, what would change the tier |
 | Compare hotels | Compare page: differences are highlighted only when they are credible |
-| Label your own review text | About page, "Try the model", or `POST /v1/analyze` |
-| Use the tiers in your app | REST API, OpenAPI docs at `/docs` |
+| Label your own review text | "Try the model" on the home page or the About page, or `POST /v1/analyze` |
+| Use the tiers in your app | REST API, OpenAPI docs at `/api/docs` on the site (`/docs` on the API itself) |
 
 ## Repository map
 
@@ -156,7 +187,9 @@ flowchart LR
 | `config/tier_policy.yaml` | every tier parameter (pre-registered) |
 | `data/` | manifests, label sets, demo results (raw data is downloaded, not committed) |
 | `artifacts/` | evaluation reports per model, the served model package, the frozen v1 model |
-| `docs/` | plan, decisions (ADRs), data card, model docs, security review, architecture |
+| `fly.toml`, `web/fly*.toml`, `deploy/` | Fly.io configs, the production Postgres image, pinned tool images |
+| `scripts/` | the public site's deploy, secrets, parking, smoke test and edge checks; the OpenAPI export, notebook builder, end-to-end test data, panel answers and learning curve |
+| `docs/` | plan, decisions (ADRs), data card, model docs, security review, architecture, deployment and runbook |
 | `notebooks/` | thin notebooks that read committed artifacts; v1 notebooks archived in `notebooks/v1/` |
 
 ## Reproduce everything
@@ -194,8 +227,31 @@ Every number in the docs comes from a command in this list; the manifests in
 [v1 audit](docs/v1-audit.md) ·
 [security review](docs/security/v2-security-review.md) ·
 [architecture](docs/architecture/) ·
+[deployment](docs/deploy/fly.md) ·
+[runbook](docs/RUNBOOK.md) ·
 [glossary](docs/GLOSSARY.md) ·
 [v2 report](docs/V2_REPORT.md)
 
-Licence: code MIT ([LICENSE](LICENSE)); data and model provenance in
-[NOTICE](NOTICE).
+## Licence
+
+- **Code:** MIT ([LICENSE](LICENSE)), except the vendored Swagger UI in
+  `src/hotel_curator/api/static/swagger-ui/` (Apache-2.0, with its own
+  LICENSE and NOTICE), which the API docs page uses.
+- **Data:** the Booking.com reviews are "CC0 as declared by the uploader,
+  originally Booking.com content", unconfirmed; review excerpts are shown
+  for illustration, and any commercial use needs a legal review first.
+- **Model weights:** they come with no licence of their own. They derive
+  from roberta-base (recorded as MIT, as its authors published it; not
+  re-verified here) and from labels of that review text, so they inherit
+  its uncertainty ([model
+  card](artifacts/models/roberta-base-ft-train2/MODEL_CARD.md)).
+- **Third-party code** in the web app keeps its own licences: its
+  packages, and the build tools whose code the build adds
+  ([web/public/THIRD-PARTY-NOTICES.txt](web/public/THIRD-PARTY-NOTICES.txt),
+  served at `/THIRD-PARTY-NOTICES.txt`).
+- **The public site** is a free, non-commercial demo, not affiliated with
+  Booking.com. Corrections and removal requests go to the
+  [issue tracker](https://github.com/amit-badave-04/hotel-curator/issues).
+
+Sources, licences and attribution in full: [NOTICE](NOTICE), also served
+at `/NOTICE.txt`.

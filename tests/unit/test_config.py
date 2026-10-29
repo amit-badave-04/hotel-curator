@@ -119,11 +119,15 @@ def test_production_refuses_plain_or_sqlite_urls(
     assert "pw@" not in str(refused.value)
 
 
-def test_database_urls_never_appear_in_repr() -> None:
+def test_database_urls_and_the_dsn_never_appear_in_repr() -> None:
+    dsn = "https://0123456789abcdef0123456789abcdef@sentry.example/1"
     settings = Settings(
-        database_url=TLS_URL, migration_database_url="postgres://o:hunter2@h/d"
+        database_url=TLS_URL,
+        migration_database_url="postgres://o:hunter2@h/d",
+        sentry_dsn=dsn,
     )
     shown = f"{settings!r} {settings} {settings.model_dump()}"
     assert "pw@" not in shown
     assert "hunter2" not in shown
+    assert "0123456789abcdef" not in shown
     assert settings.migration_db_url() == "postgresql+psycopg://o:hunter2@h/d"

@@ -79,7 +79,8 @@ reloading once after a deploy removed a page's code, error states with
 request ids, the theme toggle, and that the nginx site (`nginx/site.conf`)
 sends the same security headers as `security-headers.ts`. Tooling tests
 check robots.txt, the sitemap and the link-preview tags (`test/seo.test.ts`),
-the image sizes and that `public/NOTICE.txt` is the repository's `NOTICE`
+the image sizes, that `public/NOTICE.txt` is the repository's `NOTICE` and
+that `public/THIRD-PARTY-NOTICES.txt` matches the installed packages
 (`test/public-files.test.ts`), and that policy numbers worded inline in the
 pages match `config/tier_policy.yaml` (`test/policy-wording.test.ts`).
 
@@ -149,12 +150,19 @@ build argument; `scripts/deploy.py` passes the Cloudflare domain in
 Cloudflare mode.
 
 `public/` holds the favicon (SVG and ICO), the touch icon, the link-preview
-image and `NOTICE.txt`. The images are rendered from `public/favicon.svg` and
+image, `NOTICE.txt` and `THIRD-PARTY-NOTICES.txt`. The images are rendered from `public/favicon.svg` and
 `scripts/og-image.html` by `npm run images` and committed, so builds need no
 browser; the preview image shows no numbers, so it never goes stale.
 `NOTICE.txt` is a copy of the repository's `NOTICE` (the image's build
 context is `web/`); after changing `NOTICE`, run
 `cp NOTICE web/public/NOTICE.txt`, which a test checks.
+`THIRD-PARTY-NOTICES.txt` lists every package whose code the production
+bundle can include, with its licence text, since the minified scripts keep
+no licence comments: the production dependencies and everything they
+depend on, plus the build tools that add code of their own (Tailwind CSS,
+Vite, Rolldown; `BUILD_PACKAGES`). After changing dependencies, run
+`npm run notices` (`scripts/third-party-notices.ts`); a test checks the
+file is current and that the app's code imports no other package.
 
 ## Docker
 
@@ -164,7 +172,8 @@ docker build -t hotel-curator-web .
 
 A two-stage build: `node:22.23.4-alpine3.24` runs `npm ci` and `npm run build`,
 then `nginxinc/nginx-unprivileged:1.30.6-alpine3.24` (both pinned by digest)
-serves `dist/` as a non-root user on port 8080. At start,
+serves `dist/` as a non-root user on port 8080 (in Cloudflare mode, on 8443
+with TLS and the PROXY protocol, and 8080 answers only `/healthz`). At start,
 `nginx/15-curator-site.sh` renders the site for `CURATOR_EDGE` (`local` for
 compose, `fly` behind Fly's edge, `cloudflare` behind Cloudflare; ADR 011)
 from `nginx/`: SPA fallback to `index.html`, `/api/` proxied to

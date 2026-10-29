@@ -17,7 +17,11 @@ import urllib.request
 from pathlib import Path
 
 import pytest
+import uvicorn
+from typer.testing import CliRunner
 
+from hotel_curator.cli.main import app as cli
+from hotel_curator.config import get_settings
 from hotel_curator.db.release import release
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -141,3 +145,26 @@ def test_serve_logs_only_json_and_finishes_a_request_on_sigterm(
     assert "uvicorn.error" in loggers  # uvicorn's own lines, as JSON
     assert "uvicorn.access" not in loggers  # one access log: the app's
     assert "DIRTY" not in err
+
+
+def test_serve_never_lets_uvicorn_rewrite_the_client_or_log_on_its_own(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Rate limits key on X-Real-IP, which the app reads itself; uvicorn
+    # would otherwise take the peer from X-Forwarded-For (Fly's proxy adds
+    # to it) and write its own plain-text logs.
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(uvicorn, "run", lambda *_a, **kw: calls.append(kw))
+    monkeypatch.delenv("CURATOR_METRICS_PORT", raising=False)
+    get_settings.cache_clear()
+    try:
+        result = CliRunner().invoke(cli, ["serve", "--port", "8123"])
+    finally:
+        get_settings.cache_clear()
+    assert result.exit_code == 0, result.output
+    (options,) = calls
+    assert options["proxy_headers"] is False
+    assert options["server_header"] is False
+    assert options["log_config"] is None
+    assert options["access_log"] is False
+    assert options["port"] == 8123

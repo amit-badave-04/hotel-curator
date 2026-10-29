@@ -72,8 +72,9 @@ Mermaid versions of these views, with tables, are in
 <nav aria-label="Views">
   <a href="#overview">1. Offline and online</a>
   <a href="#offline">2. Offline pipeline</a>
-  <a href="#online">3. Online deployment</a>
-  <a href="#request">4. Request flow</a>
+  <a href="#online">3. Online on a laptop</a>
+  <a href="#production">4. Production on Fly.io</a>
+  <a href="#request">5. Request flow</a>
 </nav>
 
 <svg width="0" height="0" aria-hidden="true" style="position:absolute">
@@ -93,7 +94,7 @@ calls an LLM.</p>
 <figure>
 <svg viewBox="0 0 1040 330" role="img" aria-labelledby="o-title o-desc">
   <title id="o-title">Offline and online halves</title>
-  <desc id="o-desc">Left, the offline curator CLI: data, labels, models (ladder, package, compare, publish), scores. Middle, the committed hand-off files: the model package, promotion.json, hotel_results.json.gz and tier_policy.yaml. Right, the online stack: web, API and Postgres. The API loads the package, promotion decision and policy at start-up; the seed step loads the hotel results into Postgres.</desc>
+  <desc id="o-desc">Left, the offline curator CLI: data, labels, models (ladder, package, compare, publish), scores. Middle, the committed hand-off files: the model package, promotion.json, hotel_results.json.gz and tier_policy.yaml. Right, the online stack: web, API and Postgres, run by docker compose on a laptop or as three Fly.io apps in production. The API loads the package, promotion decision and policy at start-up; the release step loads the hotel results into Postgres.</desc>
   <rect class="zone" x="10" y="20" width="300" height="290" rx="12"/>
   <text class="label" x="28" y="44">OFFLINE: curator CLI, by hand</text>
   <rect class="box" x="40" y="62" width="240" height="44" rx="8"/><text x="160" y="89" text-anchor="middle">data: download, build, split</text>
@@ -114,16 +115,16 @@ calls an LLM.</p>
   <text class="small" x="300" y="238">policy</text>
 
   <rect class="zone" x="720" y="20" width="310" height="290" rx="12"/>
-  <text class="label" x="738" y="44">ONLINE: docker compose</text>
+  <text class="label" x="738" y="44">ONLINE: compose or Fly.io</text>
   <rect class="accent" x="760" y="62" width="230" height="52" rx="8"/><text x="875" y="85" text-anchor="middle">web</text><text class="small" x="875" y="102" text-anchor="middle">nginx + React app</text>
   <rect class="accent" x="760" y="146" width="230" height="52" rx="8"/><text x="875" y="169" text-anchor="middle">api</text><text class="small" x="875" y="186" text-anchor="middle">FastAPI + ONNX Runtime</text>
-  <rect class="box" x="760" y="232" width="230" height="52" rx="8"/><text x="875" y="255" text-anchor="middle">db</text><text class="small" x="875" y="272" text-anchor="middle">Postgres, socket only</text>
+  <rect class="box" x="760" y="232" width="230" height="52" rx="8"/><text x="875" y="255" text-anchor="middle">db</text><text class="small" x="875" y="272" text-anchor="middle">Postgres: socket (compose), TLS (Fly)</text>
   <path class="arrow" d="M875 114 V142"/><path class="arrow" d="M875 198 V228"/>
   <path class="arrow" d="M650 84 C 700 84, 710 166, 756 168"/>
   <path class="arrow" d="M650 144 C 700 144, 710 172, 756 172"/>
   <path class="arrow" d="M650 204 C 700 204, 710 178, 756 176"/>
   <path class="arrow" d="M650 264 H756"/>
-  <text class="small" x="668" y="256">db seed</text>
+  <text class="small" x="668" y="256">db release</text>
   <text class="small" x="668" y="122">loaded at start</text>
 </svg>
 <figcaption><code>model.onnx</code> is not in git yet (Git LFS was blocked in the build environment, <code>docs/BLOCKERS.md</code> B8). Until it is added, <code>POST /v1/analyze</code> answers 503; everything else works from the committed results.</figcaption>
@@ -173,8 +174,9 @@ tier scheme were committed before any model ran.</p>
 <figcaption>Large or re-downloadable files (raw CSVs, processed tables, base weights, training runs, packages, part scores) stay local and git-ignored; labels, evaluations, manifests, the package metadata and the hotel results are committed.</figcaption>
 </figure>
 
-<h2 id="online">3. Online deployment and trust boundaries</h2>
-<p>The web container serves the app; the API is also published on
+<h2 id="online">3. Online on a laptop: docker compose</h2>
+<p><code>docker compose up</code> runs the same three images on one machine.
+The web container serves the app; the API is also published on
 127.0.0.1:8000 (docs and direct API) for local use. Postgres has no
 network: it listens only on a Unix socket in a volume that only the db and
 API containers mount. Over that socket the API's role, which is not a
@@ -231,7 +233,99 @@ the db container.</p>
 <figcaption>Only the API's root filesystem is read-only; the API (uid 10001) and web (uid 101) run as non-root, and Postgres drops to its own user after its entrypoint. Rate limits key on the client address that nginx writes into <code>X-Real-IP</code>; the API believes it (and nginx's <code>X-Request-ID</code>) only from the web container and never reads <code>X-Forwarded-For</code>. In laptop compose the Docker gateway rewrites client addresses, so every client on the host shares one bucket (an accepted risk in the security review). The role rules apply to a data volume initialised with <code>docker/db-init</code>.</figcaption>
 </figure>
 
-<h2 id="request">4. Request flow: a hotel page</h2>
+<h2 id="production">4. Production on Fly.io</h2>
+<p>Three Fly apps in <code>lhr</code>, one machine each
+(<a href="../decisions/011-deployment-fly-cloudflare.md">ADR 011</a>). Only the
+web app has public addresses. It reaches the API through Flycast, Fly's
+private load-balanced address, and the API reaches Postgres by its
+<code>.internal</code> name over TLS. Before the Cloudflare cutover, visitors
+reach Fly's edge directly (Fly mode); after it, Cloudflare terminates their
+TLS and passes requests to the origin over TLS with its client certificate,
+which Fly passes through untouched (Cloudflare mode). Deploys from GitHub
+come only from CI on <code>main</code>, after the owner approves them; the
+database app, the first deploy and manual redeploys run by hand with
+<code>scripts/deploy.py</code>, and an API rollback redeploys an earlier
+image with <code>flyctl deploy --image</code>.</p>
+<figure>
+<svg viewBox="0 0 1040 520" role="img" aria-labelledby="p-title p-desc">
+  <title id="p-title">Production on Fly.io, in Fly mode and Cloudflare mode</title>
+  <desc id="p-desc">The browser reaches Fly's edge over HTTPS for fly.dev (Fly mode), or Cloudflare over HTTPS for the domain, which passes TLS with its client certificate through Fly's edge as raw TCP (Cloudflare mode). Inside the Fly organisation's private network, the web app runs nginx on port 8080 (Fly mode) or 8443 with TLS and the PROXY protocol (Cloudflare mode), computes one client address and proxies /api over Flycast to the API on port 8000. The API has no public address; it serves metrics on port 9091, which Fly's metrics scraper reads and no service exposes, and reaches Postgres at hotel-curator-db.internal port 5432 over TLS as a read-only role. Postgres has no public address, accepts only TLS with scram for two roles, and keeps its data on the pg_data volume. GitHub Actions deploys the API and then the web app with one app-scoped token each, after CI passes on main and the owner approves. Dashed orange lines mark trust boundaries.</desc>
+  <rect class="box" x="20" y="208" width="110" height="56" rx="8"/><text x="75" y="241" text-anchor="middle">Browser</text>
+
+  <rect class="external" x="160" y="64" width="176" height="104" rx="8"/>
+  <text x="248" y="88" text-anchor="middle">Cloudflare</text>
+  <text class="small" x="248" y="108" text-anchor="middle">Cloudflare mode only</text>
+  <text class="small" x="248" y="125" text-anchor="middle">TLS for the domain, WAF</text>
+  <text class="small" x="248" y="142" text-anchor="middle">client certificate to origin</text>
+  <text class="small" x="248" y="159" text-anchor="middle">sets CF-Connecting-IP</text>
+  <rect class="external" x="160" y="196" width="176" height="104" rx="8"/>
+  <text x="248" y="220" text-anchor="middle">Fly edge</text>
+  <text class="small" x="248" y="240" text-anchor="middle">Fly mode: TLS for fly.dev,</text>
+  <text class="small" x="248" y="257" text-anchor="middle">force_https, Fly-Client-IP</text>
+  <text class="small" x="248" y="274" text-anchor="middle">Cloudflare mode: TCP 443</text>
+  <text class="small" x="248" y="291" text-anchor="middle">passed through (PROXY)</text>
+
+  <rect class="boundary" x="360" y="40" width="660" height="370" rx="14"/>
+  <text class="label" x="376" y="62">FLY ORGANISATION, lhr: private network; only the web app is public</text>
+
+  <rect class="external" x="610" y="80" width="190" height="56" rx="8"/>
+  <text x="705" y="103" text-anchor="middle">Fly metrics</text>
+  <text class="small" x="705" y="122" text-anchor="middle">scrapes :9091 ([metrics])</text>
+
+  <rect class="accent" x="380" y="170" width="200" height="170" rx="8"/>
+  <text x="480" y="194" text-anchor="middle">hotel-curator (web)</text>
+  <text class="small" x="480" y="214" text-anchor="middle">nginx, 256 MB</text>
+  <text class="small" x="480" y="232" text-anchor="middle">Fly mode: HTTP :8080</text>
+  <text class="small" x="480" y="250" text-anchor="middle">Cloudflare mode: TLS :8443,</text>
+  <text class="small" x="480" y="266" text-anchor="middle">client cert, Cloudflare ranges</text>
+  <text class="small" x="480" y="284" text-anchor="middle">one client address: X-Real-IP</text>
+  <text class="small" x="480" y="302" text-anchor="middle">CSP, one HSTS, 64 KB bodies</text>
+  <text class="small" x="480" y="320" text-anchor="middle">JSON access log, no queries</text>
+
+  <rect class="boundary" x="598" y="158" width="406" height="236" rx="10"/>
+  <text class="small" x="996" y="388" text-anchor="end">no public address: Flycast and .internal only</text>
+  <rect class="accent" x="610" y="170" width="190" height="170" rx="8"/>
+  <text x="705" y="194" text-anchor="middle">hotel-curator-api</text>
+  <text class="small" x="705" y="214" text-anchor="middle">FastAPI + ONNX, 1 GB</text>
+  <text class="small" x="705" y="232" text-anchor="middle">Flycast :8000</text>
+  <text class="small" x="705" y="250" text-anchor="middle">metrics :9091, no service</text>
+  <text class="small" x="705" y="268" text-anchor="middle">rate limits on X-Real-IP</text>
+  <text class="small" x="705" y="286" text-anchor="middle">release_command: migrate,</text>
+  <text class="small" x="705" y="302" text-anchor="middle">seed, under a lock</text>
+  <text class="small" x="705" y="320" text-anchor="middle">JSON logs; optional Sentry</text>
+  <rect class="box" x="830" y="170" width="160" height="170" rx="8"/>
+  <text x="910" y="194" text-anchor="middle">hotel-curator-db</text>
+  <text class="small" x="910" y="214" text-anchor="middle">Postgres 16, 512 MB</text>
+  <text class="small" x="910" y="232" text-anchor="middle">.internal:5432</text>
+  <text class="small" x="910" y="250" text-anchor="middle">hostssl + scram only</text>
+  <text class="small" x="910" y="268" text-anchor="middle">owner role (release)</text>
+  <text class="small" x="910" y="286" text-anchor="middle">read-only role (serving)</text>
+  <text class="small" x="910" y="304" text-anchor="middle">superuser: local only</text>
+  <text class="small" x="910" y="322" text-anchor="middle">volume pg_data, 1 GB</text>
+
+  <rect class="external" x="380" y="440" width="420" height="64" rx="8"/>
+  <text x="590" y="464" text-anchor="middle">GitHub Actions: deploy job</text>
+  <text class="small" x="590" y="484" text-anchor="middle">after CI passes on main and the owner approves;</text>
+  <text class="small" x="590" y="499" text-anchor="middle">one app-scoped token per app; pinned flyctl image</text>
+
+  <path class="arrow" d="M130 236 H156"/>
+  <path class="arrow dashed" d="M120 208 C 135 150, 140 118, 156 116"/>
+  <path class="arrow dashed" d="M248 168 V192"/>
+  <text class="small" x="256" y="186">TLS</text>
+  <path class="arrow" d="M336 248 H376"/>
+  <path class="arrow" d="M580 255 H606"/>
+  <text class="small" x="593" y="246" text-anchor="middle">/api</text>
+  <path class="arrow" d="M800 255 H826"/>
+  <text class="small" x="813" y="246" text-anchor="middle">TLS</text>
+  <path class="arrow dashed" d="M705 140 V166"/>
+  <path class="arrow dashed" d="M520 440 V344"/>
+  <path class="arrow dashed" d="M680 440 V344"/>
+  <text class="small" x="600" y="428" text-anchor="middle">flyctl deploy</text>
+</svg>
+<figcaption>Rate limits key on the one client address nginx writes into <code>X-Real-IP</code>: <code>Fly-Client-IP</code> in Fly mode, <code>CF-Connecting-IP</code> from Cloudflare's ranges behind its client certificate in Cloudflare mode. Every other identity header is blanked. Because Fly's proxy sits between nginx and the API, the API believes <code>X-Real-IP</code> from any peer, so another app in the same Fly organisation could choose its own bucket. The API connects with <code>sslmode=require</code>: encrypted, but the server certificate is not verified. Secrets live in Fly (database URLs, passwords, the origin certificate) and in the GitHub environment (deploy tokens), never in git or images. Fly and Cloudflare behaviours that could not be checked from the build environment are listed as assumptions A1 to A22 in ADR 011.</figcaption>
+</figure>
+
+<h2 id="request">5. Request flow: a hotel page</h2>
 <p>Hotel results are computed offline; the hotel itself is one primary-key
 lookup of the stored detail and a schema-validated JSON response (the app
 shell also fetches <code>/v1/meta</code> and <code>/v1/cities</code>). Live inference

@@ -185,7 +185,9 @@ def _move_ports(site: Path, edge: Edge) -> None:
 
 
 ASSET = "/assets/index-0123abcd.js"
+NOTICES = "/THIRD-PARTY-NOTICES.txt"
 ACCESS_LOG = "access.log"
+ERROR_LOG = "nginx-stderr.log"
 
 
 def access_log(tmp_path: Path, lines: int) -> list[dict[str, object]]:
@@ -207,6 +209,7 @@ def _web_root(tmp_path: Path) -> Path:
     (root / "index.html").write_text("<!doctype html><title>t</title>")
     (root / ASSET.lstrip("/")).write_text("console.log(1);")
     (root / "og-image.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    (root / NOTICES.lstrip("/")).write_text("Copyright Rouven We\u00dfling\n")
     return root
 
 
@@ -260,10 +263,14 @@ def start(tmp_path: Path, api: str) -> Iterator[object]:
             [*command, "-t"], capture_output=True, text=True
         )
         assert checked.returncode == 0, checked.stderr
-        # The access log goes to stdout (site.conf); keep it for reading.
-        with (tmp_path / ACCESS_LOG).open("ab") as log:
+        # The access log goes to stdout (site.conf) and request errors to
+        # stderr (http.conf); keep both for reading.
+        with (
+            (tmp_path / ACCESS_LOG).open("ab") as log,
+            (tmp_path / ERROR_LOG).open("ab") as errors,
+        ):
             process = subprocess.Popen(
-                [*command, "-g", "daemon off;"], stdout=log
+                [*command, "-g", "daemon off;"], stdout=log, stderr=errors
             )
         running.append(process)
         _wait_for(edge.http_port, process)
@@ -356,6 +363,26 @@ def test_the_access_log_is_json_with_fly_and_cloudflare_ids(
     assert "private-search" not in (tmp_path / ACCESS_LOG).read_text()
 
 
+def test_no_nginx_log_holds_a_query_string_even_when_the_api_is_down(
+    start: object, tmp_path: Path
+) -> None:
+    # nginx's error messages quote the request line, query string included;
+    # an API that does not answer is the common case that triggers one.
+    (closed,) = _free_ports(1)
+    edge = start(  # type: ignore[operator]
+        "fly", CURATOR_API_UPSTREAM=f"127.0.0.1:{closed}"
+    )
+    answer = get(edge.http_port, "/api/v1/hotels?q=private-search")
+    assert answer.status == 502
+    (record,) = access_log(tmp_path, 1)
+    assert record["status"] == 502
+    time.sleep(0.2)  # let nginx write any error line
+    logs = [tmp_path / ACCESS_LOG, tmp_path / ERROR_LOG, tmp_path / "error.log"]
+    for log in logs:
+        text = log.read_text() if log.exists() else ""
+        assert "private-search" not in text, log.name
+
+
 @pytest.mark.parametrize("path", ["/", "/explore", "/api/v1/meta", "/api/docs"])
 def test_every_answer_has_exactly_one_hsts_value(
     start: object, path: str
@@ -364,6 +391,17 @@ def test_every_answer_has_exactly_one_hsts_value(
     answer = get(edge.http_port, path)
     assert answer.header("strict-transport-security") == [HSTS]
     assert answer.header("x-content-type-options") == ["nosniff"]
+
+
+def test_text_is_served_as_utf8_and_api_answers_keep_their_type(
+    start: object,
+) -> None:
+    edge = start("fly")  # type: ignore[operator]
+    notices = get(edge.http_port, NOTICES)
+    assert notices.header("content-type") == ["text/plain; charset=utf-8"]
+    assert notices.body.decode("utf-8") == "Copyright Rouven We\u00dfling\n"
+    api = get(edge.http_port, "/api/v1/hotels")
+    assert api.header("content-type") == ["application/json"]
 
 
 def test_redirects_are_relative(start: object) -> None:

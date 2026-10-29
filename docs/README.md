@@ -15,6 +15,7 @@ by question.
 | How are tiers computed, and do they hold up? | [decisions/006-tier-scheme.md](decisions/006-tier-scheme.md), [model/TIERS.md](model/TIERS.md) |
 | How is the system put together? | [architecture/](architecture/) |
 | Is it secure? | [security/v2-security-review.md](security/v2-security-review.md) |
+| Which licences apply to the code, data, model and the packages the web app bundles? | [../NOTICE](../NOTICE), [../web/public/THIRD-PARTY-NOTICES.txt](../web/public/THIRD-PARTY-NOTICES.txt), [the model card](../artifacts/models/roberta-base-ft-train2/MODEL_CARD.md#licence-and-use) |
 | What tools were available while building it? | [TOOLING.md](TOOLING.md) |
 | What is blocked or needs the owner? | [BLOCKERS.md](BLOCKERS.md) |
 | What do the terms mean? | [GLOSSARY.md](GLOSSARY.md) |

@@ -63,9 +63,9 @@ Browser
 | Who terminates browser TLS | Fly's edge (`[http_service]`, `force_https`) | Cloudflare's edge |
 | Fly service | HTTP service on 80/443 to nginx's plain port 8080 | TCP service on 443 with `handlers = ["proxy_proto"]`, passed through to nginx's TLS port 8443, on a dedicated IPv4 (unverified here; A7, A14) |
 | Origin TLS | none past Fly's edge | Cloudflare Origin Certificate in nginx; SSL mode Full (strict) |
-| Origin lock | none (the fly.dev hostname is the site) | nginx requires Cloudflare's origin-pull client certificate (Authenticated Origin Pulls) and closes requests for any other `Host` |
-| Client IP for rate limits | `Fly-Client-IP`, set by Fly's edge from the connection | `CF-Connecting-IP`, trusted only because the client-certificate handshake proved the request came through Cloudflare |
-| Health checks | plain internal port, no public service | same |
+| Origin lock | none (the fly.dev hostname is the site) | nginx refuses the TLS handshake for any other name, answers 400 without Cloudflare's origin-pull client certificate (Authenticated Origin Pulls), 403 when the PROXY source is outside Cloudflare's committed ranges, and 421 for any other `Host` |
+| Client IP for rate limits | `Fly-Client-IP`, set by Fly's edge from the connection | `CF-Connecting-IP`, trusted only from a PROXY source in Cloudflare's ranges after the client certificate verified |
+| Health checks | `GET /` on the HTTP service's own port 8080 | `GET /healthz` on port 8080, which no service exposes and which answers nothing else |
 
 nginx can only verify Cloudflare's client certificate if it terminates TLS
 itself; behind Fly's TLS it never sees one. That is why Cloudflare mode
@@ -84,10 +84,12 @@ In every mode nginx computes the client address once and **overwrites**
 otherwise pass on (`X-Forwarded-For`, `Forwarded`, `Fly-Client-IP`,
 `CF-Connecting-IP`, `True-Client-IP`). The API keys its rate limits on
 `X-Real-IP` only (IPv6 clients per /64), and only from peers in
-`CURATOR_FORWARDED_ALLOW_IPS`. Only nginx can reach the API, because the
-API has no public address. On Fly that setting is `*`: Fly's proxy sits
-between nginx and the API on the Flycast hop, so the API's TCP peer is
-never nginx's own address.
+`CURATOR_FORWARDED_ALLOW_IPS`. The API has no public address, so only
+nginx and the other apps of the owner's Fly organisation can reach it. On
+Fly that setting is `*`: Fly's proxy sits between nginx and the API on the
+Flycast hop, so the API's TCP peer is never nginx's own address, and an app
+in the same organisation could choose its own rate-limit bucket (keep the
+organisation to these three apps, or give them one of their own).
 
 nginx's site is a template rendered at start by
 `web/nginx/15-curator-site.sh` for `CURATOR_EDGE` (`local`, `fly` or
@@ -100,7 +102,7 @@ a trusted peer, so one id follows a request through both logs.
 |---|---|---|
 | compose | the TCP peer (`$remote_addr`) | the API is not reachable from outside the compose network except on loopback |
 | Fly | `Fly-Client-IP` | Fly's edge sets it from the connection; a client-sent value is replaced (unverified here) |
-| Cloudflare | `CF-Connecting-IP` | Cloudflare sets it; only connections that present Cloudflare's client certificate reach nginx |
+| Cloudflare | `CF-Connecting-IP` | Cloudflare sets it; nginx believes it only from a PROXY source in Cloudflare's ranges, after Cloudflare's client certificate verified |
 
 ### TLS chain
 
@@ -162,8 +164,10 @@ interface an attacker could reach.
 - flyctl runs from its official image pinned by tag and digest in
   `deploy/tools/flyctl/Dockerfile` (`scripts/flyctl_docker.sh`); the first
   step checks it reports the pinned version. No binary is downloaded.
-- Order: a dry run of both deploys (missing weights or a web mode or
-  domain that does not match refuse here, before anything moves), the API
+- Order: a dry run of both deploys (missing weights or, when no mode
+  variable is set, a parked web app or a web deploy that would quietly
+  leave Cloudflare mode or a recorded domain, refuse here, before
+  anything moves; a mode variable is applied as given), the API
   (its release command migrates and seeds), the web app, then
   `scripts/smoke.py` against the public address. The database app is
   deployed by hand.
@@ -191,7 +195,9 @@ interface an attacker could reach.
   Fly's `Fly-Request-Id` (Fly mode, assumption A19) and Cloudflare's
   `CF-Ray` when they look like ids. nginx's id stays the one that joins both logs: it exists in every
   mode, while a client can send either provider header in some modes (gap
-  audit D16 had proposed adopting `Fly-Request-Id`). Logs never hold
+  audit D16 had proposed adopting `Fly-Request-Id`). nginx's error log
+  keeps only critical errors, since its messages quote the request line,
+  query string included. Logs never hold
   submitted text, query strings or local variables, and the database
   engines hide bound values from error messages, so a failed search does
   not log its terms. The release command's lines are JSON too.
@@ -311,7 +317,7 @@ owner's refit project already runs there.
 | A1 | Fly's edge sets `Fly-Client-IP` from the connection and replaces a client-sent value | send `Fly-Client-IP: 203.0.113.9` to `https://hotel-curator.fly.dev/api/v1/hotels`; nginx's log shows the real address |
 | A2 | `hotel-curator-api.flycast:8000` reaches the API after a private IPv6 is allocated | `scripts/smoke.py` gets analyze 200 through the web app |
 | A3 | An app with only a private address and `[[services]]` gets no public IP | `flyctl ips list -a hotel-curator-api` and `-a hotel-curator-db` list no public address |
-| A4 | `release_command` runs once per deploy on a temporary machine with the app's secrets | `flyctl releases -a hotel-curator-api` and the release log line "up to date" or "loaded 1494 hotels from …" |
+| A4 | `release_command` runs once per deploy on a temporary machine with the app's secrets and the private network, so it reaches `hotel-curator-db.internal:5432` | `flyctl releases -a hotel-curator-api` and the release log line "up to date" or "loaded 1494 hotels from …" |
 | A5 | `kill_signal` and `kill_timeout` are honoured | the deploy log shows "Application shutdown complete" before the machine stops |
 | A6 | Top-level `[checks]` may target a port without a public service | `flyctl checks list` shows the checks passing |
 | A7 | A TCP service with `handlers = ["proxy_proto"]` passes TLS through with a PROXY header | after cutover, nginx's log shows a Cloudflare address as the proxy-protocol peer and the visitor's address as the client |
@@ -328,6 +334,8 @@ owner's refit project already runs there.
 | A18 | Fly's scraper reaches a listener bound to `::` over the private network and labels each series with its `app` | `curator_http_requests_total{app="hotel-curator-api"}` returns series in Fly's Grafana |
 | A19 | In Fly mode, Fly's proxy passes the request to nginx with a `Fly-Request-Id` header holding the id it returns to the client as `fly-request-id` (in Cloudflare mode Fly only passes TCP through, so there is none) | `curl -sI https://hotel-curator.fly.dev/`, then find its `fly-request-id` in `flyctl logs --app hotel-curator` |
 | A20 | Fly's managed Grafana can hold alert rules and send them to an email contact point | create the runbook's "No metrics" rule and send a test notification; if it cannot, point another Grafana or an outside uptime monitor at the site |
+| A21 | A job in a reusable workflow that names an environment gets that environment's secrets without the caller passing any | the first deploy run: its check step authenticates with the web token; without it the run stops there, before anything is deployed |
+| A22 | The first `flyctl deploy` of the web app in Fly mode gives it public addresses for `hotel-curator.fly.dev` (no code allocates them) | `flyctl ips list -a hotel-curator`, and the smoke test reaching the site |
 
 ## Controls: compose versus Fly
 
@@ -346,7 +354,8 @@ owner's refit project already runs there.
 
 - Two web edge modes, switched by a config change at the Cloudflare
   cutover, both covered by tests.
-- One API machine: a deploy or crash means seconds of 503 on `/api`. That
-  is acceptable for a demo and documented in the runbook.
+- One API machine: a deploy or crash means seconds of errors on `/api`
+  (502 to 504, depending on where the request stops). That is acceptable
+  for a demo and documented in the runbook.
 - A standing monthly cost, controlled by `scripts/ops.py stop` when the
   demo is not needed.

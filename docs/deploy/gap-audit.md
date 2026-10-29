@@ -78,7 +78,7 @@ Severities come from three independent audits (reference conventions, serving si
 | N5 | The landing page has no loading, error or unavailable states yet. There is no pending indicator for lazy routes. After a deploy, a stale tab requesting a removed chunk gets a 404 and the generic RouteError. | `RouteError.tsx:4-21`; `web/nginx.conf:81-83`; `AppShell.tsx:36-54` | S | 6 |
 | N6 | Landing assets must be self-hosted to keep the CSP unchanged. `gzip_types` lacks XML. The og-image has no long cache lifetime. | `web/security-headers.ts:6-26`; `web/nginx.conf:7-10,27` | S | 6 |
 | N7 | The Explorer is bundled eagerly because it used to be the landing page. | `web/src/routes.tsx:6,10-11,24` | S | 6 |
-| N8 | The web README describes `/` as the explorer. | `web/README.md:3,73,94-99,167` | S | 9 |
+| N8 | The web README describes `/` as the explorer. Fixed in step 6, with the landing page. | `web/README.md:3,73,94-99,167` | S | 9 |
 
 **Merges:** B1's "/readyz requires the model" moved into S6. The image scan from S10 and the image-size gap both sit in N2. B11 stays separate from B1 because it needs API and frontend work even after the weights land. All other gaps are kept as the audits reported them; none were dropped.
 
@@ -194,12 +194,12 @@ Every step ends with a commit (What / Why / Evidence). "Here" means the build en
 | R9 | Secrets leak. | `.env*` excluded from images and git (`.dockerignore:27-28`, `.gitignore:19-20`); `SecretStr`; stdin-only secret pushes; gitleaks; per-app deploy tokens in a protected environment. |
 | R10 | Cloudflare features silently break the CSP. | The checklist turns them off; `check_edge.py` compares the CSP and scripts against the repo; the e2e CSP fixture (`web/e2e/fixtures.ts:7-23`). |
 | R11 | Old shared links break. | The loader redirect with unit and e2e tests. |
-| R12 | Cost overruns. | Smallest provisional sizes; `ops.py stop`; the Q2 ceiling. Prices could not be checked here. |
+| R12 | Cost overruns. | Smallest provisional sizes, one machine per app; `ops.py stop` parks the site; the runbook's cost formula. Prices could not be checked here, and the owner set no ceiling. |
 | R13 | The API runs out of memory. | Measured RSS before sizing; swap; Fly restarts; optional Sentry. |
 | R14 | Slow cold starts or a failing first check. | API kept warm; grace period from measurement. |
-| R15 | Licence or legal exposure. | Q3; NOTICE served and linked; the correction channel; non-commercial framing. |
+| R15 | Licence or legal exposure. | The owner's licence decision (non-commercial demo, above); NOTICE served and linked, with the model's licence status; the third-party licences served; the correction channel. |
 | R16 | The deploy pipeline is abused. | Deploy called from CI's own run for a push to main (no `workflow_run`, no `pull_request_target`, no manual trigger); required reviewer; app-scoped tokens per step; actions by SHA, flyctl and Trivy by digest; minimal permissions. Revised in ADR 011 ("Deploy pipeline"). |
-| R17 | A bad release reaches production. | API deploys before web; the smoke test gates the deploy; rollback documented in the runbook (unverified here); only one migration so far (`0001`). |
+| R17 | A bad release reaches production. | API deploys before web, after a dry run of both; the smoke test runs after both deploys and shows a failure, but rolls nothing back; rollback by hand, documented (unverified here); migrations are additive (`0001`, `0002`), so an older API image runs on a newer schema. |
 | R18 | HSTS locks in a mistake. | `max-age=86400`, no includeSubDomains or preload until verified. |
 | R19 | App names are already taken, or the region is unavailable. | Names live only in the tomls and workflow variables; the owner confirms at phase 4; the ADR lists alternatives. |
 | R20 | nginx's envsubst substitutes something unintended. | Only `CURATOR_`-prefixed template variables; `nginx -t` and a rendered-config diff in CI. |

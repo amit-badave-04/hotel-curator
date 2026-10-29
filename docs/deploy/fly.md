@@ -69,8 +69,8 @@ uv run python scripts/smoke.py https://hotel-curator.fly.dev
 
 It waits up to three minutes for readiness, then checks the pages, the
 hashed script's cache lifetime, the API's readiness, metadata, search and
-a hotel, an analyze call answered by the model, and robots.txt; any FAIL
-exits 1.
+a hotel, an analyze call answered by the model, robots.txt, and that
+/NOTICE.txt and /THIRD-PARTY-NOTICES.txt are served; any FAIL exits 1.
 
 ## Secrets
 

@@ -264,6 +264,19 @@ LIMITS = [
     "ModernBERT-architecture model tried was mmBERT-small; ModernBERT-base, "
     "DeBERTa-v3 and Ettin were not trained (ADR 005).",
 ]
+LICENCE = [
+    "## Licence and use",
+    "",
+    "- The weights derive from the base model above, whose licence is "
+    "recorded as its authors published it and was not re-verified from the "
+    "build environment (ADR 005), and from labels of review text whose "
+    "licence is unconfirmed: CC0 as declared by an uploader, originally "
+    "Booking.com content (`NOTICE`). They inherit that uncertainty and come "
+    "with no licence of their own. They are served only in a non-commercial "
+    "demo; any other use, commercial use above all, needs the legal review "
+    "`NOTICE` asks for.",
+    "",
+]
 RARE_LABELS = 3
 WEAKEST_LABELS = 4
 
@@ -297,6 +310,7 @@ def model_card(inputs: CardInputs) -> str:
         _card_package,
         lambda c: LIMITS,
         _label_limits,
+        lambda c: LICENCE,
     )
     lines = [line for make in sections for line in make(inputs)]
     return "\n".join(lines)
