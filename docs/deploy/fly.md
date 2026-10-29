@@ -177,3 +177,10 @@ make fly-deploy FLY_DEPLOY_ARGS="--edge cloudflare --domain <domain>"
 
 Switching back to Fly mode needs Fly certificates for the domain first;
 follow [the rollback](cloudflare.md#rolling-back-to-fly-mode).
+
+To roll the API back to an earlier image, deploy that image
+(`flyctl deploy --app hotel-curator-api --image <image> --config fly.toml`;
+`flyctl releases --app hotel-curator-api --image` lists them). Its release
+command leaves a schema that a newer image migrated further as it is, with
+a warning in the release log: migrations are additive, so the earlier code
+still runs on it (`src/hotel_curator/db/migrate.py`).

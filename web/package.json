@@ -21,6 +21,7 @@
     "pretest:e2e": "npm run build",
     "test:e2e": "playwright test",
     "generate:api": "orval --config orval.config.ts && prettier --write src/api/generated",
+    "images": "node scripts/render-images.ts",
     "audit:deps": "npm audit --audit-level=high",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build"
   },

@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   activeFilterCount,
   DEFAULT_FILTERS,
+  explorerHref,
   filtersToSearchParams,
+  legacyExplorerTarget,
   parseFilters,
   toApiParams,
 } from './filters';
@@ -64,5 +66,26 @@ describe('explorer filters', () => {
       page_size: 20,
       tier: ['caution'],
     });
+  });
+});
+
+describe('explorer links', () => {
+  it('puts the filters on the explorer path', () => {
+    expect(explorerHref(DEFAULT_FILTERS)).toBe('/explore');
+    expect(explorerHref({ ...DEFAULT_FILTERS, tiers: ['good'], page: 2 })).toBe(
+      '/explore?tier=good&page=2',
+    );
+  });
+
+  it('sends old explorer links on, with only valid filters', () => {
+    expect(legacyExplorerTarget('?city=Paris&tier=good')).toBe('/explore?city=Paris&tier=good');
+    expect(legacyExplorerTarget('?q=grand&utm_source=mail')).toBe('/explore?q=grand');
+    expect(legacyExplorerTarget('?tier=bogus&page=-3')).toBe('/explore');
+    expect(legacyExplorerTarget('?city=%3Cscript%3E')).toBe('/explore');
+  });
+
+  it('leaves the landing page alone without explorer filters', () => {
+    expect(legacyExplorerTarget('')).toBeNull();
+    expect(legacyExplorerTarget('?utm_source=mail')).toBeNull();
   });
 });

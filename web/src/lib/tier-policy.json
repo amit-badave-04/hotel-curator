@@ -1,0 +1,58 @@
+{
+ "compare": {
+  "draws": 20000,
+  "probability": 0.95
+ },
+ "complaining_review_probability": 0.5,
+ "confirmation": 0.95,
+ "essentials": [
+  "cleanliness",
+  "room",
+  "staff"
+ ],
+ "excellent": {
+  "max_month_share": 0.25,
+  "min_months": 6
+ },
+ "hard_label_probability": 0.5,
+ "interval_level": 0.9,
+ "materiality": 0.05,
+ "min_complaining_reviews": 3,
+ "min_opinions": 10,
+ "min_reviews": 30,
+ "must_be": [
+  "noise",
+  "wifi"
+ ],
+ "must_be_lines": {
+  "strong": 0.05,
+  "weak": 0.1
+ },
+ "near_duplicate_min_words": 10,
+ "params_version": "2026-10-24.1",
+ "prior": {
+  "alpha": 0.5,
+  "beta": 0.5
+ },
+ "quotes": {
+  "counter": 1,
+  "max_chars": 200,
+  "min_probability": 0.8,
+  "min_probability_negative": 0.9,
+  "supporting": 2
+ },
+ "seed": 20261024,
+ "trends": {
+  "baseline_months": 18,
+  "draws": 4000,
+  "min_opinions": 15,
+  "must_be_shift": 0.05,
+  "probability": 0.9,
+  "recent_months": 6,
+  "two_sided_shift": 0.1
+ },
+ "two_sided": {
+  "strong": 0.8,
+  "weak": 0.5
+ }
+}

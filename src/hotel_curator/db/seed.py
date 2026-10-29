@@ -89,6 +89,14 @@ def to_rows(result: HotelDetail) -> Hotel:
     )
 
 
+def review_period(results: list[HotelDetail]) -> tuple[str, str]:
+    """First and last month of the usable reviews over all hotels."""
+    return (
+        min(r.first_month for r in results),
+        max(r.last_month for r in results),
+    )
+
+
 def seed(session: Session, path: Path) -> int:
     """Load ``path`` unless it is already the loaded dataset.
 
@@ -105,8 +113,14 @@ def seed(session: Session, path: Path) -> int:
     current = session.scalars(
         select(DatasetInfo).order_by(DatasetInfo.id.desc()).limit(1)
     ).first()
+    first_month, last_month = review_period(results)
     if current is not None and current.results_sha256 == digest:
-        logger.info("Dataset %s already loaded", digest[:12])
+        if current.first_month is None:  # seeded before migration 0002
+            current.first_month, current.last_month = first_month, last_month
+            session.flush()
+            logger.info("Dataset %s: review period filled in", digest[:12])
+        else:
+            logger.info("Dataset %s already loaded", digest[:12])
         return 0
     session.execute(delete(AttributeScore))
     session.execute(delete(Hotel))
@@ -119,6 +133,8 @@ def seed(session: Session, path: Path) -> int:
             model=first.model,
             hotels=len(results),
             loaded_at=datetime.now(UTC),
+            first_month=first_month,
+            last_month=last_month,
         )
     )
     session.flush()

@@ -1,0 +1,38 @@
+hotel-curator
+=============
+
+Code
+----
+The source code in this repository is licensed under the MIT License (see
+LICENSE). The MIT License covers code only. It does not cover the data
+described below.
+
+Data sources
+------------
+1. Booking.com "515K Hotel Reviews Data in Europe"
+   Original: https://www.kaggle.com/datasets/jiashenliu/515k-hotel-reviews-data-in-europe
+   Copy used by the pipeline: GitHub raghavendranhp/Dynamic-Hotel-Recommendation-System-Using-NLP
+   at commit 903600f2ed2dbd761f2f435564c7e630f79e74b7, pinned by SHA-256.
+   Licence: CC0 1.0, as declared by the Kaggle uploader. The uploader also
+   states that the content was originally owned by Booking.com. This could not
+   be confirmed first-hand from the build environment.
+   Used for: training, evaluation, and display of short review excerpts.
+   The raw data are not redistributed in this repository. Derived files that
+   are committed (annotation samples, label files, the demo dataset) contain
+   short review excerpts.
+   Obtain a legal review before any commercial use.
+
+2. Overture Maps Foundation places (if the enrichment stage has been run)
+   https://overturemaps.org/ - CDLA-Permissive-2.0.
+   Used for: display metadata only (website, category, coordinates).
+
+3. Evaluation-only sources (never committed, never used for training):
+   - TripAdvisor Annotated (Marcheggiani et al.), fetched by pinned hash,
+     used only to measure annotation agreement. Licence not verified.
+   - Booking.com accommodation reviews (bookingcom/ml-dataset-reviews), only
+     as an opt-in out-of-domain evaluation. Its licence statement is
+     ambiguous (non-commercial wording, CC BY-SA 4.0 link).
+
+This project is not affiliated with or endorsed by Booking.com, TripAdvisor or
+the Overture Maps Foundation. To request a correction or removal of a review
+excerpt, open an issue in this repository.

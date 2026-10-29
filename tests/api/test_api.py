@@ -214,6 +214,14 @@ def test_cities_and_meta(client: TestClient) -> None:
     assert meta["model"] == "test-model"
     assert len(meta["attributes"]) == 8
     assert meta["policy"]["confirmation"] == 0.95
+    assert meta["analyze_available"] is False
+    period = meta["data_period"]
+    assert period == {"first_month": "2015-09", "last_month": "2017-08"}
+
+
+def test_meta_says_when_analyze_can_answer(client: TestClient) -> None:
+    client.app.state.curator._model = _FakeModel()  # type: ignore[attr-defined]
+    assert client.get("/v1/meta").json()["analyze_available"] is True
 
 
 def test_openapi_documents_every_route(client: TestClient) -> None:
@@ -560,6 +568,8 @@ def test_meta_evaluates_the_served_model_not_the_latest_winner(
             {
                 "winner": "newer-model",
                 "v1_config": "v1",
+                "test_reviews": 1200,
+                "test_hotels": 182,
                 "rows": [
                     row("v1", 0.6, None),
                     row("test-model", 0.85, diff),
@@ -572,6 +582,7 @@ def test_meta_evaluates_the_served_model_not_the_latest_winner(
     assert served is not None
     assert served.model == "test-model"
     assert served.macro_f1.point == 0.85
+    assert (served.test_reviews, served.test_hotels) == (1200, 182)
     assert load_evaluation(evals, "unknown-model") is None
     assert load_evaluation(evals, None) is None
 

@@ -18,6 +18,10 @@ export interface Evaluation {
   mean_review_ece: number;
   model: string;
   rungs: EvaluationRungsItem[];
+  /** Hotels those test reviews come from. */
+  test_hotels?: number | null;
+  /** Held-out test reviews behind the scores. */
+  test_reviews?: number | null;
   v1_configuration: string;
   v1_macro_f1: Interval;
 }

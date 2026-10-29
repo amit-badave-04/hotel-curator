@@ -2,7 +2,7 @@ import { expect, HOTELS, test } from './fixtures';
 
 test.describe('J1: find a hotel with the explorer', () => {
   test('filter by city, tier and attribute, then open a hotel', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/explore');
     await expect(page.getByRole('heading', { level: 1, name: 'Explore hotels' })).toBeVisible();
     await expect(page.getByRole('article')).toHaveCount(5);
 
@@ -39,10 +39,10 @@ test.describe('J1: find a hotel with the explorer', () => {
   });
 
   test('shows "not enough evidence to judge" and an empty state', async ({ page }) => {
-    await page.goto('/?q=Delta');
+    await page.goto('/explore?q=Delta');
     const delta = page.getByRole('article', { name: 'Delta Rooms' });
     await expect(delta.getByText('Not enough evidence to judge')).toBeVisible();
-    await page.goto('/?q=no-such-hotel');
+    await page.goto('/explore?q=no-such-hotel');
     await expect(page.getByText('No hotels match these filters')).toBeVisible();
   });
 });
@@ -105,7 +105,7 @@ test.describe('J2: is this hotel good, and why?', () => {
 
 test.describe('J3: compare hotels', () => {
   test('compare two hotels from the explorer and see the credible difference', async ({ page }) => {
-    await page.goto('/?city=Paris');
+    await page.goto('/explore?city=Paris');
     await page
       .getByRole('article', { name: 'Alpha Grand' })
       .getByRole('button', { name: /Add to compare/ })
@@ -160,15 +160,20 @@ test.describe('J5: analyse my own review text', () => {
   test('returns labels, or says the model is unavailable', async ({ page }) => {
     await page.goto('/about');
     const panel = page.getByRole('region', { name: 'Try the model' });
+    const form = panel.getByLabel('What the guest liked');
+    await expect(form.or(panel.getByText('No model loaded'))).toBeVisible();
+    if (!(await form.isVisible())) {
+      // /v1/meta says no model is loaded, so there is no form to fill in.
+      await expect(panel).toContainText('Search, hotel pages and compare still work');
+      return;
+    }
     await panel.getByLabel('What the guest liked').fill('Friendly staff and a spotless room');
     await panel.getByLabel('What the guest disliked').fill('Street noise at night');
     await expect(panel.getByText('34 of 2,000 characters')).toBeVisible();
     await panel.getByRole('button', { name: 'Analyse review' }).click();
 
     const labels = panel.getByText('What the model found');
-    const unavailable = panel
-      .getByRole('alert')
-      .filter({ hasText: 'The model is not available right now' });
+    const unavailable = panel.getByRole('alert').filter({ hasText: 'No model loaded' });
     await expect(labels.or(unavailable)).toBeVisible();
     if (await unavailable.isVisible()) {
       await expect(unavailable).toContainText('Request id:');
@@ -188,10 +193,9 @@ test.describe('J5: analyse my own review text', () => {
         .getByText('Evaluation not available')
         .or(evaluation.getByText('Served model, macro-F1')),
     ).toBeVisible();
-    await expect(page.getByRole('link', { name: /API documentation/ })).toHaveAttribute(
-      'href',
-      '/api/docs',
-    );
+    await expect(
+      page.getByRole('main').getByRole('link', { name: /API documentation/ }),
+    ).toHaveAttribute('href', '/api/docs');
     const docs = await page.request.get('/api/openapi.json');
     expect(docs.ok()).toBe(true);
   });
@@ -217,7 +221,7 @@ test.describe('J3 with three hotels', () => {
 
 test.describe('Focus and scroll position', () => {
   test('a filter change keeps the scroll position and the focused checkbox', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/explore');
     await expect(page.getByRole('article')).toHaveCount(5);
     const box = page
       .getByRole('group', { name: 'Not weak in' })
@@ -236,7 +240,7 @@ test.describe('Focus and scroll position', () => {
 
   test('on a phone, tapping a filter does not jump to the top', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 780 });
-    await page.goto('/');
+    await page.goto('/explore');
     await page.getByRole('button', { name: 'Show filters' }).click();
     const box = page
       .getByRole('group', { name: 'Not weak in' })
@@ -251,7 +255,7 @@ test.describe('Focus and scroll position', () => {
   });
 
   test('clearing from the empty state focuses the results heading', async ({ page }) => {
-    await page.goto('/?q=no-such-hotel');
+    await page.goto('/explore?q=no-such-hotel');
     const empty = page.getByText('No hotels match these filters').locator('..');
     await empty.getByRole('button', { name: 'Clear filters' }).click();
     await expect(page.getByRole('article')).toHaveCount(5);
@@ -309,23 +313,27 @@ test.describe('Keyboard, theme and small screens', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   });
 
-  test('no page scrolls sideways at 360 px', async ({ page }) => {
-    await page.setViewportSize({ width: 360, height: 780 });
-    for (const path of [
-      '/',
-      `/hotels/${HOTELS.goodButNoisy}`,
-      `/compare?ids=${HOTELS.excellent}&ids=${HOTELS.caution}&ids=${HOTELS.goodButNoisy}`,
-      '/about',
-    ]) {
+  test('no page scrolls sideways at 360 or 768 px', async ({ page }) => {
+    for (const [width, path] of [360, 768].flatMap((w) =>
+      [
+        '/',
+        '/explore',
+        `/hotels/${HOTELS.goodButNoisy}`,
+        `/compare?ids=${HOTELS.excellent}&ids=${HOTELS.caution}&ids=${HOTELS.goodButNoisy}`,
+        '/about',
+      ].map((p) => [w, p] as const),
+    )) {
+      await page.setViewportSize({ width, height: 780 });
       await page.goto(path);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
       await page.waitForLoadState('networkidle');
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
-      expect(overflow, path).toBeLessThanOrEqual(0);
+      expect(overflow, `${path} at ${width} px`).toBeLessThanOrEqual(0);
     }
-    await page.goto('/');
+    await page.setViewportSize({ width: 360, height: 780 });
+    await page.goto('/explore');
     await page.getByRole('button', { name: 'Show filters' }).click();
     await expect(page.getByLabel('City')).toBeVisible();
   });
@@ -337,5 +345,93 @@ test.describe('Keyboard, theme and small screens', () => {
     expect(headers['content-security-policy']).toContain("frame-ancestors 'none'");
     expect(headers['x-content-type-options']).toBe('nosniff');
     expect(headers['referrer-policy']).toBe('no-referrer');
+  });
+});
+
+test.describe('J0: the landing page', () => {
+  test('says what the product is, shows live numbers and leads to the explorer', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await expect(page).toHaveTitle('hotel-curator: hotel quality tiers from guest reviews');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+      'Hotel tiers you can check against what guests wrote',
+    );
+    const numbers = page.getByRole('region', { name: 'The numbers' });
+    await expect(numbers.getByText('Hotels graded')).toBeVisible();
+    await expect(page.getByRole('table', { name: 'How the 5 hotels are graded' })).toBeVisible();
+    await expect(page.getByRole('region', { name: /Excellent/ })).toBeVisible();
+    await page.getByRole('link', { name: 'Explore hotels' }).click();
+    await expect(page).toHaveURL(/\/explore$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Explore hotels' })).toBeVisible();
+  });
+
+  test('"Try the model" jumps to the box, and Back returns to the top', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('link', { name: 'Try the model' }).click();
+    await expect(page).toHaveURL(/\/#try$/);
+    const heading = page.getByRole('heading', { level: 2, name: 'Try the model' });
+    await expect(heading).toBeInViewport();
+    await expect(heading).toBeFocused();
+    await page.goBack();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole('heading', { level: 1 })).toBeInViewport();
+  });
+
+  test('an old explorer link opens the explorer with its filters', async ({ page }) => {
+    await page.goto('/?city=Paris&tier=excellent');
+    await expect(page).toHaveURL(/\/explore\?city=Paris&tier=excellent$/);
+    await expect(page.getByLabel('City')).toHaveValue('Paris');
+    await expect(page.getByRole('checkbox', { name: 'Excellent' })).toBeChecked();
+  });
+
+  test('serves robots.txt, the sitemap, the notice and absolute preview URLs', async ({
+    page,
+    request,
+  }) => {
+    const robots = await request.get('/robots.txt');
+    expect(robots.ok()).toBe(true);
+    expect(await robots.text()).toContain('Sitemap: https://hotel-curator.fly.dev/sitemap.xml');
+    const sitemap = await request.get('/sitemap.xml');
+    expect(await sitemap.text()).toContain('<loc>https://hotel-curator.fly.dev/explore</loc>');
+    const notice = await request.get('/NOTICE.txt');
+    expect(await notice.text()).toContain('Booking.com');
+    for (const path of ['/favicon.ico', '/apple-touch-icon.png', '/og-image.png']) {
+      const response = await request.get(path);
+      expect(response.headers()['content-type'], path).toMatch(/^image\//);
+    }
+    await page.goto('/');
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      'content',
+      'https://hotel-curator.fly.dev/og-image.png',
+    );
+  });
+});
+
+test.describe('After a deploy', () => {
+  test('a page whose code is gone reloads once, then asks for a reload', async ({ page }) => {
+    await page.goto('/');
+    // The About page's chunk is missing, as when a deploy renamed it.
+    await page.route(/\/assets\/AboutPage-[^/]+\.js$/, (route) =>
+      route.fulfill({ status: 404, contentType: 'text/plain', body: 'gone' }),
+    );
+    let loads = 0;
+    page.on('load', () => (loads += 1));
+    await page
+      .getByRole('navigation', { name: 'Main' })
+      .getByRole('link', { name: 'About' })
+      .click();
+    await expect(
+      page.getByRole('heading', { name: 'This page could not be loaded' }),
+    ).toBeVisible();
+    await expect(page).toHaveURL(/\/about$/);
+    // One reload, and the guard stops a second one while the chunk stays gone.
+    await page.waitForTimeout(1500);
+    expect(loads).toBe(1);
+    await page.unroute(/\/assets\/AboutPage-[^/]+\.js$/);
+    await page.getByRole('button', { name: 'Reload the page' }).click();
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'How hotel-curator works' }),
+    ).toBeVisible();
   });
 });

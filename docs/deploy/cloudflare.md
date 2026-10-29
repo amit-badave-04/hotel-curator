@@ -135,7 +135,9 @@ requiring them (step 11).
     From now on every web deploy needs `--edge cloudflare --domain
     <domain>` (or `make fly-deploy FLY_DEPLOY_ARGS="--edge cloudflare
     --domain <domain>"`); `deploy.py` refuses a web deploy that would
-    silently go back to Fly mode.
+    silently go back to Fly mode. It also builds the web image with
+    `VITE_PUBLIC_ORIGIN=https://<domain>`, so link previews, canonical
+    links, `robots.txt` and the sitemap name the domain.
 12. **Check the result** (see [Check the result](#check-the-result)).
 
 ## Check the result
@@ -158,8 +160,10 @@ It must report no FAIL. It checks:
 - TLS 1.1 is refused (SKIP if the machine running the check cannot
   offer TLS 1.1 at all).
 
-Then update every link that still names `hotel-curator.fly.dev`, which no
-longer serves the site.
+Then update every link in the README and the docs that still names
+`hotel-curator.fly.dev`, which no longer serves the site (the site's own
+absolute URLs follow `--domain`, step 11). Check a link preview of
+`https://<domain>/` with a social network's card validator.
 
 ## Rolling back to Fly mode
 
@@ -170,9 +174,13 @@ In this order, so the site never stops answering:
    the `_acme-challenge` CNAME Fly needs for a DNS challenge; add it in
    Cloudflare as **DNS only**, and wait until both certificates are
    issued. (The proxied records cannot pass Fly's HTTP challenge.)
-2. `uv run python scripts/deploy.py deploy web --edge fly`. Cloudflare in
-   Full (strict) accepts Fly's certificate, so the site keeps answering
-   through Cloudflare. In this state nginx keys rate limits on
+2. `uv run python scripts/deploy.py deploy web --edge fly --domain <domain>`
+   (the domain keeps link previews and the sitemap on `<domain>`). The
+   domain is recorded on the web machines, so later web deploys need the
+   same two flags; without them `deploy.py` stops instead of moving the
+   site's own links back to `hotel-curator.fly.dev`.
+   Cloudflare in Full (strict) accepts Fly's certificate, so the site keeps
+   answering through Cloudflare. In this state nginx keys rate limits on
    `Fly-Client-IP`, which is now a Cloudflare address, so visitors share
    buckets; do not stay here.
 3. Set both DNS records to **DNS only** (grey cloud) so browsers reach

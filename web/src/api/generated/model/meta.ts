@@ -4,19 +4,24 @@
  * hotel-curator API 2.0.0
  */
 import type { AttributeInfo } from './attributeInfo';
+import type { DataPeriod } from './dataPeriod';
 import type { Evaluation } from './evaluation';
-import type { MetaPolicy } from './metaPolicy';
 import type { MetaTiers } from './metaTiers';
+import type { TierPolicy } from './tierPolicy';
 
 /**
  * Service metadata shown on the "About the model" page.
  */
 export interface Meta {
+  /** Whether POST /v1/analyze can answer: a model is loaded. */
+  analyze_available: boolean;
   attributes: AttributeInfo[];
+  /** None until a seed has recorded it. */
+  data_period?: DataPeriod | null;
   evaluation?: Evaluation | null;
   hotels: number;
   model: string | null;
   params_version: string;
-  policy: MetaPolicy;
+  policy: TierPolicy;
   tiers: MetaTiers;
 }

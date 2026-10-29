@@ -1,31 +1,15 @@
-import { Hotel, Moon, Sun } from 'lucide-react';
-import { useEffect, useRef } from 'react';
-import { NavLink, Outlet, ScrollRestoration, useLocation } from 'react-router';
+import { ExternalLink, Hotel } from 'lucide-react';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { NavLink, Outlet, ScrollRestoration, useLocation, useNavigation } from 'react-router';
 
 import { useGetMeta, useListCities } from '@/api/generated/endpoints';
-import { Button } from '@/components/ui/button';
-import { Tooltip } from '@/components/ui/tooltip';
+import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { compareHref, useCompare } from '@/lib/compare';
 import { formatCount } from '@/lib/domain';
-import { useTheme } from '@/lib/theme';
+import { EXPLORER_PATH } from '@/lib/filters';
+import { formatPeriod } from '@/lib/policy';
+import { ISSUES_URL, NOTICE_PATH, PUBLIC_ORIGIN, REPO_URL } from '@/lib/site';
 import { cn } from '@/lib/utils';
-
-function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
-  const next = theme === 'dark' ? 'light' : 'dark';
-  return (
-    <Tooltip content={`Use ${next} theme`}>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => setTheme(next)}
-        aria-label={`Use ${next} theme`}
-      >
-        {theme === 'dark' ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
-      </Button>
-    </Tooltip>
-  );
-}
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -37,6 +21,7 @@ function ScopeStatement() {
   const meta = useGetMeta();
   const cities = useListCities();
   const count = meta.data?.hotels;
+  const period = formatPeriod(meta.data?.data_period);
   const names = cities.data?.map((c) => c.city) ?? [];
   const cityText =
     names.length > 1
@@ -46,15 +31,45 @@ function ScopeStatement() {
         : '';
   return (
     <p>
-      Based on guest reviews from August 2015 to August 2017
+      Based on guest reviews{period ? ` from ${period}` : ''}
       {count !== undefined ? ` for ${formatCount(count)} hotels` : ''}
       {cityText}. Tiers describe what guests wrote then, not how the hotels are today.
     </p>
   );
 }
 
+/** A plain link out of the app (to a file, the API docs or GitHub). */
+function FooterLink({
+  href,
+  external = false,
+  children,
+}: {
+  href: string;
+  external?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <a href={href} className="inline-flex min-h-6 items-center gap-1 text-link underline">
+      {children}
+      {external && <ExternalLink aria-hidden="true" className="size-3.5" />}
+    </a>
+  );
+}
+
+/**
+ * The page's public address without its query string, for search engines:
+ * explorer filters and compare lists are views of the same page. React
+ * moves the link into <head>.
+ */
+function CanonicalLink({ pathname }: { pathname: string }) {
+  return <link rel="canonical" href={`${PUBLIC_ORIGIN}${pathname}`} />;
+}
+
 export function AppShell() {
   const location = useLocation();
+  const navigation = useNavigation();
+  // A page whose code is still downloading (every page but the landing page).
+  const loading = navigation.state === 'loading';
   const compare = useCompare();
   const mainRef = useRef<HTMLElement>(null);
   const firstRender = useRef(true);
@@ -71,6 +86,13 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <CanonicalLink pathname={location.pathname} />
+      {loading && (
+        <div
+          aria-hidden="true"
+          className="route-progress fixed inset-x-0 top-0 z-50 h-1 bg-primary"
+        />
+      )}
       <a
         href="#main"
         className="sr-only z-50 rounded-md bg-primary px-4 py-2 text-primary-foreground focus:not-sr-only focus:absolute focus:top-2 focus:left-2"
@@ -81,6 +103,7 @@ export function AppShell() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-2">
           <NavLink
             to="/"
+            end
             className="inline-flex min-h-10 items-center gap-2 rounded-md font-semibold text-foreground no-underline"
           >
             <Hotel aria-hidden="true" className="size-5 text-primary" />
@@ -90,7 +113,7 @@ export function AppShell() {
             <nav aria-label="Main">
               <ul className="flex flex-wrap items-center gap-1">
                 <li>
-                  <NavLink to="/" end className={navLinkClass}>
+                  <NavLink to={EXPLORER_PATH} className={navLinkClass}>
                     Explore
                   </NavLink>
                 </li>
@@ -123,20 +146,42 @@ export function AppShell() {
         id="main"
         ref={mainRef}
         tabIndex={-1}
+        aria-busy={loading || undefined}
         className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:py-8"
       >
         <Outlet />
       </main>
       <footer className="border-t bg-card">
-        <div className="mx-auto max-w-6xl space-y-1 px-4 py-4 text-sm text-muted-foreground">
-          <ScopeStatement />
-          <p>
-            Labels are machine-made and checked against people; the data licence is unconfirmed. See{' '}
-            <NavLink to="/about" className="text-link underline">
-              how this works
-            </NavLink>
-            .
-          </p>
+        <div className="mx-auto max-w-6xl space-y-3 px-4 py-5 text-sm text-muted-foreground">
+          <div className="space-y-1">
+            <ScopeStatement />
+            <p>
+              Labels are machine-made and checked against people; the data licence is unconfirmed. A
+              non-commercial demo, not affiliated with Booking.com. See{' '}
+              <NavLink to="/about" className="text-link underline">
+                how this works
+              </NavLink>
+              .
+            </p>
+          </div>
+          <ul className="flex flex-wrap gap-x-5 gap-y-1">
+            <li>
+              <FooterLink href={REPO_URL} external>
+                Source code on GitHub
+              </FooterLink>
+            </li>
+            <li>
+              <FooterLink href={NOTICE_PATH}>Data sources and attribution (NOTICE)</FooterLink>
+            </li>
+            <li>
+              <FooterLink href={ISSUES_URL} external>
+                Report a mistake or ask for a removal
+              </FooterLink>
+            </li>
+            <li>
+              <FooterLink href="/api/docs">API documentation</FooterLink>
+            </li>
+          </ul>
         </div>
       </footer>
       <ScrollRestoration />

@@ -45,7 +45,14 @@ export default defineConfig([
     },
   },
   {
-    files: ['*.config.{ts,js}', 'security-headers.ts', 'e2e/**/*.ts', 'test/**/*.ts'],
+    files: [
+      '*.config.{ts,js}',
+      'security-headers.ts',
+      'seo.ts',
+      'scripts/**/*.ts',
+      'e2e/**/*.ts',
+      'test/**/*.ts',
+    ],
     languageOptions: {
       globals: globals.node,
     },

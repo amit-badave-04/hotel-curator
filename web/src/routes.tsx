@@ -3,12 +3,12 @@ import type { RouteObject } from 'react-router';
 import { AppShell } from '@/components/layout/AppShell';
 import { RouteError } from '@/components/layout/RouteError';
 import { LoadingBlock } from '@/components/states';
-import { ExplorerPage } from '@/pages/ExplorerPage';
+import { LandingPage } from '@/pages/LandingPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
 /**
- * Routes. The explorer is in the main bundle (it is the landing page); the
- * pages with charts load on demand so the first page stays small.
+ * Routes. The landing page is in the main bundle; every other page loads on
+ * demand, so the first page a visitor sees stays small.
  */
 export const routes: RouteObject[] = [
   {
@@ -21,7 +21,11 @@ export const routes: RouteObject[] = [
       </div>
     ),
     children: [
-      { index: true, element: <ExplorerPage /> },
+      { index: true, element: <LandingPage /> },
+      {
+        path: 'explore',
+        lazy: async () => ({ Component: (await import('@/pages/ExplorerPage')).ExplorerPage }),
+      },
       {
         path: 'hotels/:hotelId',
         lazy: async () => ({ Component: (await import('@/pages/HotelPage')).HotelPage }),

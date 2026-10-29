@@ -4,6 +4,8 @@ Fly runs ``curator db release`` once per deploy (``release_command``); the
 API container runs it at start when ``CURATOR_MIGRATE_ON_START`` is true
 (docker compose). Both steps are idempotent: Alembic skips applied
 migrations and the seed skips a dataset whose SHA-256 is already loaded.
+A database migrated by a newer image (before a rollback) is left as it is,
+because migrations are additive (``hotel_curator.db.migrate``).
 On Postgres a session-level advisory lock makes concurrent releases (two
 deploys, or a deploy and a restart) run one after the other.
 """
@@ -15,7 +17,7 @@ from pathlib import Path
 
 from sqlalchemy import Engine, text
 
-from hotel_curator.db.migrate import upgrade
+from hotel_curator.db.migrate import revisions_ahead, upgrade
 from hotel_curator.db.seed import seed
 from hotel_curator.db.session import (
     make_engine,
@@ -56,6 +58,19 @@ def ensure_sqlite_dir(database_url: str) -> None:
         db_file.parent.mkdir(parents=True, exist_ok=True)
 
 
+def _migrate(engine: Engine, database_url: str) -> None:
+    """Migrate to head, unless a newer image already went further."""
+    ahead = revisions_ahead(engine, database_url)
+    if ahead:
+        logger.warning(
+            "Database is at revision %s, which this image does not know "
+            "(an older image after a newer release): schema left as it is",
+            ", ".join(ahead),
+        )
+        return
+    upgrade(database_url)
+
+
 def release(database_url: str, results: Path) -> int:
     """Migrate to head, then load ``results`` unless already loaded.
 
@@ -66,7 +81,7 @@ def release(database_url: str, results: Path) -> int:
     engine = make_engine(database_url)
     try:
         with release_lock(engine):
-            upgrade(database_url)
+            _migrate(engine, database_url)
             with session_scope(make_session_factory(engine)) as session:
                 loaded = seed(session, results)
     finally:

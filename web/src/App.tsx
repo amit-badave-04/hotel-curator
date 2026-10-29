@@ -2,7 +2,6 @@ import { CSPProvider } from '@base-ui/react/csp-provider';
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
-import { TooltipProvider } from '@/components/ui/tooltip';
 import { CompareProvider } from '@/lib/compare';
 import { ThemeProvider } from '@/lib/theme';
 
@@ -13,9 +12,7 @@ export function Providers({ client, children }: { client: QueryClient; children:
     <CSPProvider disableStyleElements>
       <QueryClientProvider client={client}>
         <ThemeProvider>
-          <CompareProvider>
-            <TooltipProvider delay={300}>{children}</TooltipProvider>
-          </CompareProvider>
+          <CompareProvider>{children}</CompareProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </CSPProvider>

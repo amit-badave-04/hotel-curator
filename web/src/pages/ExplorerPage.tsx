@@ -31,6 +31,7 @@ import {
 import {
   activeFilterCount,
   DEFAULT_FILTERS,
+  explorerHref,
   filtersToSearchParams,
   PAGE_SIZE,
   parseFilters,
@@ -366,7 +367,7 @@ export function ExplorerPage() {
   };
   const clear = () =>
     setSearchParams(filtersToSearchParams(DEFAULT_FILTERS), { preventScrollReset: true });
-  const hrefFor = (page: number) => `/?${filtersToSearchParams({ ...filters, page }).toString()}`;
+  const hrefFor = (page: number) => explorerHref({ ...filters, page });
   /**
    * For controls that vanish once used (page links, the empty state's
    * buttons): move focus to the results heading instead of losing it.

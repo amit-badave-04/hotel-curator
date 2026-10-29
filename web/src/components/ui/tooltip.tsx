@@ -1,7 +1,8 @@
 import { Tooltip as BaseTooltip } from '@base-ui/react/tooltip';
 import type { ReactElement } from 'react';
 
-export const TooltipProvider = BaseTooltip.Provider;
+/** How long the pointer rests on the trigger before the tooltip shows. */
+const OPEN_DELAY_MS = 300;
 
 interface TooltipProps {
   /** Short text; it must repeat the trigger's accessible name, never add to it. */
@@ -18,7 +19,7 @@ interface TooltipProps {
 export function Tooltip({ content, children }: TooltipProps) {
   return (
     <BaseTooltip.Root>
-      <BaseTooltip.Trigger render={children} />
+      <BaseTooltip.Trigger delay={OPEN_DELAY_MS} render={children} />
       <BaseTooltip.Portal>
         <BaseTooltip.Positioner sideOffset={6} className="z-50">
           <BaseTooltip.Popup className="rounded-md border bg-card px-2 py-1 text-xs text-card-foreground shadow-md">

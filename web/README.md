@@ -1,7 +1,8 @@
 # hotel-curator web
 
-The web frontend: an explorer, a hotel page, a compare view and an "about the
-model" page over the hotel-curator API. It is a static single-page app (React
+The web frontend: a landing page (`/`), an explorer (`/explore`), a hotel page,
+a compare view and an "about the model" page over the hotel-curator API. Old
+explorer links (`/?city=Paris`) are sent on to `/explore` with their filters. It is a static single-page app (React
 19, TypeScript, Vite, Tailwind 4, Base UI, TanStack Query, React Router,
 Recharts); the stack and its exact versions are decided in
 [ADR 009](../docs/decisions/009-frontend-stack.md) and pinned in
@@ -60,6 +61,7 @@ Set `CURATOR_API_URL` to proxy to another API address. The API docs are at
 | `npm test`                        | Unit and component tests (Vitest, Testing Library, MSW)                              |
 | `npm run test:e2e`                | Builds, then runs Playwright against the real API (see below)                        |
 | `npm run generate:api`            | Regenerates the typed client in `src/api/generated/` from `openapi.json`             |
+| `npm run images`                  | Renders `og-image.png`, `apple-touch-icon.png` and `favicon.ico` into `public/`      |
 | `npm run audit:deps`              | `npm audit`, failing on high or critical advisories (needs the registry)             |
 | `npm run check`                   | lint + typecheck + test + build                                                      |
 
@@ -71,9 +73,15 @@ by MSW handlers (`src/test/handlers.ts`) built from fixtures
 (`src/test/fixtures.ts`) that are typed with the generated OpenAPI models, so a
 fixture that no longer matches `openapi.json` fails the type check. They cover
 explorer filters and the URL, the hotel page sections, compare highlighting,
-the analyze states (200, 422, 429, 503), error states with request ids, the
-theme toggle, and that the nginx site (`nginx/site.conf`) sends the same
-security headers as `security-headers.ts`.
+the analyze states (200, 422, 429, 503, and "no model loaded" from
+`/v1/meta`), the landing page's numbers and states, old-link redirects,
+reloading once after a deploy removed a page's code, error states with
+request ids, the theme toggle, and that the nginx site (`nginx/site.conf`)
+sends the same security headers as `security-headers.ts`. Tooling tests
+check robots.txt, the sitemap and the link-preview tags (`test/seo.test.ts`),
+the image sizes and that `public/NOTICE.txt` is the repository's `NOTICE`
+(`test/public-files.test.ts`), and that policy numbers worded inline in the
+pages match `config/tier_policy.yaml` (`test/policy-wording.test.ts`).
 
 **End-to-end tests** (`e2e/`) run in Chromium against the production build
 and the real API with the synthetic dev data:
@@ -92,12 +100,14 @@ npm run test:e2e
 
 Locally, servers already running on those ports are reused; with `CI=true`
 they are always started fresh. The journeys are J1 (explorer filters to a
-hotel), J2 (hotel page shows why and evidence), J3 (compare two hotels) and J5
-(analyze returns labels, or says the model is unavailable: the dev API has no
-model package and answers 503). Every page and its interactive states are
-checked with axe (`@axe-core/playwright`) in light and dark mode; any serious
-or critical violation fails the run, and every test also fails on a page
-error or a Content-Security-Policy violation.
+hotel), J2 (hotel page shows why and evidence), J3 (compare two hotels), J5
+(analyze returns labels, or says no model is loaded: the dev API has no
+model package) and J0 (the landing page, its live numbers, old links, and
+the served robots.txt, sitemap and notice). Every page and its interactive
+states are checked with axe (`@axe-core/playwright`) in light and dark mode,
+and the main pages again at 360 and 768 px; any serious or critical
+violation fails the run, and every test also fails on a page error or a
+Content-Security-Policy violation.
 
 The seed file is the synthetic data the e2e assertions rely on (5 made-up
 hotels, 4 KB); it lives here because the repository ignores `var/`.
@@ -122,11 +132,29 @@ When the backend changes:
 
 ```sh
 cd ..                                  # repository root
-.venv/bin/python scripts/export_openapi.py   # writes web/openapi.json
+.venv/bin/python scripts/export_openapi.py   # web/openapi.json, src/lib/tier-policy.json
 cd web
 npm run generate:api
 git diff --exit-code src/api/generated # what CI checks for drift
 ```
+
+## Public address, link previews and static files
+
+`VITE_PUBLIC_ORIGIN` (default `https://hotel-curator.fly.dev`) is read at
+build time by `seo.ts`: it fills in the absolute image URLs of the link
+previews in `index.html`, each page's canonical link, `robots.txt` (crawlers
+stay off `/api/`) and `sitemap.xml` (`/`, `/explore`, `/about`). The build
+fails on anything but a bare https origin. The Docker build takes it as a
+build argument; `scripts/deploy.py` passes the Cloudflare domain in
+Cloudflare mode.
+
+`public/` holds the favicon (SVG and ICO), the touch icon, the link-preview
+image and `NOTICE.txt`. The images are rendered from `public/favicon.svg` and
+`scripts/og-image.html` by `npm run images` and committed, so builds need no
+browser; the preview image shows no numbers, so it never goes stale.
+`NOTICE.txt` is a copy of the repository's `NOTICE` (the image's build
+context is `web/`); after changing `NOTICE`, run
+`cp NOTICE web/public/NOTICE.txt`, which a test checks.
 
 ## Docker
 
@@ -166,11 +194,14 @@ src/
   components/   badges, interval chart, states, layout/ (shell, route error)
     ui/         shadcn-style components on Base UI: button, card, badge,
                 table, select (native), tabs, tooltip, skeleton, checkbox, input
-  lib/          wording for tiers and grades, URL filters, compare list, theme
-  pages/        Explorer, Hotel, Compare, About, NotFound (+ tests)
+  lib/          wording for tiers and grades, URL filters, compare list, theme,
+                default tier policy (generated), site links, stale-chunk reload
+  pages/        Landing, Explorer, Hotel, Compare, About, NotFound (+ tests)
   test/         fixtures, MSW handlers, render helper, setup
 e2e/            Playwright journeys and axe checks
-test/           tooling tests (nginx headers)
+scripts/        image renderer and the link-preview image's source
+test/           tooling tests (nginx headers, SEO files, public files,
+                policy wording)
 ```
 
 ## Design and accessibility

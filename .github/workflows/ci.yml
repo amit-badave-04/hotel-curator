@@ -44,10 +44,10 @@ jobs:
         run: uv run mypy
       - name: Tests with coverage (fails under 80%)
         run: uv run pytest --cov --cov-report=term-missing --cov-fail-under=80
-      - name: Generated OpenAPI schema is up to date
+      - name: Generated OpenAPI schema and default policy are up to date
         run: |
           uv run python scripts/export_openapi.py
-          git diff --exit-code web/openapi.json
+          git diff --exit-code web/openapi.json web/src/lib/tier-policy.json
 
   web:
     runs-on: ubuntu-latest

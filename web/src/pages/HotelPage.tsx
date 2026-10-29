@@ -60,6 +60,7 @@ import {
   TIER_INFO,
   TREND_INFO,
 } from '@/lib/domain';
+import { EXPLORER_PATH } from '@/lib/filters';
 
 function measureName(attribute: AttributeOut): string {
   return attribute.family === 'must_be' ? 'complaint rate' : 'share of praise';
@@ -444,7 +445,7 @@ function HotelView({ hotel }: { hotel: HotelDetail }) {
       <nav aria-label="Breadcrumb" className="text-sm">
         <ol className="flex flex-wrap items-center gap-1 text-muted-foreground">
           <li>
-            <Link to="/">Explore</Link>
+            <Link to={EXPLORER_PATH}>Explore</Link>
           </li>
           <li aria-hidden="true">/</li>
           <li aria-current="page" className="text-foreground">
@@ -671,7 +672,7 @@ function NotFound({ error }: { error?: ApiError }) {
           Request id: <code className="font-mono">{error.requestId}</code>
         </p>
       )}
-      <Link to="/">Back to the explorer</Link>
+      <Link to={EXPLORER_PATH}>Back to the explorer</Link>
     </div>
   );
 }

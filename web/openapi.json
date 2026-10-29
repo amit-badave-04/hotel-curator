@@ -321,6 +321,29 @@
     "title": "City",
     "type": "object"
    },
+   "ComparePolicy": {
+    "additionalProperties": false,
+    "description": "Credible-difference rule for hotel comparisons.",
+    "properties": {
+     "draws": {
+      "minimum": 100.0,
+      "title": "Draws",
+      "type": "integer"
+     },
+     "probability": {
+      "exclusiveMaximum": 1.0,
+      "exclusiveMinimum": 0.5,
+      "title": "Probability",
+      "type": "number"
+     }
+    },
+    "required": [
+     "probability",
+     "draws"
+    ],
+    "title": "ComparePolicy",
+    "type": "object"
+   },
    "CompareRow": {
     "description": "One attribute across the compared hotels.",
     "properties": {
@@ -430,6 +453,33 @@
     "title": "Comparison",
     "type": "object"
    },
+   "DataPeriod": {
+    "description": "First and last month of the usable reviews behind the tiers.",
+    "properties": {
+     "first_month": {
+      "examples": [
+       "2015-08"
+      ],
+      "pattern": "^\\d{4}-\\d{2}$",
+      "title": "First Month",
+      "type": "string"
+     },
+     "last_month": {
+      "examples": [
+       "2017-08"
+      ],
+      "pattern": "^\\d{4}-\\d{2}$",
+      "title": "Last Month",
+      "type": "string"
+     }
+    },
+    "required": [
+     "first_month",
+     "last_month"
+    ],
+    "title": "DataPeriod",
+    "type": "object"
+   },
    "ErrorBody": {
     "description": "Machine-readable code, human message, request id for support.",
     "properties": {
@@ -512,6 +562,30 @@
       "title": "Rungs",
       "type": "array"
      },
+     "test_hotels": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Hotels those test reviews come from.",
+      "title": "Test Hotels"
+     },
+     "test_reviews": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Held-out test reviews behind the scores.",
+      "title": "Test Reviews"
+     },
      "v1_configuration": {
       "title": "V1 Configuration",
       "type": "string"
@@ -530,6 +604,29 @@
      "rungs"
     ],
     "title": "Evaluation",
+    "type": "object"
+   },
+   "ExcellentGate": {
+    "additionalProperties": false,
+    "description": "Review-spread conditions for the top tier.",
+    "properties": {
+     "max_month_share": {
+      "exclusiveMinimum": 0.0,
+      "maximum": 1.0,
+      "title": "Max Month Share",
+      "type": "number"
+     },
+     "min_months": {
+      "minimum": 1.0,
+      "title": "Min Months",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "min_months",
+     "max_month_share"
+    ],
+    "title": "ExcellentGate",
     "type": "object"
    },
    "ExplanationOut": {
@@ -1050,15 +1147,55 @@
     "title": "Lean",
     "type": "string"
    },
+   "Lines": {
+    "additionalProperties": false,
+    "description": "Strong and Weak lines for one attribute family.",
+    "properties": {
+     "strong": {
+      "exclusiveMaximum": 1.0,
+      "exclusiveMinimum": 0.0,
+      "title": "Strong",
+      "type": "number"
+     },
+     "weak": {
+      "exclusiveMaximum": 1.0,
+      "exclusiveMinimum": 0.0,
+      "title": "Weak",
+      "type": "number"
+     }
+    },
+    "required": [
+     "strong",
+     "weak"
+    ],
+    "title": "Lines",
+    "type": "object"
+   },
    "Meta": {
     "description": "Service metadata shown on the \"About the model\" page.",
     "properties": {
+     "analyze_available": {
+      "description": "Whether POST /v1/analyze can answer: a model is loaded.",
+      "title": "Analyze Available",
+      "type": "boolean"
+     },
      "attributes": {
       "items": {
        "$ref": "#/components/schemas/AttributeInfo"
       },
       "title": "Attributes",
       "type": "array"
+     },
+     "data_period": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/DataPeriod"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "None until a seed has recorded it."
      },
      "evaluation": {
       "anyOf": [
@@ -1090,9 +1227,7 @@
       "type": "string"
      },
      "policy": {
-      "additionalProperties": true,
-      "title": "Policy",
-      "type": "object"
+      "$ref": "#/components/schemas/TierPolicy"
      },
      "tiers": {
       "additionalProperties": {
@@ -1108,7 +1243,8 @@
      "hotels",
      "tiers",
      "attributes",
-     "policy"
+     "policy",
+     "analyze_available"
     ],
     "title": "Meta",
     "type": "object"
@@ -1173,6 +1309,28 @@
     ],
     "title": "Polarity",
     "type": "string"
+   },
+   "Prior": {
+    "additionalProperties": false,
+    "description": "Beta prior shared by every attribute.",
+    "properties": {
+     "alpha": {
+      "exclusiveMinimum": 0.0,
+      "title": "Alpha",
+      "type": "number"
+     },
+     "beta": {
+      "exclusiveMinimum": 0.0,
+      "title": "Beta",
+      "type": "number"
+     }
+    },
+    "required": [
+     "alpha",
+     "beta"
+    ],
+    "title": "Prior",
+    "type": "object"
    },
    "ProvenanceOut": {
     "additionalProperties": false,
@@ -1276,6 +1434,48 @@
     "title": "QuoteOut",
     "type": "object"
    },
+   "QuotePolicy": {
+    "additionalProperties": false,
+    "description": "When a review part may be quoted as evidence.",
+    "properties": {
+     "counter": {
+      "minimum": 0.0,
+      "title": "Counter",
+      "type": "integer"
+     },
+     "max_chars": {
+      "minimum": 40.0,
+      "title": "Max Chars",
+      "type": "integer"
+     },
+     "min_probability": {
+      "exclusiveMaximum": 1.0,
+      "exclusiveMinimum": 0.0,
+      "title": "Min Probability",
+      "type": "number"
+     },
+     "min_probability_negative": {
+      "exclusiveMaximum": 1.0,
+      "exclusiveMinimum": 0.0,
+      "title": "Min Probability Negative",
+      "type": "number"
+     },
+     "supporting": {
+      "minimum": 0.0,
+      "title": "Supporting",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "min_probability",
+     "min_probability_negative",
+     "max_chars",
+     "supporting",
+     "counter"
+    ],
+    "title": "QuotePolicy",
+    "type": "object"
+   },
    "SegmentOut": {
     "additionalProperties": false,
     "description": "A credible difference between one kind of guest and the others.",
@@ -1357,6 +1557,130 @@
     "title": "Tier",
     "type": "string"
    },
+   "TierPolicy": {
+    "additionalProperties": false,
+    "description": "All tier parameters (ADR 006, section 6).",
+    "properties": {
+     "compare": {
+      "$ref": "#/components/schemas/ComparePolicy"
+     },
+     "complaining_review_probability": {
+      "exclusiveMaximum": 1.0,
+      "exclusiveMinimum": 0.0,
+      "title": "Complaining Review Probability",
+      "type": "number"
+     },
+     "confirmation": {
+      "exclusiveMaximum": 1.0,
+      "exclusiveMinimum": 0.5,
+      "title": "Confirmation",
+      "type": "number"
+     },
+     "essentials": {
+      "items": {
+       "$ref": "#/components/schemas/Attribute"
+      },
+      "title": "Essentials",
+      "type": "array"
+     },
+     "excellent": {
+      "$ref": "#/components/schemas/ExcellentGate"
+     },
+     "hard_label_probability": {
+      "exclusiveMaximum": 1.0,
+      "exclusiveMinimum": 0.0,
+      "title": "Hard Label Probability",
+      "type": "number"
+     },
+     "interval_level": {
+      "exclusiveMaximum": 1.0,
+      "exclusiveMinimum": 0.0,
+      "title": "Interval Level",
+      "type": "number"
+     },
+     "materiality": {
+      "exclusiveMaximum": 1.0,
+      "exclusiveMinimum": 0.0,
+      "title": "Materiality",
+      "type": "number"
+     },
+     "min_complaining_reviews": {
+      "minimum": 1.0,
+      "title": "Min Complaining Reviews",
+      "type": "integer"
+     },
+     "min_opinions": {
+      "minimum": 1.0,
+      "title": "Min Opinions",
+      "type": "integer"
+     },
+     "min_reviews": {
+      "minimum": 1.0,
+      "title": "Min Reviews",
+      "type": "integer"
+     },
+     "must_be": {
+      "items": {
+       "$ref": "#/components/schemas/Attribute"
+      },
+      "title": "Must Be",
+      "type": "array"
+     },
+     "must_be_lines": {
+      "$ref": "#/components/schemas/Lines"
+     },
+     "near_duplicate_min_words": {
+      "minimum": 1.0,
+      "title": "Near Duplicate Min Words",
+      "type": "integer"
+     },
+     "params_version": {
+      "minLength": 1,
+      "title": "Params Version",
+      "type": "string"
+     },
+     "prior": {
+      "$ref": "#/components/schemas/Prior"
+     },
+     "quotes": {
+      "$ref": "#/components/schemas/QuotePolicy"
+     },
+     "seed": {
+      "title": "Seed",
+      "type": "integer"
+     },
+     "trends": {
+      "$ref": "#/components/schemas/TrendPolicy"
+     },
+     "two_sided": {
+      "$ref": "#/components/schemas/Lines"
+     }
+    },
+    "required": [
+     "params_version",
+     "prior",
+     "confirmation",
+     "interval_level",
+     "essentials",
+     "must_be",
+     "two_sided",
+     "must_be_lines",
+     "min_opinions",
+     "min_reviews",
+     "min_complaining_reviews",
+     "complaining_review_probability",
+     "hard_label_probability",
+     "materiality",
+     "excellent",
+     "quotes",
+     "trends",
+     "compare",
+     "near_duplicate_min_words",
+     "seed"
+    ],
+    "title": "TierPolicy",
+    "type": "object"
+   },
    "TrendOut": {
     "additionalProperties": false,
     "description": "Last 6 months of data versus the 18 months before.",
@@ -1403,6 +1727,61 @@
      "prob_declined"
     ],
     "title": "TrendOut",
+    "type": "object"
+   },
+   "TrendPolicy": {
+    "additionalProperties": false,
+    "description": "Recent-versus-baseline comparison windows.",
+    "properties": {
+     "baseline_months": {
+      "minimum": 1.0,
+      "title": "Baseline Months",
+      "type": "integer"
+     },
+     "draws": {
+      "minimum": 100.0,
+      "title": "Draws",
+      "type": "integer"
+     },
+     "min_opinions": {
+      "minimum": 1.0,
+      "title": "Min Opinions",
+      "type": "integer"
+     },
+     "must_be_shift": {
+      "exclusiveMaximum": 1.0,
+      "exclusiveMinimum": 0.0,
+      "title": "Must Be Shift",
+      "type": "number"
+     },
+     "probability": {
+      "exclusiveMaximum": 1.0,
+      "exclusiveMinimum": 0.5,
+      "title": "Probability",
+      "type": "number"
+     },
+     "recent_months": {
+      "minimum": 1.0,
+      "title": "Recent Months",
+      "type": "integer"
+     },
+     "two_sided_shift": {
+      "exclusiveMaximum": 1.0,
+      "exclusiveMinimum": 0.0,
+      "title": "Two Sided Shift",
+      "type": "number"
+     }
+    },
+    "required": [
+     "recent_months",
+     "baseline_months",
+     "min_opinions",
+     "two_sided_shift",
+     "must_be_shift",
+     "probability",
+     "draws"
+    ],
+    "title": "TrendPolicy",
     "type": "object"
    },
    "TrendState": {

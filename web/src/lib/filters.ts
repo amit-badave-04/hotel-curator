@@ -108,3 +108,27 @@ export function activeFilterCount(filters: ExplorerFilters): number {
     filters.avoidWeak.length
   );
 }
+
+/** The explorer's address; `/` is the landing page. */
+export const EXPLORER_PATH = '/explore';
+
+const EXPLORER_KEYS = ['q', 'city', 'tier', 'strong', 'avoid_weak', 'sort', 'page'] as const;
+
+/** An explorer link: the filters as a query string on the explorer's path. */
+export function explorerHref(filters: ExplorerFilters): string {
+  const query = filtersToSearchParams(filters).toString();
+  return query ? `${EXPLORER_PATH}?${query}` : EXPLORER_PATH;
+}
+
+/**
+ * Where an old explorer link (from when the explorer was at `/`) should go:
+ * `/?city=Paris` becomes `/explore?city=Paris`. The filters are parsed and
+ * written back, so only valid values travel. `null` when the query names
+ * no explorer filter, so `/` and links like `/?utm_source=x` stay on the
+ * landing page.
+ */
+export function legacyExplorerTarget(search: string): string | null {
+  const params = new URLSearchParams(search);
+  if (!EXPLORER_KEYS.some((key) => params.has(key))) return null;
+  return explorerHref(parseFilters(params));
+}

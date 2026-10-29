@@ -11,10 +11,11 @@ function region(name: string): HTMLElement {
   return screen.getByRole('region', { name });
 }
 
+/** The About page once /v1/meta has answered (the tier counts need it). */
 async function openAbout() {
   const app = renderApp('/about');
   await screen.findByRole('heading', { level: 1, name: 'How hotel-curator works' });
-  await screen.findByRole('region', { name: 'How tiers work' });
+  await screen.findByRole('table', { name: 'Hotels per tier in the data loaded now.' });
   return app;
 }
 
@@ -38,7 +39,7 @@ describe('About page', () => {
     expect(tiers).toHaveTextContent('near-duplicates');
     const limits = region('Limits and caveats');
     expect(limits).toHaveTextContent('Machine-made labels');
-    expect(limits).toHaveTextContent('August 2015 to August 2017');
+    expect(limits).toHaveTextContent('Reviews are from September 2015 to August 2017.');
     expect(limits).toHaveTextContent('Licence unconfirmed');
     expect(
       within(region('For developers')).getByRole('link', { name: /API documentation/ }),
@@ -70,23 +71,48 @@ describe('About page', () => {
       min_opinions: 12,
       materiality: 0.04,
       two_sided: { strong: 0.75, weak: 0.5 },
+      hard_label_probability: 0.6,
       must_be_lines: { strong: 0.04, weak: 0.1 },
       excellent: { min_months: 8, max_month_share: 0.2 },
     };
     server.use(http.get('*/api/v1/meta', () => HttpResponse.json(live)));
     await openAbout();
     const tiers = region('How tiers work');
-    expect(tiers).toHaveTextContent('Fewer than 40 usable reviews.');
+    await waitFor(() => expect(tiers).toHaveTextContent('Fewer than 40 usable reviews.'));
     expect(tiers).toHaveTextContent('Fewer than 12 opinions on an essential.');
     expect(tiers).toHaveTextContent(
       'at least 8 different months with no month holding more than 20% of them',
     );
     expect(tiers).toHaveTextContent('raised by at least 4% of guests');
+    expect(tiers).toHaveTextContent('when the model gives it 60% or more');
     const grades = region('What the grades mean');
     expect(grades).toHaveTextContent('At least 75% praise (about 3 praises per complaint)');
     expect(grades).toHaveTextContent('At most 4% complained (1 guest in 25)');
     expect(grades).toHaveTextContent('Fewer than 12 opinions');
     expect(grades).toHaveTextContent('Fewer than 40 reviews');
+  });
+
+  it('shows the rules before /v1/meta answers, so #tiers and #grades exist', async () => {
+    let answer: (() => void) | undefined;
+    server.use(
+      http.get('*/api/v1/meta', async () => {
+        await new Promise<void>((resolve) => (answer = resolve));
+        return HttpResponse.json(meta());
+      }),
+    );
+    renderApp('/about#tiers');
+    expect(await screen.findByRole('region', { name: 'How tiers work' })).toHaveAttribute(
+      'aria-labelledby',
+      'tiers',
+    );
+    expect(document.getElementById('grades')).not.toBeNull();
+    expect(screen.getByText('Loading the tier counts')).toBeInTheDocument();
+    await waitFor(() => expect(answer).toBeDefined());
+    answer?.();
+    expect(
+      await screen.findByRole('table', { name: 'Hotels per tier in the data loaded now.' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Loading the tier counts')).toBeNull();
   });
 
   it('says when no evaluation is available', async () => {
@@ -104,6 +130,9 @@ describe('About page', () => {
     expect(evaluation).toHaveTextContent('+0.108');
     expect(evaluation).toHaveTextContent('credibly better than v1');
     expect(evaluation).toHaveTextContent('0.031');
+    expect(evaluation).toHaveTextContent(
+      'on the held-out test reviews (1,200 from 182 hotels); intervals come from a bootstrap',
+    );
     const table = within(evaluation).getByRole('table');
     expect(within(table).getAllByRole('row')).toHaveLength(4);
     expect(within(table).getByRole('rowheader', { name: 'encoder-small (served)' })).toBeVisible();
@@ -169,13 +198,23 @@ describe('Try the model', () => {
     expect(panel).toHaveTextContent('Model: test-model');
   });
 
-  it('explains that the model is unavailable on 503', async () => {
+  it('says no model is loaded on 503', async () => {
     const { panel } = await submit('Nice staff');
     const alert = await within(panel).findByRole('alert');
-    expect(alert).toHaveTextContent('The model is not available right now');
+    expect(alert).toHaveTextContent('No model loaded');
     expect(alert).toHaveTextContent('The model is not loaded.');
     expect(alert).toHaveTextContent('Search, hotel pages and compare still work');
     expect(alert).toHaveTextContent('req-503-test');
+  });
+
+  it('says no model is loaded, without a form, when /v1/meta says so', async () => {
+    server.use(http.get('*/api/v1/meta', () => HttpResponse.json(meta(null, false))));
+    await openAbout();
+    const panel = region('Try the model');
+    expect(await within(panel).findByText('No model loaded')).toBeInTheDocument();
+    expect(panel).toHaveTextContent('Search, hotel pages and compare still work');
+    expect(within(panel).queryByRole('button', { name: 'Analyse review' })).toBeNull();
+    expect(within(panel).queryByRole('alert')).toBeNull();
   });
 
   it('shows the wait time on 429', async () => {

@@ -533,7 +533,8 @@ def test_cloudflare_mode_deploys_the_cloudflare_config_for_one_domain(
     line = capsys.readouterr().out.strip()
     root = deploy_cli.ROOT
     assert f"--config {root / 'web/fly.cloudflare.toml'} " in line
-    assert line.endswith("--env 'CURATOR_SERVER_NAMES=a.example www.a.example'")
+    assert " --env 'CURATOR_SERVER_NAMES=a.example www.a.example' " in line
+    assert line.endswith("--build-arg VITE_PUBLIC_ORIGIN=https://a.example")
     for bad in (["--domain", "A.example"], ["--domain", "a.example; rm"]):
         with pytest.raises(SystemExit):
             deploy_cli.main([*args[:4], *bad, "--dry-run"])
@@ -561,6 +562,59 @@ def _deployed_configs(fake: FakeFly) -> list[str]:
         cmd[cmd.index("--config") + 1]
         for cmd in fake.commands
         if cmd[0] == "deploy"
+    ]
+
+
+def test_a_rollback_to_fly_mode_keeps_the_domain_in_the_build(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    args = ["deploy", "web", "--edge", "fly", "--domain", "a.example"]
+    assert deploy_cli.main([*args, "--dry-run"]) == 0
+    line = capsys.readouterr().out.strip()
+    assert f"--config {deploy_cli.ROOT / 'web/fly.toml'} " in line
+    assert "CURATOR_SERVER_NAMES" not in line
+    assert " --env CURATOR_PUBLIC_HOST=a.example " in line
+    assert line.endswith("--build-arg VITE_PUBLIC_ORIGIN=https://a.example")
+
+
+def test_a_redeploy_after_a_rollback_keeps_the_domain_unless_told() -> None:
+    fake = FakeFly(
+        {
+            "machine list --app hotel-curator": [
+                {
+                    "config": {
+                        "env": {
+                            "CURATOR_EDGE": "fly",
+                            "CURATOR_PUBLIC_HOST": "a.example",
+                        }
+                    }
+                }
+            ]
+        }
+    )
+    fly = deploy_cli.Fly("flyctl", dry_run=False, runner=fake)
+    with pytest.raises(SystemExit, match=r"published at a\.example"):
+        deploy_cli.deploy_apps(fly, ["web"], None, None)
+    assert fake.commands == []
+    deploy_cli.deploy_apps(fly, ["web"], "fly", "a.example")
+    deploy_cli.deploy_apps(fly, ["web"], "fly", None)  # back to fly.dev
+    # Machines that record their own fly.dev name deploy without flags.
+    fake.listings["machine list --app hotel-curator"] = [
+        {
+            "config": {
+                "env": {
+                    "CURATOR_EDGE": "fly",
+                    "CURATOR_PUBLIC_HOST": "hotel-curator.fly.dev",
+                }
+            }
+        }
+    ]
+    deploy_cli.deploy_apps(fly, ["web"], None, None)
+    origins = [c[c.index("--build-arg") + 1] for c in fake.commands]
+    assert origins == [
+        "VITE_PUBLIC_ORIGIN=https://a.example",
+        "VITE_PUBLIC_ORIGIN=https://hotel-curator.fly.dev",
+        "VITE_PUBLIC_ORIGIN=https://hotel-curator.fly.dev",
     ]
 
 
@@ -593,6 +647,11 @@ def test_fly_mode_and_new_apps_deploy_without_flags() -> None:
         assert _deployed_configs(fake) == [
             str(deploy_cli.ROOT / "web/fly.toml")
         ]
+        command = fake.commands[-1]
+        build_arg = command[command.index("--build-arg") + 1]
+        assert build_arg == "VITE_PUBLIC_ORIGIN=https://hotel-curator.fly.dev"
+        env = command[command.index("--env") + 1]
+        assert env == "CURATOR_PUBLIC_HOST=hotel-curator.fly.dev"
 
 
 def test_a_refusal_comes_before_any_deploy(tmp_path: Path) -> None:
@@ -626,7 +685,7 @@ def test_a_failing_flyctl_listing_stops_without_a_traceback() -> None:
 
     fly = deploy_cli.Fly("flyctl", dry_run=False, runner=failing)
     with pytest.raises(SystemExit, match="machine list --app hotel-curator"):
-        deploy_cli.web_edge_now(fly)
+        deploy_cli.web_now(fly)
 
 
 def test_machines_that_disagree_stop_the_deploy() -> None:

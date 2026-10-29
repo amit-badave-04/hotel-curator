@@ -5,12 +5,13 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from hotel_curator.api.deps import SessionDep, StateDep
 from hotel_curator.db.models import DatasetInfo, Hotel
 from hotel_curator.scoring.grades import family_of
+from hotel_curator.scoring.policy import TierPolicy
 from hotel_curator.taxonomy import ATTRIBUTE_INFO, Attribute
 
 router = APIRouter(prefix="/v1", tags=["meta"])
@@ -48,6 +49,22 @@ class Evaluation(BaseModel):
     difference: Interval
     mean_review_ece: float
     rungs: list[dict[str, Any]]
+    test_reviews: int | None = Field(
+        default=None, description="Held-out test reviews behind the scores."
+    )
+    test_hotels: int | None = Field(
+        default=None, description="Hotels those test reviews come from."
+    )
+
+
+MONTH_PATTERN = r"^\d{4}-\d{2}$"
+
+
+class DataPeriod(BaseModel):
+    """First and last month of the usable reviews behind the tiers."""
+
+    first_month: str = Field(pattern=MONTH_PATTERN, examples=["2015-08"])
+    last_month: str = Field(pattern=MONTH_PATTERN, examples=["2017-08"])
 
 
 class Meta(BaseModel):
@@ -58,8 +75,14 @@ class Meta(BaseModel):
     hotels: int
     tiers: dict[str, int]
     attributes: list[AttributeInfo]
-    policy: dict[str, object]
+    policy: TierPolicy
     evaluation: Evaluation | None = None
+    data_period: DataPeriod | None = Field(
+        default=None, description="None until a seed has recorded it."
+    )
+    analyze_available: bool = Field(
+        description="Whether POST /v1/analyze can answer: a model is loaded."
+    )
 
 
 def _interval(values: dict[str, Any]) -> Interval:
@@ -119,6 +142,8 @@ def load_evaluation(evals_dir: Path, served: str | None) -> Evaluation | None:
         v1_macro_f1=_rung_ci(rows[v1]),
         difference=difference,
         mean_review_ece=ece,
+        test_reviews=decision.get("test_reviews"),
+        test_hotels=decision.get("test_hotels"),
         rungs=[
             {
                 "name": r["name"],
@@ -159,8 +184,17 @@ def meta(session: SessionDep, state: StateDep) -> Meta:
             )
             for a in Attribute
         ],
-        policy=policy.model_dump(mode="json"),
+        policy=policy,
         evaluation=load_evaluation(
             state.settings.artifacts_dir / "evals", info.model if info else None
         ),
+        data_period=_period(info),
+        # Loaded (or found missing) at startup, so this never loads a model.
+        analyze_available=state.model() is not None,
     )
+
+
+def _period(info: DatasetInfo | None) -> DataPeriod | None:
+    if info is None or info.first_month is None or info.last_month is None:
+        return None
+    return DataPeriod(first_month=info.first_month, last_month=info.last_month)

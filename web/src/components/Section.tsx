@@ -8,13 +8,19 @@ interface SectionProps {
   title: ReactNode;
   children: ReactNode;
   className?: string;
+  /** The heading can take focus from script (for links that jump here). */
+  focusable?: boolean;
 }
 
 /** A page section labelled by its own h2, so it is listed as a region. */
-export function Section({ id, title, children, className }: SectionProps) {
+export function Section({ id, title, children, className, focusable = false }: SectionProps) {
   return (
     <section aria-labelledby={id} className={cn('space-y-3', className)}>
-      <h2 id={id} className="text-xl font-semibold tracking-tight">
+      <h2
+        id={id}
+        tabIndex={focusable ? -1 : undefined}
+        className="text-xl font-semibold tracking-tight"
+      >
         {title}
       </h2>
       {children}

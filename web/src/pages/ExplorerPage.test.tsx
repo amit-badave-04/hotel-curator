@@ -13,7 +13,7 @@ function card(name: string): HTMLElement {
 
 describe('Explorer page', () => {
   it('shows each hotel with tier label, essentials, catches, review count and a why line', async () => {
-    renderApp('/');
+    renderApp('/explore');
     expect(await screen.findByRole('heading', { level: 1, name: 'Explore hotels' })).toBeVisible();
     expect(document.title).toBe('Explore hotels | hotel-curator');
     await screen.findByRole('article', { name: 'Charlie House' });
@@ -41,7 +41,7 @@ describe('Explorer page', () => {
   });
 
   it('reads the two "not enough" tiers as not enough evidence, not as bad', async () => {
-    renderApp('/');
+    renderApp('/explore');
     const delta = await screen.findByRole('article', { name: 'Delta Rooms' });
     expect(within(delta).getByText('Not enough evidence to judge')).toBeInTheDocument();
     expect(within(delta).queryByText('Caution')).not.toBeInTheDocument();
@@ -51,7 +51,7 @@ describe('Explorer page', () => {
   });
 
   it('puts every filter in the URL query string', async () => {
-    const { user, search } = renderApp('/');
+    const { user, search } = renderApp('/explore');
     await screen.findByRole('article', { name: 'Alpha Grand' });
 
     await user.selectOptions(screen.getByLabelText('City'), 'Paris');
@@ -81,7 +81,7 @@ describe('Explorer page', () => {
   });
 
   it('maps "Not enough evidence to judge" to both underlying tiers', async () => {
-    const { user, search } = renderApp('/');
+    const { user, search } = renderApp('/explore');
     await screen.findByRole('article', { name: 'Alpha Grand' });
     await user.click(screen.getByRole('checkbox', { name: 'Not enough evidence to judge' }));
     await waitFor(() =>
@@ -95,7 +95,7 @@ describe('Explorer page', () => {
   });
 
   it('checks "Not enough evidence to judge" for a URL with only one of its tiers', async () => {
-    renderApp('/?tier=not_enough_reviews');
+    renderApp('/explore?tier=not_enough_reviews');
     await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(2));
     expect(screen.getByRole('article', { name: 'Echo Stay' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Not enough evidence to judge' })).toBeChecked();
@@ -105,7 +105,7 @@ describe('Explorer page', () => {
   });
 
   it('reads filters from the URL, ignoring invalid values', async () => {
-    renderApp('/?city=London&tier=good&tier=bogus&strong=nope&page=-3');
+    renderApp('/explore?city=London&tier=good&tier=bogus&strong=nope&page=-3');
     await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(1));
     expect(screen.getByRole('article', { name: 'Charlie House' })).toBeInTheDocument();
     expect(screen.getByLabelText('City')).toHaveValue('London');
@@ -113,7 +113,7 @@ describe('Explorer page', () => {
   });
 
   it('shows an empty state with a way out', async () => {
-    const { user, search } = renderApp('/?q=nothing-like-this');
+    const { user, search } = renderApp('/explore?q=nothing-like-this');
     expect(await screen.findByText('No hotels match these filters')).toBeInTheDocument();
     const emptyClear = screen.getAllByRole('button', { name: 'Clear filters' });
     await user.click(emptyClear[emptyClear.length - 1]!);
@@ -124,7 +124,7 @@ describe('Explorer page', () => {
   });
 
   it("keeps the form's Clear filters button focusable once the filters are cleared", async () => {
-    const { user, search } = renderApp('/?city=Paris');
+    const { user, search } = renderApp('/explore?city=Paris');
     await screen.findByRole('article', { name: 'Alpha Grand' });
     const clear = within(screen.getByRole('search', { name: 'Filter hotels' })).getByRole(
       'button',
@@ -137,7 +137,7 @@ describe('Explorer page', () => {
   });
 
   it('names noise and wifi as strengths without reading as "noisy"', async () => {
-    const { user, search } = renderApp('/');
+    const { user, search } = renderApp('/explore');
     const alpha = await screen.findByRole('article', { name: 'Alpha Grand' });
     expect(alpha).toHaveTextContent(
       'Also strong: location, quiet (few noise complaints), wifi (few complaints) and value',
@@ -164,7 +164,7 @@ describe('Explorer page', () => {
         ),
       ),
     );
-    renderApp('/');
+    renderApp('/explore');
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('The hotel list could not be loaded');
     expect(alert).toHaveTextContent('Too many requests; try again later.');
@@ -185,16 +185,16 @@ describe('Explorer page', () => {
         });
       }),
     );
-    renderApp('/?page=2&city=Paris');
+    renderApp('/explore?page=2&city=Paris');
     const nav = await screen.findByRole('navigation', { name: 'Pagination' });
     expect(nav).toHaveTextContent('Page 2 of 75');
     expect(within(nav).getByRole('link', { name: /Next/ })).toHaveAttribute(
       'href',
-      '/?city=Paris&page=3',
+      '/explore?city=Paris&page=3',
     );
     expect(within(nav).getByRole('link', { name: /Previous/ })).toHaveAttribute(
       'href',
-      '/?city=Paris',
+      '/explore?city=Paris',
     );
   });
 
@@ -205,7 +205,7 @@ describe('Explorer page', () => {
         return HttpResponse.json({ items: [summary(alpha)], total: 40, page, page_size: 20 });
       }),
     );
-    const { user, search } = renderApp('/?page=1');
+    const { user, search } = renderApp('/explore?page=1');
     const nav = await screen.findByRole('navigation', { name: 'Pagination' });
     // On the last page "Next" is no longer a link; focus must not be lost with it.
     await user.click(within(nav).getByRole('link', { name: /Next/ }));
@@ -214,7 +214,7 @@ describe('Explorer page', () => {
   });
 
   it('adds hotels to the compare list', async () => {
-    const { user } = renderApp('/');
+    const { user } = renderApp('/explore');
     const alpha = await screen.findByRole('article', { name: 'Alpha Grand' });
     await user.click(within(alpha).getByRole('button', { name: /Add to compare/ }));
     expect(within(alpha).getByRole('button', { name: /Remove from compare/ })).toBeInTheDocument();

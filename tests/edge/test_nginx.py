@@ -193,6 +193,7 @@ def _web_root(tmp_path: Path) -> Path:
     (root / "assets").mkdir(parents=True, exist_ok=True)
     (root / "index.html").write_text("<!doctype html><title>t</title>")
     (root / ASSET.lstrip("/")).write_text("console.log(1);")
+    (root / "og-image.png").write_bytes(b"\x89PNG\r\n\x1a\n")
     return root
 
 
@@ -580,6 +581,11 @@ def test_only_found_assets_are_cached_for_a_year(start: object) -> None:
     assert get(edge.http_port, "/explore").header("cache-control") == [
         "no-cache"
     ]
+    preview = get(edge.http_port, "/og-image.png")
+    assert preview.status == 200
+    assert preview.header("cache-control") == ["public, max-age=86400"]
+    lookalike = get(edge.http_port, "/og-image.png.html")
+    assert lookalike.header("cache-control") == ["no-cache"]
     for ranged in ("bytes=0-3", "bytes=9000-"):
         whole = get(edge.http_port, ASSET, {"Range": ranged})
         assert whole.status == 200

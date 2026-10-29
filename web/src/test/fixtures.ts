@@ -21,6 +21,8 @@ import type {
   TrendOut,
 } from '@/api/generated/model';
 
+import { DEFAULT_POLICY } from '@/lib/policy';
+
 const NAMES: Record<Attribute, string> = {
   cleanliness: 'Cleanliness',
   room: 'Room',
@@ -533,6 +535,8 @@ export const EVALUATION: Evaluation = {
   v1_macro_f1: { point: 0.604, low: 0.571, high: 0.636 },
   difference: { point: 0.108, low: 0.079, high: 0.137 },
   mean_review_ece: 0.031,
+  test_reviews: 1200,
+  test_hotels: 182,
   rungs: [
     { name: 'tfidf-logreg', family: 'linear', test_macro_f1: 0.62, low: 0.59, high: 0.65 },
     { name: 'encoder-small', family: 'encoder', test_macro_f1: 0.712, low: 0.681, high: 0.741 },
@@ -540,8 +544,9 @@ export const EVALUATION: Evaluation = {
   ],
 };
 
-export function meta(evaluation: Evaluation | null = null): Meta {
+export function meta(evaluation: Evaluation | null = null, analyzeAvailable = true): Meta {
   return {
+    analyze_available: analyzeAvailable,
     params_version: '2026-10-24.1',
     model: 'test-model',
     hotels: 5,
@@ -553,23 +558,8 @@ export function meta(evaluation: Evaluation | null = null): Meta {
       essential: ['cleanliness', 'room', 'staff'].includes(a),
       family: MUST_BE.includes(a) ? 'must_be' : 'two_sided',
     })),
-    policy: {
-      params_version: '2026-10-24.1',
-      prior: { alpha: 0.5, beta: 0.5 },
-      confirmation: 0.95,
-      interval_level: 0.9,
-      essentials: ['cleanliness', 'room', 'staff'],
-      must_be: ['noise', 'wifi'],
-      two_sided: { strong: 0.8, weak: 0.5 },
-      must_be_lines: { strong: 0.05, weak: 0.1 },
-      min_opinions: 10,
-      min_reviews: 30,
-      min_complaining_reviews: 3,
-      materiality: 0.05,
-      excellent: { min_months: 6, max_month_share: 0.25 },
-      trends: { recent_months: 6, baseline_months: 18, probability: 0.9 },
-      compare: { probability: 0.95, draws: 20000 },
-    },
+    policy: structuredClone(DEFAULT_POLICY),
+    data_period: { first_month: '2015-09', last_month: '2017-08' },
     evaluation,
   };
 }

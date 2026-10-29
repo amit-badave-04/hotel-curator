@@ -9,7 +9,10 @@ COPY package.json package-lock.json .npmrc ./
 RUN --mount=type=secret,id=extra_ca,required=false \
     NODE_EXTRA_CA_CERTS=/run/secrets/extra_ca npm ci --no-audit --no-fund
 COPY . .
-RUN npm run build
+# The public address in link previews, robots.txt and the sitemap (seo.ts).
+# scripts/deploy.py passes the Cloudflare domain in Cloudflare mode.
+ARG VITE_PUBLIC_ORIGIN=https://hotel-curator.fly.dev
+RUN VITE_PUBLIC_ORIGIN="$VITE_PUBLIC_ORIGIN" npm run build
 
 # Serve it with nginx as a non-root user on port 8080 (8443 in Cloudflare
 # mode). The site is rendered at start for CURATOR_EDGE (local, fly or

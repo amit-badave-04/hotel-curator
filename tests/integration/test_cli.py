@@ -269,3 +269,30 @@ def test_encoder_rung_name_tags_every_non_default_setting() -> None:
         name(extra=True, train_fraction=0.5, seed=7, learning_rate=2e-5)
         == "roberta-base-ft-frac0.5-seed7-lr2e-05-train2"
     )
+
+
+def test_db_release_after_a_newer_image_leaves_the_schema_alone(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sqlalchemy import text
+
+    from hotel_curator.config import get_settings
+    from hotel_curator.db import release
+    from hotel_curator.db.session import make_engine
+
+    _write_demo(home)
+    assert "loaded 5 hotels" in invoke_cli("db", "release")
+    # A rollback: a newer image migrated to a revision this code lacks.
+    engine = make_engine(get_settings().db_url())
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE alembic_version SET version_num = '9999'"))
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        release.logger, "warning", lambda msg, *a: warnings.append(msg % a)
+    )
+    assert "up to date" in invoke_cli("db", "release")
+    assert warnings and warnings[0].startswith("Database is at revision 9999")
+    with engine.connect() as conn:
+        version = conn.execute(text("SELECT version_num FROM alembic_version"))
+        assert version.scalar_one() == "9999"
+    engine.dispose()

@@ -74,8 +74,19 @@ DOMAIN_PATTERN = re.compile(
 """A lower-case DNS name short enough for nginx's server-name table
 (server_names_hash_bucket_size 128 in web/nginx/http.conf)."""
 EDGE_SETTING = "CURATOR_EDGE"
+PUBLIC_ORIGIN_ARG = "VITE_PUBLIC_ORIGIN"
+PUBLIC_HOST_SETTING = "CURATOR_PUBLIC_HOST"
+"""Web machine setting that records the host a Fly-mode deploy published
+(a domain after a rollback from Cloudflare mode), so a later deploy keeps
+it or says why not. Set on every Fly-mode deploy, so the check does not
+depend on whether flyctl keeps earlier --env values. nginx does not read
+it."""
+"""Build argument for the web image: the address in link previews,
+robots.txt and the sitemap (web/seo.ts)."""
 
 Runner = Callable[[list[str]], str]
+Plan = tuple["FlyApp", dict[str, str], dict[str, str]]
+"""An app with the settings and build arguments of one deploy."""
 
 
 def run_command(command: list[str]) -> str:
@@ -201,12 +212,18 @@ def require_weights(models_dir: Path) -> None:
         raise SystemExit(f"no model weights at {names}: run git lfs pull")
 
 
-def deploy(fly: Fly, app: FlyApp, env: dict[str, str] | None = None) -> None:
+def deploy(
+    fly: Fly,
+    app: FlyApp,
+    env: dict[str, str] | None = None,
+    build_args: dict[str, str] | None = None,
+) -> None:
     """Build remotely and deploy one app on a single machine.
 
     Paths are absolute: flyctl changes into the build context before it
     reads ``--config``, so a relative config path would be looked up inside
-    the context. ``env`` adds non-secret settings for this deploy.
+    the context. ``env`` adds non-secret settings for this deploy and
+    ``build_args`` non-secret build arguments.
     """
     args = [
         "deploy", str(ROOT / app.context), "--config", str(ROOT / app.config),
@@ -216,10 +233,32 @@ def deploy(fly: Fly, app: FlyApp, env: dict[str, str] | None = None) -> None:
         args.append("--no-public-ips")
     for key, value in (env or {}).items():
         args += ["--env", f"{key}={value}"]
+    for key, value in (build_args or {}).items():
+        args += ["--build-arg", f"{key}={value}"]
     fly.run(*args)
 
 
-def cloudflare_web(domain: str) -> tuple[FlyApp, dict[str, str]]:
+def fly_web(domain: str | None = None) -> Plan:
+    """The web app in Fly mode, published at ``domain`` or its fly.dev name.
+
+    A domain in Fly mode is the rollback from Cloudflare mode: Fly serves
+    the domain with its own certificates.
+    """
+    web = APP_BY_KEY["web"]
+    host = domain or fly_host()
+    return (
+        web,
+        {PUBLIC_HOST_SETTING: host},
+        {PUBLIC_ORIGIN_ARG: f"https://{host}"},
+    )
+
+
+def fly_host() -> str:
+    """The web app's own name on Fly."""
+    return f"{APP_BY_KEY['web'].name}.fly.dev"
+
+
+def cloudflare_web(domain: str) -> Plan:
     """The web app in Cloudflare mode, answering ``domain`` and its www.
 
     Raises:
@@ -228,13 +267,19 @@ def cloudflare_web(domain: str) -> tuple[FlyApp, dict[str, str]]:
     if not DOMAIN_PATTERN.fullmatch(domain):
         raise SystemExit(f"--domain must be a lower-case DNS name: {domain!r}")
     web = dataclasses.replace(APP_BY_KEY["web"], config=CLOUDFLARE_CONFIG)
-    return web, {"CURATOR_SERVER_NAMES": f"{domain} www.{domain}"}
+    env = {"CURATOR_SERVER_NAMES": f"{domain} www.{domain}"}
+    return web, env, {PUBLIC_ORIGIN_ARG: f"https://{domain}"}
+
+
+def _machine_env(machine: dict[str, Any]) -> dict[str, Any] | None:
+    config = field(machine, "config")
+    env = field(config, "env") if isinstance(config, dict) else None
+    return env if isinstance(env, dict) else None
 
 
 def _machine_edge(machine: dict[str, Any]) -> str:
-    config = field(machine, "config")
-    env = field(config, "env") if isinstance(config, dict) else None
-    edge = env.get(EDGE_SETTING) if isinstance(env, dict) else None
+    env = _machine_env(machine)
+    edge = env.get(EDGE_SETTING) if env is not None else None
     if not isinstance(edge, str):
         raise SystemExit(
             f"unexpected answer from flyctl machine list: no {EDGE_SETTING} "
@@ -244,32 +289,51 @@ def _machine_edge(machine: dict[str, Any]) -> str:
     return edge
 
 
-def web_edge_now(fly: Fly) -> str | None:
-    """The edge mode the web app's machines run in (None: no machines)."""
+def _one(values: set[Any], setting: str) -> Any:
+    if len(values) > 1:
+        raise SystemExit(f"web machines disagree on {setting}: {values}")
+    return values.pop() if values else None
+
+
+def web_now(fly: Fly) -> tuple[str | None, str | None]:
+    """The web machines' edge mode and recorded public host.
+
+    Either is None when there are no machines; the host is None when none
+    is recorded (the app is published at its fly.dev name).
+    """
     machines = fly.query("machine", "list", "--app", APP_BY_KEY["web"].name)
     edges = {_machine_edge(machine) for machine in machines}
-    if len(edges) > 1:
-        raise SystemExit(f"web machines disagree on {EDGE_SETTING}: {edges}")
-    return edges.pop() if edges else None
+    hosts = {
+        (_machine_env(machine) or {}).get(PUBLIC_HOST_SETTING) or None
+        for machine in machines
+    }
+    return _one(edges, EDGE_SETTING), _one(hosts, PUBLIC_HOST_SETTING)
 
 
-def web_target(
-    fly: Fly, edge: str | None, domain: str | None
-) -> tuple[FlyApp, dict[str, str]]:
+def web_target(fly: Fly, edge: str | None, domain: str | None) -> Plan:
     """The web app config to deploy, keeping the running edge mode.
 
     Raises:
-        SystemExit: If the machines run in Cloudflare mode and ``edge`` does
-            not say which mode to deploy.
+        SystemExit: If ``edge`` is not given and the machines run in
+            Cloudflare mode, or in Fly mode at a recorded domain: a deploy
+            without flags would quietly change where the site says it is.
     """
-    if edge is None and web_edge_now(fly) == "cloudflare":
-        raise SystemExit(
-            "hotel-curator runs in Cloudflare mode: pass --edge cloudflare "
-            "--domain <domain> to keep it, or --edge fly to switch back"
-        )
+    if edge is None:
+        edge_now, host_now = web_now(fly)
+        if edge_now == "cloudflare":
+            raise SystemExit(
+                "hotel-curator runs in Cloudflare mode: pass --edge cloudflare "
+                "--domain <domain> to keep it, or --edge fly to switch back"
+            )
+        if host_now and host_now != fly_host():
+            raise SystemExit(
+                f"hotel-curator is published at {host_now} in Fly mode: pass "
+                f"--edge fly --domain {host_now} to keep it, or --edge fly to "
+                "publish at its fly.dev name"
+            )
     if edge == "cloudflare":
         return cloudflare_web(domain or "")
-    return APP_BY_KEY["web"], {}
+    return fly_web(domain)
 
 
 def deploy_apps(
@@ -284,12 +348,12 @@ def deploy_apps(
     chosen = [app for app in APPS if app.key in (keys or APP_BY_KEY)]
     if APP_BY_KEY["api"] in chosen:
         require_weights(ROOT / "artifacts" / "models")
-    plans: list[tuple[FlyApp, dict[str, str]]] = [
-        web_target(fly, edge, domain) if app.key == "web" else (app, {})
+    plans: list[Plan] = [
+        web_target(fly, edge, domain) if app.key == "web" else (app, {}, {})
         for app in chosen
     ]
-    for app, env in plans:
-        deploy(fly, app, env)
+    for app, env, build_args in plans:
+        deploy(fly, app, env, build_args)
 
 
 def public_ip_problems(fly: Fly) -> list[str]:
@@ -329,8 +393,10 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     if unknown or (args.apps and args.action != "deploy"):
         parser.error(f"app names go after deploy only: {sorted(args.apps)}")
     deploying = args.action == "deploy"
-    if deploying and (args.edge == "cloudflare") != (args.domain is not None):
-        parser.error("--edge cloudflare and --domain go together")
+    if deploying and args.edge == "cloudflare" and args.domain is None:
+        parser.error("--edge cloudflare needs --domain")
+    if args.domain is not None and args.edge is None:
+        parser.error("--domain goes with --edge fly or --edge cloudflare")
     if args.edge and args.apps and "web" not in args.apps:
         parser.error("--edge applies to the web app: include web")
     if args.edge and args.action not in {"deploy", "setup"}:
@@ -347,7 +413,7 @@ def plan(flyctl: str, org: str) -> None:
     fly = Fly(flyctl, dry_run=True, runner=lambda _command: "[]")
     setup(fly, org)
     for app in APPS:
-        deploy(fly, app)
+        deploy(fly, *(fly_web() if app.key == "web" else (app, {}, {})))
     for app in APPS:
         fly.run("status", "--app", app.name)
 
