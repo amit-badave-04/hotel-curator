@@ -4,6 +4,8 @@ How to create and deploy hotel-curator's three Fly apps. The design and
 the reasons behind it are in
 [ADR 011](../decisions/011-deployment-fly-cloudflare.md). The Cloudflare
 cutover comes later; until then the site is `https://hotel-curator.fly.dev`.
+Running the site once it is up (parking, logs, metrics, alerts, error
+reports) is in the [runbook](../RUNBOOK.md).
 
 | App | Config | Reachable at |
 |---|---|---|
@@ -85,6 +87,7 @@ to `flyctl secrets import` on stdin and prints only their names.
 |---|---|---|
 | `hotel-curator-db` | `POSTGRES_PASSWORD`, `CURATOR_OWNER_PASSWORD`, `CURATOR_APP_PASSWORD` | before the first database deploy (init fails without them) |
 | `hotel-curator-api` | `CURATOR_DATABASE_URL`, `CURATOR_MIGRATION_DATABASE_URL` | before the first API deploy |
+| `hotel-curator-api` | `CURATOR_SENTRY_DSN` | optional: error reports ([runbook](../RUNBOOK.md#error-reports-optional)); checked for the shape `https://<key>@<host>/<project>` |
 | `hotel-curator` | `CURATOR_ORIGIN_CERT_B64`, `CURATOR_ORIGIN_KEY_B64`, `CURATOR_ORIGIN_PULL_CA_B64` | Cloudflare mode only (`origin-tls`) |
 
 The same, by hand. Placeholders are in angle brackets. These commands
@@ -177,8 +180,10 @@ stays.
 A web deploy keeps the edge mode its machines run in. Once the web app is
 in Cloudflare mode, a deploy without `--edge` stops with a message instead
 of quietly switching back to Fly mode (which would drop the origin
-certificate, origin pulls and the client-address rule). Pass the mode each
-time:
+certificate, origin pulls and the client-address rule). While the site is
+parked (`make fly-stop`, see the [runbook](../RUNBOOK.md#parking-and-resuming))
+the web app has no machines to read the mode from, so every web deploy
+needs it. Pass the mode each time:
 
 ```sh
 make fly-deploy FLY_DEPLOY_ARGS="--edge cloudflare --domain <domain>"
@@ -250,7 +255,9 @@ step, before anything is deployed.
    With neither set, the workflow passes no mode and `scripts/deploy.py`
    keeps the one the machines run in, or stops if they run in Cloudflare
    mode or at a recorded domain. Set them only to the mode the web app
-   really runs in: a value is applied as given.
+   really runs in: a value is applied as given. While the site is parked,
+   a run without them stops at its check step; resume it first
+   (`make fly-start`).
 
 flyctl comes from its official image, pinned by tag and digest in
 [`deploy/tools/flyctl/Dockerfile`](../../deploy/tools/flyctl/Dockerfile)

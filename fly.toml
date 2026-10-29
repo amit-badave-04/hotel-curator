@@ -34,6 +34,11 @@ kill_timeout = 30
   # own address: believe X-Real-IP from any peer. Only apps in the same
   # Fly organisation can reach the API at all (ADR 011).
   CURATOR_FORWARDED_ALLOW_IPS = "*"
+  # Prometheus metrics on a listener of their own, scraped by Fly through
+  # [metrics] below; not a service, so nothing outside the private network
+  # reaches it. :: because the scraper comes over private IPv6.
+  CURATOR_METRICS_PORT = "9091"
+  CURATOR_METRICS_HOST = "::"
 
 # Flycast service: reachable only through the private IPv6 above.
 [[services]]
@@ -72,6 +77,10 @@ kill_timeout = 30
     interval = "30s"
     timeout = "5s"
     grace_period = "60s"
+
+[metrics]
+  port = 9091
+  path = "/metrics"
 
 # Measured peak RSS 451 MiB with the model warm; 1 GB leaves over 30% headroom.
 [[vm]]

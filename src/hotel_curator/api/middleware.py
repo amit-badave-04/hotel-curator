@@ -3,6 +3,7 @@
 import json
 import time
 import uuid
+from collections.abc import Callable
 
 import structlog
 from fastapi import HTTPException
@@ -17,6 +18,11 @@ from hotel_curator.api.clientip import (
 from hotel_curator.api.errors import STATUS_CODES
 
 logger = structlog.get_logger("hotel_curator.access")
+
+Observer = Callable[[Scope, int, float], None]
+"""Receives each answered request: its scope, status and seconds taken."""
+ErrorReporter = Callable[[BaseException, str], None]
+"""Receives an unexpected error and the id of the request it broke."""
 
 SECURITY_HEADERS = (
     (b"x-content-type-options", b"nosniff"),
@@ -61,14 +67,22 @@ class RequestContextMiddleware:
 
     It is the outermost middleware, so it also answers unexpected errors:
     Starlette's own 500 handler sits outside every user middleware and would
-    send a response without the request id and security headers.
+    send a response without the request id and security headers. The same
+    timing feeds ``observe`` (metrics), and an unexpected error also goes to
+    ``report_error`` (error reports), when they are given.
     """
 
     def __init__(
-        self, app: ASGIApp, trusted: TrustedProxies | None = None
+        self,
+        app: ASGIApp,
+        trusted: TrustedProxies | None = None,
+        observe: Observer | None = None,
+        report_error: ErrorReporter | None = None,
     ) -> None:
         self.app = app
         self.trusted = trusted or TrustedProxies()
+        self.observe = observe
+        self.report_error = report_error
 
     async def __call__(
         self, scope: Scope, receive: Receive, send: Send
@@ -103,23 +117,28 @@ class RequestContextMiddleware:
 
         try:
             await self.app(scope, receive, send_wrapper)
-        except Exception:
+        except Exception as exc:
             # Logged here (no request data, no locals) and answered with the
             # standard body; not re-raised, so nothing else answers twice.
             logger.exception("unhandled error", request_id=request_id)
+            if self.report_error is not None:
+                self.report_error(exc, request_id)
             if status is None:
                 await send_error(
                     send_wrapper, 500, "Internal error.", request_id
                 )
         finally:
+            seconds = time.perf_counter() - started
             logger.info(
                 "request",
                 request_id=request_id,
                 method=scope.get("method"),
                 path=scope.get("path"),
                 status=status or 500,
-                ms=round(1000 * (time.perf_counter() - started), 1),
+                ms=round(1000 * seconds, 1),
             )
+            if self.observe is not None:
+                self.observe(scope, status or 500, seconds)
 
 
 class BodySizeLimitMiddleware:

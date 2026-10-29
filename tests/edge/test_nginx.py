@@ -185,6 +185,19 @@ def _move_ports(site: Path, edge: Edge) -> None:
 
 
 ASSET = "/assets/index-0123abcd.js"
+ACCESS_LOG = "access.log"
+
+
+def access_log(tmp_path: Path, lines: int) -> list[dict[str, object]]:
+    """The first ``lines`` access-log records (nginx writes each one just
+    after its response, so wait briefly); every line must be JSON."""
+    deadline = time.monotonic() + 5
+    while True:
+        text = (tmp_path / ACCESS_LOG).read_text()
+        records = [json.loads(line) for line in text.split("\n") if line]
+        if len(records) >= lines or time.monotonic() > deadline:
+            return records
+        time.sleep(0.05)
 
 
 def _web_root(tmp_path: Path) -> Path:
@@ -247,9 +260,11 @@ def start(tmp_path: Path, api: str) -> Iterator[object]:
             [*command, "-t"], capture_output=True, text=True
         )
         assert checked.returncode == 0, checked.stderr
-        process = subprocess.Popen(
-            [*command, "-g", "daemon off;"], stdout=subprocess.DEVNULL
-        )
+        # The access log goes to stdout (site.conf); keep it for reading.
+        with (tmp_path / ACCESS_LOG).open("ab") as log:
+            process = subprocess.Popen(
+                [*command, "-g", "daemon off;"], stdout=log
+            )
         running.append(process)
         _wait_for(edge.http_port, process)
         return edge
@@ -319,6 +334,26 @@ def test_request_id_is_nginx_own_and_reaches_the_api(start: object) -> None:
     assert answer.header("x-request-id") == [sent]
     static = get(edge.http_port, "/", {"X-Request-ID": "mine-1234"})
     assert re.fullmatch(r"[0-9a-f]{32}", static.header("x-request-id")[0])
+
+
+def test_the_access_log_is_json_with_fly_and_cloudflare_ids(
+    start: object, tmp_path: Path
+) -> None:
+    edge = start("fly")  # type: ignore[operator]
+    ids = {
+        "Fly-Request-Id": "01JBQX4Z8YH-lhr",
+        "Cf-Ray": "8c2f1a2b3c4d5e6f-LHR",
+    }
+    get(edge.http_port, "/api/v1/meta?q=private-search", ids)
+    forged = {"Fly-Request-Id": 'x" "admin', "Cf-Ray": "r" * 65}
+    get(edge.http_port, '/explore/"quoted"', forged)
+    api, page = access_log(tmp_path, 2)
+    assert (api["fly_request_id"], api["cf_ray"]) == tuple(ids.values())
+    assert api["api_request_id"] == api["request_id"]
+    assert api["path"] == "/api/v1/meta"
+    assert (page["fly_request_id"], page["cf_ray"]) == ("", "")
+    assert page["path"] == '/explore/"quoted"'
+    assert "private-search" not in (tmp_path / ACCESS_LOG).read_text()
 
 
 @pytest.mark.parametrize("path", ["/", "/explore", "/api/v1/meta", "/api/docs"])

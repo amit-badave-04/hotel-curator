@@ -158,7 +158,7 @@ interface an attacker could reach.
 - The job runs in the GitHub environment `production`. Its required
   reviewer (the owner) approves each run, and only it holds the two
   app-scoped deploy tokens, `FLY_API_TOKEN_API` and `FLY_API_TOKEN_WEB`,
-  each passed to the one step that needs it.
+  each passed only to the steps for its app.
 - flyctl runs from its official image pinned by tag and digest in
   `deploy/tools/flyctl/Dockerfile` (`scripts/flyctl_docker.sh`); the first
   step checks it reports the pinned version. No binary is downloaded.
@@ -179,6 +179,44 @@ interface an attacker could reach.
   release at least two weeks old; the CLI tools CI runs at pinned
   versions through uvx or curl are updated by hand.
 
+### Observability
+
+- **Logs.** The API writes one JSON object per line and nothing else:
+  `curator serve` starts uvicorn without its own logging config, so
+  uvicorn's lines go through the app's formatter, and without uvicorn's
+  access log, because the app logs one line per request (request id,
+  method, path, status, time). nginx logs one JSON object per request:
+  the path asked for without its query string, the client address the
+  rate limits use, its own request id and the API's, and, beside them,
+  Fly's `Fly-Request-Id` (Fly mode, assumption A19) and Cloudflare's
+  `CF-Ray` when they look like ids. nginx's id stays the one that joins both logs: it exists in every
+  mode, while a client can send either provider header in some modes (gap
+  audit D16 had proposed adopting `Fly-Request-Id`). Logs never hold
+  submitted text, query strings or local variables, and the database
+  engines hide bound values from error messages, so a failed search does
+  not log its terms. The release command's lines are JSON too.
+- **Metrics.** The API serves Prometheus metrics on port 9091, a listener
+  of its own bound to `::` (Fly's scraper comes over the private network),
+  which no Fly service exposes; `[metrics]` in `fly.toml` has Fly scrape
+  it. Labels are bounded and carry no request data: the method (from a
+  fixed set), the matched route's template and the status. Counts live in
+  the process, so a metrics port needs one worker (`curator serve`
+  refuses more). A port that cannot be bound is logged as an error and
+  the API serves on; the missing series trip an alert. Alert rules (no metrics, readiness
+  failing, 5xx rate, analyze p95, no model, memory) are written out in
+  the runbook for the owner to set in Fly's Grafana (assumption A20).
+- **Error reports.** Sentry, off unless the API has `CURATOR_SENTRY_DSN`
+  (the `sentry` extra is in the image). Only the request middleware's
+  unexpected 500s are reported, with the request id as a tag: no
+  integrations of any kind (framework, logging, thread or exit hooks), no
+  breadcrumbs, no local variables, and a
+  scrubber that drops any request, user or extra data from every event.
+  The lifespan flushes queued reports at shutdown, since uvicorn exits by
+  re-raising the signal and Sentry's exit handler never runs.
+- **Shutdown.** Fly sends SIGTERM; uvicorn stops accepting connections,
+  lets requests in flight finish for up to 20 s (`kill_timeout` is 30),
+  runs the app's shutdown, then exits by the signal it caught.
+
 ### Sizing, idle policy and cost
 
 - **API.** Measured on the build machine with the int8 model warm, after 30
@@ -189,8 +227,16 @@ interface an attacker could reach.
   - `min_machines_running = 1` on API and web, with auto-stop off, because
     a cold start would load the model on a visitor's first request.
   - The database runs one machine.
-- **Parking.** `scripts/ops.py stop` stops all three (graphrag's pattern);
-  `start` brings them back in order.
+- **Parking.** `scripts/ops.py stop` scales the web app and the API to
+  zero machines and stops the database machine; `start` reverses it in
+  dependency order and checks that the web machine kept its deploy's
+  settings. Only the web machines record the edge mode, so `stop` first
+  prints the flags that deploy the web app in that mode, and while it has
+  no machines `scripts/deploy.py` refuses a web deploy that does not
+  name one. Stopping the
+  web and API machines instead (graphrag's pattern) would not hold: both
+  start on demand, so the first visit would wake them. flyctl runs from a
+  directory without a `fly.toml`, so it uses each app's deployed config.
 - **Cost.** Monthly cost ≈ Σ over machines (price of its size × hours
   running) + volume GB × volume price + outbound bandwidth. Prices are on
   Fly's pricing page; they could not be checked from the build environment.
@@ -247,6 +293,13 @@ owner's refit project already runs there.
 - **A manual "Run workflow" trigger for deploys.** It would deploy
   `main`'s head whether or not CI passed for it; re-running the `deploy`
   job of the commit's CI run gives the same control with the gate kept.
+- **Metrics on the API's own port, blocked in nginx.** One listener
+  fewer, but a single missed `location` rule would publish them; a port no
+  service exposes cannot leak through nginx.
+- **Sentry's FastAPI and logging integrations.** Less code, but they
+  attach request data and log lines to events by default, and the app
+  already answers every unexpected error in one place, which can report
+  it with nothing but the exception and the request id.
 - **flyctl downloaded as a release archive and checked against a pinned
   SHA-256.** Equivalent, but the archive's checksum could not be read from
   the build environment; the image digest could.
@@ -270,7 +323,11 @@ owner's refit project already runs there.
 | A13 | Fly's proxy passes `X-Real-IP` unchanged on the Flycast hop from nginx to the API | two clients through the web app get separate 429s from `/api/v1/analyze`; the API's log shows the visitors' request ids |
 | A14 | Fly routes the Cloudflare-mode TCP passthrough service only on a dedicated IPv4, not a shared one | `scripts/deploy.py setup --edge cloudflare` allocates one before the cutover; `scripts/check_edge.py <domain>` probes every address the origin name resolves to, IPv4 and IPv6, and each must refuse as expected (an address that cannot route the service fails) |
 | A15 | The `flyio/flyctl` image's entrypoint is flyctl, so `docker run <image> <args>` runs flyctl | the deploy workflow's first step: `flyctl version` must report the pinned version, before anything is deployed |
-| A16 | An app-scoped deploy token can deploy with Fly's remote builder and list that app's machines | the first deploy run: its check step lists the web machines with the web token before anything is deployed |
+| A16 | An app-scoped deploy token can deploy with Fly's remote builder and list that app's machines (and its releases, when it has no machines) | the first deploy run: its check step lists the web machines with the web token before anything is deployed |
+| A17 | `flyctl scale count 1` on an app with no machines creates one from the latest release, with the settings its deploy passed as `--env` | `make fly-stop`, then `make fly-start` (which checks that the web machine has the setting its mode's deploy passes), then `make smoke` |
+| A18 | Fly's scraper reaches a listener bound to `::` over the private network and labels each series with its `app` | `curator_http_requests_total{app="hotel-curator-api"}` returns series in Fly's Grafana |
+| A19 | In Fly mode, Fly's proxy passes the request to nginx with a `Fly-Request-Id` header holding the id it returns to the client as `fly-request-id` (in Cloudflare mode Fly only passes TCP through, so there is none) | `curl -sI https://hotel-curator.fly.dev/`, then find its `fly-request-id` in `flyctl logs --app hotel-curator` |
+| A20 | Fly's managed Grafana can hold alert rules and send them to an email contact point | create the runbook's "No metrics" rule and send a test notification; if it cannot, point another Grafana or an outside uptime monitor at the site |
 
 ## Controls: compose versus Fly
 

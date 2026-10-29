@@ -62,6 +62,18 @@ def test_api_health_checks_hit_real_routes() -> None:
     assert paths <= set(create_app(Settings()).openapi()["paths"])
 
 
+def test_api_metrics_are_scraped_from_a_port_no_service_exposes() -> None:
+    config = _toml(API)
+    env = config["env"]
+    assert config["metrics"] == {
+        "port": int(env["CURATOR_METRICS_PORT"]),
+        "path": "/metrics",
+    }
+    services = {s["internal_port"] for s in config["services"]}
+    assert config["metrics"]["port"] not in services
+    assert env["CURATOR_METRICS_HOST"] == "::"  # Fly's private IPv6
+
+
 def test_api_env_is_valid_production_settings_given_the_secrets(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

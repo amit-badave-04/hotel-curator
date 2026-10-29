@@ -137,6 +137,51 @@ def test_push_sends_values_on_stdin_and_never_prints_them(
     assert all(value not in " ".join(calls[0][0]) for value in values.values())
 
 
+DSN = "https://0123456789abcdef0123456789abcdef@o1.ingest.sentry.io/42"
+
+
+def test_an_optional_sentry_dsn_goes_to_the_api_only() -> None:
+    values = {**secrets_cli.generate(), "CURATOR_SENTRY_DSN": DSN}
+    assert secrets_cli.problems_in(values) == []
+    calls: list[tuple[list[str], str]] = []
+    secrets_cli.push(
+        values,
+        ["hotel-curator-db", "hotel-curator-api"],
+        flyctl="flyctl",
+        dry_run=False,
+        runner=lambda command, stdin: calls.append((command, stdin)),
+    )
+    (db_stdin, api_stdin) = (stdin for _, stdin in calls)
+    assert f"CURATOR_SENTRY_DSN={DSN}" in api_stdin.splitlines()
+    assert "SENTRY" not in db_stdin
+    without = secrets_cli.generate()
+    secrets_cli.push(
+        without,
+        ["hotel-curator-api"],
+        flyctl="flyctl",
+        dry_run=False,
+        runner=lambda command, stdin: calls.append((command, stdin)),
+    )
+    assert "SENTRY" not in calls[-1][1]
+
+
+@pytest.mark.parametrize(
+    "dsn",
+    [
+        DSN.replace("https", "http"),
+        DSN.replace("0123456789abcdef0123456789abcdef@", ""),
+        DSN.replace("/42", "/project"),
+        f"{DSN}?debug=1",
+        "https://[broken",
+    ],
+)
+def test_a_malformed_dsn_is_refused_without_being_quoted(dsn: str) -> None:
+    values = {**secrets_cli.generate(), "CURATOR_SENTRY_DSN": dsn}
+    (problem,) = secrets_cli.problems_in(values)
+    assert problem.startswith("CURATOR_SENTRY_DSN: ")
+    assert "0123456789abcdef" not in problem and "sentry.io" not in problem
+
+
 def test_push_refuses_an_inconsistent_file(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -256,6 +301,21 @@ def test_a_listing_that_is_not_a_list_of_objects_stops(answer: str) -> None:
     fly = deploy_cli.Fly("flyctl", dry_run=False, runner=lambda _c: answer)
     with pytest.raises(SystemExit, match="unexpected answer from flyctl"):
         deploy_cli.status(fly)
+
+
+def test_a_parked_web_app_needs_its_mode_named(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    releases = {"releases --app hotel-curator": [{"Version": 7}]}
+    parked = deploy_cli.Fly("flyctl", dry_run=False, runner=FakeFly(releases))
+    with pytest.raises(SystemExit, match=r"parked\?.*--edge"):
+        deploy_cli.web_target(parked, None, None)
+    env = deploy_cli.web_target(parked, "cloudflare", "example.org")[1]
+    assert env == {"CURATOR_SERVER_NAMES": "example.org www.example.org"}
+    first = deploy_cli.Fly("flyctl", dry_run=False, runner=FakeFly({}))
+    assert deploy_cli.web_target(first, None, None)[1] == {
+        "CURATOR_PUBLIC_HOST": "hotel-curator.fly.dev"
+    }
 
 
 def test_status_fails_when_a_private_app_has_a_public_address(

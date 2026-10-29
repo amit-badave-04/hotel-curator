@@ -16,10 +16,10 @@ help: ## List targets
 # --- setup -----------------------------------------------------------------
 .PHONY: setup setup-ml
 setup: ## Install the API, data and dev dependencies from uv.lock
-	$(UV) sync --frozen --extra data --extra dev --extra postgres
+	$(UV) sync --frozen --extra data --extra dev --extra postgres --extra sentry
 
 setup-ml: ## Also install the training stack (torch, transformers, scikit-learn, ...)
-	$(UV) sync --frozen --extra data --extra dev --extra postgres --extra ml
+	$(UV) sync --frozen --extra data --extra dev --extra postgres --extra sentry --extra ml
 
 # --- data ------------------------------------------------------------------
 .PHONY: data eda
@@ -99,7 +99,7 @@ serve: db ## Run the API on http://127.0.0.1:8000 (docs at /docs)
 	$(RUN) curator serve
 
 # --- deploy (Fly.io; docs/deploy/fly.md) -----------------------------------
-.PHONY: fly-plan fly-secrets fly-setup fly-deploy fly-status smoke
+.PHONY: fly-plan fly-secrets fly-setup fly-deploy fly-status fly-stop fly-start smoke
 fly-plan: ## Print every flyctl command a first deploy runs (runs nothing)
 	$(RUN) python scripts/deploy.py plan
 
@@ -114,6 +114,12 @@ fly-deploy: ## Deploy database, API, web, in that order (FLY_DEPLOY_ARGS="--edge
 
 fly-status: ## Machines of each app; fails if the API or database is public
 	$(RUN) python scripts/deploy.py status
+
+fly-stop: ## Park the site: web and API to zero machines, database stopped
+	$(RUN) python scripts/ops.py stop
+
+fly-start: ## Resume a parked site: database, API, web; then run make smoke
+	$(RUN) python scripts/ops.py start
 
 smoke: ## Smoke-test a deployed site (SMOKE_URL=https://hotel-curator.fly.dev)
 	$(RUN) python scripts/smoke.py $(or $(SMOKE_URL),https://hotel-curator.fly.dev)

@@ -6,6 +6,7 @@ unset), so the CLI, the API and the Docker image agree on where data and
 models live. See ``.env.example`` for a documented template.
 """
 
+import ipaddress
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Self
@@ -104,7 +105,31 @@ class Settings(BaseSettings):
         "whose X-Real-IP and X-Request-ID are believed; X-Forwarded-For "
         "never is. Unset: the client is the TCP peer.",
     )
+    metrics_port: int | None = Field(
+        default=None,
+        ge=1024,
+        le=65535,
+        description="Port of the Prometheus metrics listener, separate from "
+        "the API's (Fly's [metrics] scrapes it). Unset: no metrics listener.",
+    )
+    metrics_host: str = Field(
+        default="127.0.0.1",
+        description="Address the metrics listener binds: an IP address; :: "
+        "on Fly, whose scraper comes over the private network.",
+    )
+    # Credential: a DSN is a write key for the Sentry project.
+    sentry_dsn: SecretStr | None = Field(
+        default=None,
+        description="Send unexpected errors to Sentry (needs the sentry "
+        "extra). Unset: no error reports leave the process.",
+    )
     seed: int = 20261024
+
+    @field_validator("metrics_host")
+    @classmethod
+    def _metrics_host_is_an_address(cls, value: str) -> str:
+        ipaddress.ip_address(value)  # raises ValueError on a host name
+        return value
 
     @field_validator("forwarded_allow_ips")
     @classmethod

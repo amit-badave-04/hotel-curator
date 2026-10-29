@@ -15,10 +15,12 @@ RUN --mount=type=secret,id=extra_ca,required=false \
 WORKDIR /src
 COPY pyproject.toml uv.lock README.md LICENSE ./
 RUN --mount=type=secret,id=extra_ca,required=false \
-    with-extra-ca uv sync --frozen --no-dev --extra postgres --no-install-project
+    with-extra-ca uv sync --frozen --no-dev --extra postgres --extra sentry \
+        --no-install-project
 COPY src ./src
 RUN --mount=type=secret,id=extra_ca,required=false \
-    with-extra-ca uv sync --frozen --no-dev --extra postgres --no-editable
+    with-extra-ca uv sync --frozen --no-dev --extra postgres --extra sentry \
+        --no-editable
 
 FROM python:3.12-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704
 # Production builds pass REQUIRE_MODEL=1: the image then cannot be built

@@ -61,6 +61,11 @@ SECRETS: dict[str, tuple[str, ...]] = {
     API_APP: ("CURATOR_DATABASE_URL", "CURATOR_MIGRATION_DATABASE_URL"),
 }
 """Secrets per app, in the order the apps are deployed."""
+OPTIONAL_SECRETS: dict[str, tuple[str, ...]] = {
+    API_APP: ("CURATOR_SENTRY_DSN",),
+}
+"""Secrets an app gets only when .env.fly has them (error reports)."""
+SENTRY_PROJECT = re.compile(r"/\d+")
 ORIGIN_SECRETS: dict[str, str] = {
     "CURATOR_ORIGIN_CERT_B64": "CERTIFICATE",
     "CURATOR_ORIGIN_KEY_B64": "PRIVATE KEY",
@@ -241,15 +246,32 @@ def _origin_problems(values: Secrets) -> list[str]:
     return problems
 
 
+def dsn_problem(name: str, dsn: str) -> str | None:
+    """Why ``dsn`` is not a Sentry DSN, without quoting any of it."""
+    try:
+        parts = urlsplit(dsn)
+    except ValueError:
+        return f"{name}: not a valid URL"
+    if parts.scheme != "https" or not parts.username or not parts.hostname:
+        return f"{name}: expected https://<key>@<host>/<project>"
+    if not SENTRY_PROJECT.fullmatch(parts.path) or parts.query:
+        return f"{name}: expected a project number after the host"
+    return None
+
+
 def problems_in(values: Secrets) -> list[str]:
     """Everything that would make the deployed apps fail to connect."""
     required = {key for keys in SECRETS.values() for key in keys}
-    known = required | ORIGIN_SECRETS.keys()
+    optional = {key for keys in OPTIONAL_SECRETS.values() for key in keys}
+    known = required | optional | ORIGIN_SECRETS.keys()
     problems = [
         f"{key}: not a known secret" for key in values if key not in known
     ]
     problems += [f"{key}: missing" for key in sorted(required - values.keys())]
     problems += _origin_problems(values)
+    if "CURATOR_SENTRY_DSN" in values:
+        found = dsn_problem("CURATOR_SENTRY_DSN", values["CURATOR_SENTRY_DSN"])
+        problems += [found] if found else []
     if problems:
         return problems
     passwords = [values[key] for key in SECRETS[DB_APP]]
@@ -291,6 +313,7 @@ def push(
     """Stage each app's secrets with ``flyctl secrets import``."""
     for app in apps:
         keys = SECRETS.get(app) or tuple(ORIGIN_SECRETS)
+        keys += tuple(k for k in OPTIONAL_SECRETS.get(app, ()) if k in values)
         command = [flyctl, "secrets", "import", "--app", app, "--stage"]
         print(f"$ {' '.join(command)}  < {', '.join(keys)} (on stdin)")
         if dry_run:

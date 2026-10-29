@@ -22,3 +22,4 @@ by question.
 | What stands between `main` and a public deployment, and in which order is it closed? | [deploy/gap-audit.md](deploy/gap-audit.md) |
 | How do I create, deploy and redeploy the Fly apps, and handle their secrets? | [deploy/fly.md](deploy/fly.md) |
 | How is the site moved behind Cloudflare, and how do I check the result? | [deploy/cloudflare.md](deploy/cloudflare.md) |
+| How do I run the live site: status, parking, logs, metrics, alerts, error reports, incidents? | [RUNBOOK.md](RUNBOOK.md) |

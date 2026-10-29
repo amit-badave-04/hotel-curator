@@ -11,7 +11,8 @@ The web app has two edge modes (ADR 011): ``fly`` (web/fly.toml) and,
 after the Cloudflare cutover, ``cloudflare`` (web/fly.cloudflare.toml, with
 nginx answering only DOMAIN and www.DOMAIN). A web deploy reads the mode its
 machines run in and refuses to change it unless ``--edge`` says so, so a
-routine redeploy cannot drop Cloudflare mode.
+routine redeploy cannot drop Cloudflare mode. With no machines after an
+earlier deploy (parked by scripts/ops.py) it needs ``--edge``.
 
 Every flyctl command is printed before it runs; ``--dry-run`` prints
 without running. ``setup`` skips what already exists, so running it again
@@ -75,27 +76,41 @@ DOMAIN_PATTERN = re.compile(
 (server_names_hash_bucket_size 128 in web/nginx/http.conf)."""
 EDGE_SETTING = "CURATOR_EDGE"
 PUBLIC_ORIGIN_ARG = "VITE_PUBLIC_ORIGIN"
+"""Build argument for the web image: the address in link previews,
+robots.txt and the sitemap (web/seo.ts)."""
+SERVER_NAMES_SETTING = "CURATOR_SERVER_NAMES"
 PUBLIC_HOST_SETTING = "CURATOR_PUBLIC_HOST"
 """Web machine setting that records the host a Fly-mode deploy published
 (a domain after a rollback from Cloudflare mode), so a later deploy keeps
 it or says why not. Set on every Fly-mode deploy, so the check does not
 depend on whether flyctl keeps earlier --env values. nginx does not read
 it."""
-"""Build argument for the web image: the address in link previews,
-robots.txt and the sitemap (web/seo.ts)."""
 
+MODE_SETTINGS = {"fly": PUBLIC_HOST_SETTING, "cloudflare": SERVER_NAMES_SETTING}
+"""The setting each edge mode's deploy passes with --env (fly_web,
+cloudflare_web): a web machine without it lost its deploy's settings."""
 Runner = Callable[[list[str]], str]
 Plan = tuple["FlyApp", dict[str, str], dict[str, str]]
 """An app with the settings and build arguments of one deploy."""
 
 
-def run_command(command: list[str]) -> str:
-    """Run a command from the repository root; return its stdout."""
+def run_command(command: list[str], cwd: Path = ROOT) -> str:
+    """Run a command in ``cwd`` (the repository root by default).
+
+    A ``--json`` listing's output is captured and returned. Any other
+    command writes straight to the terminal, so a status table or a
+    deploy's build log is seen as it happens, and "" is returned.
+    """
+    listing = command[-1] == "--json"
     # The command is flyctl with arguments built here, never user text.
     done = subprocess.run(  # noqa: S603  # nosec B603
-        command, cwd=ROOT, check=True, text=True, stdout=subprocess.PIPE
+        command,
+        cwd=cwd,
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE if listing else None,
     )
-    return done.stdout
+    return done.stdout or ""
 
 
 class Fly:
@@ -109,7 +124,8 @@ class Fly:
         self._runner = runner
 
     def run(self, *args: str) -> str:
-        """Print, then run (unless a dry run) a flyctl command."""
+        """Print, then run (unless a dry run) a flyctl command; its output
+        goes to the terminal."""
         command = [self.flyctl, *args]
         print(f"$ {shlex.join(command)}", flush=True)
         return "" if self.dry_run else self._runner(command)
@@ -267,7 +283,7 @@ def cloudflare_web(domain: str) -> Plan:
     if not DOMAIN_PATTERN.fullmatch(domain):
         raise SystemExit(f"--domain must be a lower-case DNS name: {domain!r}")
     web = dataclasses.replace(APP_BY_KEY["web"], config=CLOUDFLARE_CONFIG)
-    env = {"CURATOR_SERVER_NAMES": f"{domain} www.{domain}"}
+    env = {SERVER_NAMES_SETTING: f"{domain} www.{domain}"}
     return web, env, {PUBLIC_ORIGIN_ARG: f"https://{domain}"}
 
 
@@ -298,16 +314,58 @@ def _one(values: set[Any], setting: str) -> Any:
 def web_now(fly: Fly) -> tuple[str | None, str | None]:
     """The web machines' edge mode and recorded public host.
 
-    Either is None when there are no machines; the host is None when none
-    is recorded (the app is published at its fly.dev name).
+    Either is None before the first deploy; the host is None when none is
+    recorded (the app is published at its fly.dev name).
+
+    Raises:
+        SystemExit: If the app has been deployed but has no machines
+            (parked by scripts/ops.py): its mode is not recorded anywhere.
     """
-    machines = fly.query("machine", "list", "--app", APP_BY_KEY["web"].name)
+    web = APP_BY_KEY["web"].name
+    machines = fly.query("machine", "list", "--app", web)
+    if not machines and fly.query("releases", "--app", web):
+        raise SystemExit(
+            f"{web} has no machines (parked?), so the mode it ran in is "
+            "unknown: pass --edge fly, --edge fly --domain <domain> or "
+            "--edge cloudflare --domain <domain> (scripts/ops.py stop "
+            "printed the right one)"
+        )
     edges = {_machine_edge(machine) for machine in machines}
     hosts = {
         (_machine_env(machine) or {}).get(PUBLIC_HOST_SETTING) or None
         for machine in machines
     }
     return _one(edges, EDGE_SETTING), _one(hosts, PUBLIC_HOST_SETTING)
+
+
+def web_redeploy_flags(fly: Fly) -> list[str] | None:
+    """The flags that redeploy the web app in the mode its machines run.
+
+    ``None`` when it has no machines.
+
+    Raises:
+        SystemExit: If a machine lacks the setting its mode's deploy
+            passes, or the machines disagree.
+    """
+    machines = fly.query("machine", "list", "--app", APP_BY_KEY["web"].name)
+    found: set[tuple[str, ...]] = set()
+    for machine in machines:
+        edge = _machine_edge(machine)
+        setting = MODE_SETTINGS.get(edge)
+        value = (_machine_env(machine) or {}).get(setting or "")
+        if setting is None or not isinstance(value, str) or not value:
+            raise SystemExit(
+                f"a web machine in mode {edge!r} has no {setting or 'mode'}: "
+                "it lost the settings its deploy passed; redeploy it with "
+                "scripts/deploy.py deploy web --edge <mode> [--domain <domain>]"
+            )
+        domain = value.split()[0]
+        if edge == "fly" and domain == fly_host():
+            found.add(("--edge", "fly"))
+        else:
+            found.add(("--edge", edge, "--domain", domain))
+    flags = _one(found, "their deploy settings")
+    return list(flags) if flags else None
 
 
 def web_target(fly: Fly, edge: str | None, domain: str | None) -> Plan:

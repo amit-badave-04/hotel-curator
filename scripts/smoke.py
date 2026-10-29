@@ -96,7 +96,8 @@ def fetch(method: str, url: str, body: bytes | None = None) -> Answer:
     )
     try:
         try:
-            with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as r:  # noqa: S310
+            # base_url() admits only https, or http on this machine.
+            with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as r:  # noqa: S310  # nosec B310
                 status, raw, data = r.status, r.headers, r.read()
         except urllib.error.HTTPError as error:
             # Reading the body can fail too; the outer handler takes that.

@@ -59,6 +59,20 @@ def test_db_release_if_enabled_skips_when_migrate_on_start_is_off(
     assert "loaded 5 hotels" in invoke_cli("db", "release")
 
 
+def test_db_release_logs_json_where_logs_are_json(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from hotel_curator.config import get_settings
+
+    _write_demo(home)
+    monkeypatch.setenv("CURATOR_LOG_FORMAT", "json")
+    get_settings.cache_clear()
+    output = invoke_cli("db", "release")
+    records = [json.loads(line) for line in output.split("\n") if line]
+    assert records[-1]["event"].startswith("loaded 5 hotels from ")
+    assert records[-1]["logger"] == "hotel_curator.cli.db"
+
+
 def _split(prefix: str, seed: int) -> LabeledParts:
     rng = np.random.default_rng(seed)
     rows = []
