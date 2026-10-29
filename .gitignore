@@ -39,8 +39,8 @@ mlflow.db
 # Model training scratch (the promoted package lives in artifacts/models/<rung>/)
 checkpoints/
 artifacts/models/*/checkpoint/
-# The promoted model's weights go through Git LFS, which this build
-# environment cannot reach (docs/BLOCKERS.md B8); add with `git add -f`.
+# Served model weights go through Git LFS (.gitattributes): the promoted
+# model's model.onnx is tracked; add a newly published one with `git add -f`.
 artifacts/models/*/model.onnx
 
 # Frontend

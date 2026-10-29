@@ -41,8 +41,8 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        # 1 = refuse to build without the served weights (CI sets it once
-        # they are in Git LFS; BLOCKERS B8).
+        # 1 = refuse to build without the served weights (CI sets it when
+        # they are tracked in Git LFS, and pulls them first).
         REQUIRE_MODEL: ${REQUIRE_MODEL:-0}
     environment:
       CURATOR_DATABASE_URL: postgresql+psycopg://curator@/curator?host=/var/run/postgresql

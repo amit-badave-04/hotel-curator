@@ -32,8 +32,8 @@ jobs:
     steps:
       # Credentials stay: the served-model step pulls from Git LFS.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7 # zizmor: ignore[artipacked]
-      # Only the served model from Git LFS, cached by object id; once it is
-      # tracked, the eval gates run on it and fail on an unpulled pointer.
+      # Only the served model from Git LFS, cached by object id; the eval
+      # gates run on it and fail on an unpulled pointer.
       - uses: ./.github/actions/served-model
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
@@ -235,9 +235,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7 # zizmor: ignore[artipacked]
       - id: model
         uses: ./.github/actions/served-model
-      # Once the weights are tracked, the API image must contain exactly the
-      # judged files (REQUIRE_MODEL=1) and analyze must answer; before that,
-      # analyze must answer 503, not fail some other way.
+      # With the weights tracked, the API image must contain exactly the
+      # judged files (REQUIRE_MODEL=1) and analyze must answer 200; a commit
+      # without them must get 503 from analyze, not fail some other way.
       - name: Build images
         env:
           REQUIRE_MODEL: ${{ steps.model.outputs.tracked == 'true' && '1' || '0' }}

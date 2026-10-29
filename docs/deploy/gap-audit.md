@@ -171,7 +171,7 @@ Every step ends with a commit (What / Why / Evidence). "Here" means the build en
 
 | Phase | Action |
 |---|---|
-| Before the final push | Allow `lfs.github.com` in the cloud environment's network settings, so the weights can be pushed. |
+| Before the final push | Allow `lfs.github.com` in the cloud environment's network settings, so the weights can be pushed. Done on 2026-10-29: the weights are in Git LFS (`docs/BLOCKERS.md` B8, closed). |
 | Fly, after merging | `flyctl auth login`; create the three apps in `lhr`; create the database volume; push secrets with `scripts/push_fly_secrets.py`; deploy database, API, web in that order with `scripts/deploy.py`; run `scripts/smoke.py https://hotel-curator.fly.dev`; confirm `flyctl ips list` shows public addresses for the web app only. |
 | CI/CD | Create per-app deploy tokens; create the GitHub environment `production` with the owner as required reviewer and the tokens as secrets; run the deploy workflow once by hand. |
 | Cloudflare cutover (when the domain is chosen) | Add the zone or hostname; create a Cloudflare Origin Certificate and push it as web-app secrets; turn on Authenticated Origin Pulls; apply `docs/deploy/cloudflare.md`; switch the web app to Cloudflare mode and redeploy; run `scripts/check_edge.py` and `scripts/smoke.py` against the domain; confirm `.fly.dev` is refused. |
@@ -183,7 +183,7 @@ Every step ends with a commit (What / Why / Evidence). "Here" means the build en
 
 | # | Risk | Containment |
 |---|---|---|
-| R1 | lfs.github.com stays blocked. The LFS pre-push hook (`.git/hooks/pre-push`) then fails the whole push. | Keep the weights commit separate and last, and push without it if needed. `REQUIRE_MODEL=1` in `fly.toml` makes any weightless Fly build fail. `analyze_available` hides the demo. Fallback: a release asset or object storage, which would need a new owner decision. |
+| R1 | lfs.github.com stays blocked. The LFS pre-push hook (`.git/hooks/pre-push`) then fails the whole push. | Keep the weights commit separate and last, and push without it if needed. `REQUIRE_MODEL=1` in `fly.toml` makes any weightless Fly build fail. `analyze_available` hides the demo. Fallback: a release asset or object storage, which would need a new owner decision. Did not happen: the owner allowed `lfs.github.com` on 2026-10-29 and the weights went through Git LFS (`docs/BLOCKERS.md` B8, closed). |
 | R2 | GitHub LFS bandwidth or storage quota (not checked here). Two CI jobs pull 126.5 MB on every run (`ci.yml:31-32,141-142`), and the deploy pulls it again. | Cache LFS objects in `actions/cache`, keyed by the pointer's object id, and pull only in jobs that need the file. |
 | R3 | Fly or Cloudflare behaves differently from what this plan assumes. | Every assumption is listed in ADR 011 with a post-deploy check. Designs fail safe: a wrong trust setting gives a stricter, unspoofable shared bucket, and the origin lock is off by default. |
 | R4 | Spoofed client IPs. | One trusted header, set by nginx: `Fly-Client-IP` in Fly mode, `CF-Connecting-IP` only after Cloudflare's origin-pull client certificate is verified in Cloudflare mode; nginx overwrites `X-Real-IP`; forged-header tests (D10, D11). |

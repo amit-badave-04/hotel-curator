@@ -50,8 +50,9 @@ language model following the project's guideline
 (docs/labeling/GUIDELINES.md). The base model's licence is recorded as MIT,
 as its authors published it (the fairseq release); it was not re-verified
 from the build environment. The fine-tuned weights inherit the data's
-licence uncertainty and come with no licence of their own: they are served
-only in the non-commercial demo above. Model card:
+licence uncertainty and come with no licence of their own: they are stored
+in this repository through Git LFS and served only in the non-commercial
+demo above. Model card:
 artifacts/models/roberta-base-ft-train2/MODEL_CARD.md.
 
 Third-party software

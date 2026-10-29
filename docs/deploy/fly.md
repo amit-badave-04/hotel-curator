@@ -225,9 +225,9 @@ as above. The database app is never deployed from GitHub.
 Set up once, in the repository's settings, **before** this workflow
 reaches `main`. A run that names an environment that does not exist yet
 creates it without a reviewer or branch rule; if `production` already
-exists, open it and add both. Deploys also need the served weights in Git
-LFS (`docs/BLOCKERS.md`, B8): without them every run stops at its check
-step, before anything is deployed.
+exists, open it and add both. The served weights are in Git LFS, and the
+workflow pulls them; a commit without them stops at the check step,
+before anything is deployed.
 
 1. **Environment.** Settings, Environments, New environment, `production`.
    Add yourself as a required reviewer, so every deploy waits for your

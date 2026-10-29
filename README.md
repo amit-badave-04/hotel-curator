@@ -45,15 +45,16 @@ How the model was chosen: [comparison](docs/model/COMPARISON.md),
 [model card](artifacts/models/roberta-base-ft-train2/MODEL_CARD.md),
 [error analysis](docs/model/ERRORS.md).
 
-> **The trained model's weights are not in this repository yet.** The build
-> environment could not reach Git LFS, which a 126 MB file needs
-> ([BLOCKERS](docs/BLOCKERS.md) B8). The evaluation, the hotel results and
-> the tiers computed with the weights are committed, so search, hotel pages
-> and compare work fully; only "Try the model" (`POST /v1/analyze`) answers
-> "model not loaded" until the weights are added. The corpus part scores
-> (`data/processed/part_scores.parquet`, 13 MB) are not committed, so
-> re-running `make score-hotels` or `make validate-tiers` also needs the
-> weights.
+> **The trained model's weights (126 MB) are stored with Git LFS.** A clone
+> made with Git LFS installed has them; otherwise install Git LFS and run
+> `git lfs pull --include="artifacts/models/*/model.onnx"` (a plain
+> `git lfs pull` also fetches the archived v1 checkpoint, 499 MB). Without
+> them, search, hotel pages and compare still work from the committed
+> results, and only "Try the model" (`POST /v1/analyze`) answers "model not
+> loaded". The corpus part scores (`data/processed/part_scores.parquet`,
+> 13 MB) are not committed, so re-running `make score-hotels` or
+> `make validate-tiers` first needs `make data` and `make score-parts`
+> (1.7 hours on 4 CPU threads).
 
 ## Try it
 
@@ -96,10 +97,10 @@ cd web && npm ci && npm run dev   # web app on http://localhost:5173
 ## Deploy
 
 The public site is meant to run at **https://hotel-curator.fly.dev**, and
-later on its own domain behind Cloudflare. It is not live yet: the
-production API image cannot be built without the model weights, which are
-not in git yet ([BLOCKERS](docs/BLOCKERS.md) B8), and the first deploy
-needs the owner's Fly.io account.
+later on its own domain behind Cloudflare. It is not live yet: the first
+deploy needs the owner's Fly.io account ([BLOCKERS](docs/BLOCKERS.md) B9).
+The API image carries the model weights from Git LFS, and every Fly build
+checks them against the promotion record.
 
 It runs as three Fly.io apps in `lhr`: the web app (nginx and the React
 app, the only public one), the API (private, reached over Fly's private

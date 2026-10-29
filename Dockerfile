@@ -24,8 +24,8 @@ RUN --mount=type=secret,id=extra_ca,required=false \
 
 FROM python:3.12-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704
 # Production builds pass REQUIRE_MODEL=1: the image then cannot be built
-# unless the served weights are present and are exactly the files the
-# promotion rule judged (files_sha256 in promotion.json; BLOCKERS B8).
+# unless the served weights, pulled from Git LFS, are present and are exactly
+# the files the promotion rule judged (files_sha256 in promotion.json).
 ARG REQUIRE_MODEL=0
 ENV PATH=/opt/venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \

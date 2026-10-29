@@ -233,7 +233,7 @@ data again. Fly also keeps daily volume snapshots (assumption A9;
 | Pages load, data does not (502, 503 or 504 on `/api`) | the API's logs and checks | the API is down or restarting: one machine, so a deploy or crash means seconds of errors; a crash loop shows in the logs |
 | `/api/readyz` says "database unavailable" | `flyctl machine list --app hotel-curator-db`, the database's logs | database stopped or starting: `flyctl machine start <id> --app hotel-curator-db` |
 | `/api/readyz` says "no hotel data loaded" | `flyctl releases --app hotel-curator-api` | the release command failed: its log line says why; redeploy the API |
-| Analyze answers 503 | API log line "Model unavailable: …" | the image has no weights (Git LFS pointers): rebuild once `docs/BLOCKERS.md` B8 is resolved |
+| Analyze answers 503 | API log line "Model unavailable: …" | the model did not load, and the log line says why. Fly builds refuse missing or wrong weights (`REQUIRE_MODEL=1` in `fly.toml`), so look for an ONNX Runtime or memory error, then redeploy the API or roll it back ([fly.md, "Deploying again"](deploy/fly.md#deploying-again)) |
 | Everyone gets 429 at once | nginx's `client` field | every request seems to come from one address, so the rate limits share one bucket: check assumptions A1 and A13 |
 | The API restarts under load | `process_resident_memory_bytes`, "Out of memory" in the logs | raise `memory` in `fly.toml` to 2 GB and redeploy |
 | A deploy stops with an edge-mode message | the message | `scripts/deploy.py` refuses to change the web app's mode quietly; pass the mode it names |

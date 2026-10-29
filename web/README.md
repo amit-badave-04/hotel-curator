@@ -102,8 +102,9 @@ npm run test:e2e
 Locally, servers already running on those ports are reused; with `CI=true`
 they are always started fresh. The journeys are J1 (explorer filters to a
 hotel), J2 (hotel page shows why and evidence), J3 (compare two hotels), J5
-(analyze returns labels, or says no model is loaded: the dev API has no
-model package) and J0 (the landing page, its live numbers, old links, and
+(analyze returns labels, or says no model is loaded: the API has only the
+Git LFS pointer when the weights were not pulled, as in CI's e2e job) and
+J0 (the landing page, its live numbers, old links, and
 the served robots.txt, sitemap and notice). Every page and its interactive
 states are checked with axe (`@axe-core/playwright`) in light and dark mode,
 and the main pages again at 360 and 768 px; any serious or critical

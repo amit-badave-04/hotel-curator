@@ -58,10 +58,10 @@ them at build time (`Dockerfile`); nothing online writes to them.
 | `data/demo/hotel_results.json.gz` | `curator score hotels` | `curator db release`: in the API container's entrypoint in compose, as Fly's `release_command` once per deploy; migrates first, then loads unless the file's SHA-256 is already loaded, under a database lock |
 | `config/tier_policy.yaml` | by hand (values from ADR 006); read by `curator score hotels` and `validate` | API start-up; `GET /v1/meta` shows every value |
 
-`model.onnx` is not in git yet: the build environment could not upload it
-through Git LFS (`docs/BLOCKERS.md`, B8). Until it is added, `/v1/analyze`
-answers 503; tiers, search, hotel pages and comparison work from the
-committed results.
+`model.onnx` is stored in Git LFS (`.gitattributes`). A checkout that has
+only its LFS pointer (Git LFS not installed, or not pulled) cannot load
+it: `/v1/analyze` answers 503; tiers, search, hotel pages and comparison
+work from the committed results.
 
 ## System context
 

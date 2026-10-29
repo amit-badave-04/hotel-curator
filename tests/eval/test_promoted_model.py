@@ -1,9 +1,9 @@
 """Behaviour gates for the promoted model (``pytest -m eval``, plan §3.6).
 
 They read committed artifacts: the promotion decision and the served ONNX
-package. They are skipped, not passed, while the weights are not committed
-(docs/BLOCKERS.md B8), and they fail when the weights are committed but only
-a Git LFS pointer was checked out.
+package, whose weights are in Git LFS. The two that need the weights fail
+when only a Git LFS pointer was checked out (run git lfs pull), and are
+skipped, not passed, only in a tree with no model.onnx at all.
 The thresholds were fixed before the promoted model was run on the
 fixture: each label must be found in at least one of its two clear-cut
 examples, at least 80% of all expected labels must be found, and at least
@@ -58,7 +58,7 @@ def _published() -> Path:
     package_dir = ROOT / "artifacts" / "models" / _promotion()["winner"]
     model = package_dir / "model.onnx"
     if not model.is_file():
-        pytest.skip("promoted weights not committed yet (BLOCKERS B8)")
+        pytest.skip("no model.onnx for the promoted model in this tree")
     if is_lfs_pointer(model):
         pytest.fail("model.onnx is a Git LFS pointer: run git lfs pull")
     return package_dir

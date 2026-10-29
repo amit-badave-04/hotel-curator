@@ -117,8 +117,8 @@ def test_serve_logs_only_json_and_finishes_a_request_on_sigterm(
     finally:
         if process.poll() is None:
             process.kill()
-    # The model may be missing here (weights not committed): 503 is an
-    # answer too. What matters is a whole response, then a clean exit.
+    # The model may be missing here (an unpulled Git LFS pointer): 503 is
+    # an answer too. What matters is a whole response, then a clean exit.
     status_line, _, rest = answer.partition(b"\r\n")
     assert status_line in (
         b"HTTP/1.1 200 OK",

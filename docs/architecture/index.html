@@ -127,7 +127,7 @@ calls an LLM.</p>
   <text class="small" x="668" y="256">db release</text>
   <text class="small" x="668" y="122">loaded at start</text>
 </svg>
-<figcaption><code>model.onnx</code> is not in git yet (Git LFS was blocked in the build environment, <code>docs/BLOCKERS.md</code> B8). Until it is added, <code>POST /v1/analyze</code> answers 503; everything else works from the committed results.</figcaption>
+<figcaption><code>model.onnx</code> is stored in Git LFS. A checkout that has only its LFS pointer (Git LFS not installed, or not pulled) cannot load it: <code>POST /v1/analyze</code> answers 503; everything else works from the committed results.</figcaption>
 </figure>
 
 <h2 id="offline">2. Offline pipeline</h2>
@@ -171,7 +171,7 @@ tier scheme were committed before any model ran.</p>
   <path class="arrow" d="M840 330 C 700 290, 420 290, 330 308"/>
   <path class="arrow" d="M860 376 C 860 400, 760 404, 750 380"/>
 </svg>
-<figcaption>Large or re-downloadable files (raw CSVs, processed tables, base weights, training runs, packages, part scores) stay local and git-ignored; labels, evaluations, manifests, the package metadata and the hotel results are committed.</figcaption>
+<figcaption>Large or re-downloadable files (raw CSVs, processed tables, base weights, training runs, packages, part scores) stay local and git-ignored; labels, evaluations, manifests, the published model package (its <code>model.onnx</code> through Git LFS) and the hotel results are committed.</figcaption>
 </figure>
 
 <h2 id="online">3. Online on a laptop: docker compose</h2>

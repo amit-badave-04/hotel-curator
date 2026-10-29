@@ -1,8 +1,8 @@
 name: Served model weights
 description: >-
   Pull the served model's weights from Git LFS, cached by object id, and
-  report whether they are tracked yet (docs/BLOCKERS.md B8). The frozen v1
-  checkpoint is never pulled.
+  report whether this commit tracks them. The frozen v1 checkpoint is
+  never pulled.
 outputs:
   tracked:
     description: "'true' when artifacts/models/*/model.onnx is in Git LFS"
@@ -20,7 +20,7 @@ runs:
           echo "key=lfs-served-$oids" >> "$GITHUB_OUTPUT"
         else
           echo "tracked=false" >> "$GITHUB_OUTPUT"
-          echo "::notice::Served model weights are not in Git LFS yet (docs/BLOCKERS.md B8); /v1/analyze answers 503."
+          echo "::notice::Served model weights are not tracked in Git LFS in this commit; /v1/analyze answers 503."
         fi
     - if: steps.ids.outputs.tracked == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
