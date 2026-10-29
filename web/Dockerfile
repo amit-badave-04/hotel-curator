@@ -18,6 +18,10 @@ RUN VITE_PUBLIC_ORIGIN="$VITE_PUBLIC_ORIGIN" npm run build
 # mode). The site is rendered at start for CURATOR_EDGE (local, fly or
 # cloudflare) by nginx/15-curator-site.sh; see ADR 011.
 FROM nginxinc/nginx-unprivileged:1.30.6-alpine3.24@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03 AS runtime
+# Alpine fixed brotli-libs (CVE-2026-111497, 1.2.1-r0) after the newest
+# build of this image; drop this once the pinned image includes the fix.
+USER root
+RUN apk upgrade --no-cache brotli-libs
 COPY nginx/*.conf nginx/*.template /etc/nginx/curator/
 COPY --chmod=0755 nginx/15-curator-site.sh /docker-entrypoint.d/15-curator-site.sh
 COPY --from=build /app/dist /usr/share/nginx/html
