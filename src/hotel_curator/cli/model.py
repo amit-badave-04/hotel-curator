@@ -939,17 +939,34 @@ def _check_judged_files(
     directory: Path, files_sha256: list[dict[str, str]]
 ) -> None:
     """Raise unless every package file has the hash promotion recorded."""
-    from hotel_curator.data.download import sha256_file
-    from hotel_curator.inference.package import PACKAGE_FILES
+    from hotel_curator.inference.verify import judged_hashes, mismatched_files
 
-    judged = {f["file"]: f["sha256"] for f in files_sha256}
-    changed = [
-        name
-        for name in PACKAGE_FILES
-        if sha256_file(directory / name) != judged.get(name)
-    ]
-    if changed:
+    problems = mismatched_files(directory, judged_hashes(files_sha256))
+    if problems:
         raise typer.BadParameter(
-            f"{directory}: {', '.join(changed)} differ from the package "
-            "promotion judged; run curator model compare again"
+            f"{directory}: {'; '.join(problems)}; the package must be the "
+            "one promotion judged (run curator model compare again)"
         )
+
+
+@app.command("verify-served")
+def verify_served_cmd() -> None:
+    """Check the served package against the promotion record.
+
+    Exits non-zero when model.onnx, tokenizer.json or metadata.json in
+    ``artifacts/models/<winner>`` is missing, is a Git LFS pointer, or
+    differs from ``files_sha256`` in ``promotion.json``. The API image runs
+    this when built with ``REQUIRE_MODEL=1``.
+    """
+    from hotel_curator.inference.verify import check_served_package
+
+    try:
+        served = check_served_package(get_settings().artifacts_dir)
+    except (OSError, ValueError, KeyError) as exc:
+        typer.echo(f"cannot verify the served package: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    if not served.ok:
+        for problem in served.problems:
+            typer.echo(f"{served.directory}/{problem}", err=True)
+        raise typer.Exit(1)
+    typer.echo(f"{served.winner}: every file matches the promotion record")

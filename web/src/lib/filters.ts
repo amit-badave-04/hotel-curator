@@ -50,6 +50,14 @@ function groupNotEnough(tiers: Tier[]): Tier[] {
   return TIERS.filter((tier) => tiers.includes(tier) || isNotEnough(tier));
 }
 
+/** A search term the API accepts: control characters (a pasted tab, say),
+ * which it refuses, become spaces; then trimmed and cut to its limit. */
+export function cleanQuery(value: string): string {
+  // eslint-disable-next-line no-control-regex -- matching them is the point
+  const controls = /[\u0000-\u001f\u007f]+/g;
+  return value.replace(controls, ' ').trim().slice(0, MAX_QUERY_LENGTH);
+}
+
 export function parseFilters(params: URLSearchParams): ExplorerFilters {
   const city = params.get('city');
   const sort = params.get('sort');
@@ -59,7 +67,7 @@ export function parseFilters(params: URLSearchParams): ExplorerFilters {
     tiers: groupNotEnough(pick(params.getAll('tier'), TIERS)),
     strong: pick(params.getAll('strong'), ATTRIBUTES),
     avoidWeak: pick(params.getAll('avoid_weak'), ATTRIBUTES),
-    q: (params.get('q') ?? '').trim().slice(0, MAX_QUERY_LENGTH),
+    q: cleanQuery(params.get('q') ?? ''),
     sort: sort && (SORTS as readonly string[]).includes(sort) ? (sort as SortOrder) : 'best',
     page: Number.isFinite(page) && page >= 1 && page <= MAX_PAGE ? page : 1,
   };
@@ -107,4 +115,28 @@ export function activeFilterCount(filters: ExplorerFilters): number {
     filters.strong.length +
     filters.avoidWeak.length
   );
+}
+
+/** The explorer's address; `/` is the landing page. */
+export const EXPLORER_PATH = '/explore';
+
+const EXPLORER_KEYS = ['q', 'city', 'tier', 'strong', 'avoid_weak', 'sort', 'page'] as const;
+
+/** An explorer link: the filters as a query string on the explorer's path. */
+export function explorerHref(filters: ExplorerFilters): string {
+  const query = filtersToSearchParams(filters).toString();
+  return query ? `${EXPLORER_PATH}?${query}` : EXPLORER_PATH;
+}
+
+/**
+ * Where an old explorer link (from when the explorer was at `/`) should go:
+ * `/?city=Paris` becomes `/explore?city=Paris`. The filters are parsed and
+ * written back, so only valid values travel. `null` when the query names
+ * no explorer filter, so `/` and links like `/?utm_source=x` stay on the
+ * landing page.
+ */
+export function legacyExplorerTarget(search: string): string | null {
+  const params = new URLSearchParams(search);
+  if (!EXPLORER_KEYS.some((key) => params.has(key))) return null;
+  return explorerHref(parseFilters(params));
 }

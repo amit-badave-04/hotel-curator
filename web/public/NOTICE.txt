@@ -1,0 +1,77 @@
+hotel-curator
+=============
+
+Code
+----
+The source code in this repository is licensed under the MIT License (see
+LICENSE), except the vendored Swagger UI (see Third-party software below).
+The MIT License covers code only. It does not cover the data or the model
+weights described below.
+
+Terms of the public site
+------------------------
+The public site (https://hotel-curator.fly.dev until it moves to its own
+domain) is a free, non-commercial demo, published before the data licence
+below has had a legal review. This project is not affiliated with or
+endorsed by Booking.com or TripAdvisor. To request a correction or the
+removal of a review excerpt, open an issue at
+https://github.com/amit-badave-04/hotel-curator/issues; you can name the
+hotel page and month instead of quoting the text. A removal takes the
+excerpt off the site (rolling the site back to an earlier release can show
+it again until the current data is deployed). It stays in the public
+source dataset and in this repository: in its history and, for a review
+among the annotation samples below, in the current sample files.
+
+Data sources
+------------
+1. Booking.com "515K Hotel Reviews Data in Europe"
+   Original: https://www.kaggle.com/datasets/jiashenliu/515k-hotel-reviews-data-in-europe
+   Copy used by the pipeline: GitHub raghavendranhp/Dynamic-Hotel-Recommendation-System-Using-NLP
+   at commit 903600f2ed2dbd761f2f435564c7e630f79e74b7, pinned by SHA-256.
+   Licence: CC0 1.0, as declared by the Kaggle uploader. The uploader also
+   states that the content was originally owned by Booking.com. This could not
+   be confirmed first-hand from the build environment.
+   Used for: training, evaluation, and display of short review excerpts.
+   The full source file is not redistributed in this repository, but parts
+   of it are: the annotation samples (data/labels/*/sample.parquet) hold
+   9,800 whole reviews, unredacted (staff names included), with the
+   source's reviewer fields (nationality, date, reviewer score, the
+   reviewer's review count, trip and traveller type, room type, length of
+   stay, pet and mobile flags). The demo dataset holds the short excerpts
+   the site shows, some of them from sampled reviews; the site shows only
+   an excerpt's month and traveller type, never the other reviewer fields.
+   Obtain a legal review before any commercial use.
+
+2. Evaluation-only source (never committed, never used for training):
+   TripAdvisor Annotated (Marcheggiani et al.), fetched by pinned hash,
+   used only to measure annotation agreement. Licence not verified.
+
+3. The archived v1 model (artifacts/models/v1-roberta-base, kept only to
+   compare v2 with it, never served) was trained on Kaggle
+   andrewmvd/trip-advisor-hotel-reviews with machine-made labels. That
+   dataset's licence is not recorded here and could not be checked from
+   the build environment.
+
+Model
+-----
+The served model, roberta-base-ft-train2, is roberta-base (Liu et al.,
+2019), fine-tuned on 13,845 review parts from source 1, labelled by a
+language model following the project's guideline
+(docs/labeling/GUIDELINES.md). The base model's licence is recorded as MIT,
+as its authors published it (the fairseq release); it was not re-verified
+from the build environment. The fine-tuned weights inherit the data's
+licence uncertainty and come with no licence of their own: they are stored
+in this repository through Git LFS and served only in the non-commercial
+demo above. Model card:
+artifacts/models/roberta-base-ft-train2/MODEL_CARD.md.
+
+Third-party software
+--------------------
+The web app bundles open-source packages (MIT, ISC, BSD-3-Clause and
+Apache-2.0 licences), and its build adds code from Tailwind CSS, Vite and
+Rolldown (MIT; Rolldown's helpers derive from esbuild and Rollup, also
+MIT). Their licence texts are in
+web/public/THIRD-PARTY-NOTICES.txt, served at /THIRD-PARTY-NOTICES.txt.
+The API documentation page uses Swagger UI (Apache-2.0); its licence and
+notice ship with it in src/hotel_curator/api/static/swagger-ui/ and are
+served at /api/docs-assets/LICENSE and /api/docs-assets/NOTICE.

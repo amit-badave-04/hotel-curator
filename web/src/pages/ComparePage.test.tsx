@@ -196,7 +196,7 @@ describe('Compare page', () => {
   });
 
   it('is reachable from the explorer through the compare list', async () => {
-    const { user, router } = renderApp('/');
+    const { user, router } = renderApp('/explore');
     await user.click(
       within(await screen.findByRole('article', { name: 'Alpha Grand' })).getByRole('button', {
         name: /Add to compare/,

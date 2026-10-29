@@ -56,3 +56,7 @@ Per-label scores, slices and calibration tables: `docs/model/COMPARISON.md`. Typ
 - The comparison with modern encoders is partial: huggingface.co was blocked during the build (`docs/BLOCKERS.md` B1), so the only ModernBERT-architecture model tried was mmBERT-small; ModernBERT-base, DeBERTa-v3 and Ettin were not trained (ADR 005).
 - No human or external check for noise_positive, noise_negative, wifi_positive, wifi_negative: the external human set has no noise or wifi aspect, so their gold is the LLM panel's alone (ADR 001; `docs/labeling/EXTERNAL_CHECK.md`).
 - Fewest gold-test examples: value_positive (61 reviews), noise_positive (66 reviews), wifi_positive (75 reviews); lowest F1: value_positive (0.825), cleanliness_negative (0.846), location_negative (0.858), food_negative (0.867). Per-label scores: `docs/model/COMPARISON.md`.
+
+## Licence and use
+
+- The weights derive from the base model above, whose licence is recorded as its authors published it and was not re-verified from the build environment (ADR 005), and from labels of review text whose licence is unconfirmed: CC0 as declared by an uploader, originally Booking.com content (`NOTICE`). They inherit that uncertainty and come with no licence of their own. They are served only in a non-commercial demo; any other use, commercial use above all, needs the legal review `NOTICE` asks for.

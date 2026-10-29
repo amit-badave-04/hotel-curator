@@ -21,8 +21,10 @@
     "pretest:e2e": "npm run build",
     "test:e2e": "playwright test",
     "generate:api": "orval --config orval.config.ts && prettier --write src/api/generated",
+    "images": "node scripts/render-images.ts",
     "audit:deps": "npm audit --audit-level=high",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run build"
+    "check": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "notices": "node scripts/third-party-notices.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",

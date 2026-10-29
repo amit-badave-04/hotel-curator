@@ -11,19 +11,72 @@ and starts faster; the outputs match the PyTorch model to within 1e-4
 (checked by a unit test).
 """
 
+import functools
 import json
-from collections.abc import Sequence
+import logging
+import os
+import re
+import sys
+import tempfile
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from pathlib import Path
+from types import ModuleType
 
 import numpy as np
 import numpy.typing as npt
-import onnxruntime as ort
 from tokenizers import Tokenizer
 
 from hotel_curator.text import format_input
 
 FloatMatrix = npt.NDArray[np.float64]
 DEFAULT_BATCH = 64
+STDERR_FD = 2
+ORT_ERROR = 3
+"""ONNX Runtime's own severity scale: 0 verbose ... 3 error, 4 fatal."""
+ANSI_COLOUR = re.compile(r"\x1b\[[0-9;]*m")
+
+logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def native_stderr_logged() -> Iterator[None]:
+    """Pass what native code writes to stderr meanwhile through logging.
+
+    ONNX Runtime prints its own plain-text lines (on some machines, a warning
+    about their devices) straight to file descriptor 2, which would break the
+    server's one-JSON-object-per-line log stream.
+    """
+    sys.stderr.flush()
+    with tempfile.TemporaryFile() as captured:
+        saved = os.dup(STDERR_FD)
+        os.dup2(captured.fileno(), STDERR_FD)
+        try:
+            yield
+        finally:
+            os.dup2(saved, STDERR_FD)
+            os.close(saved)
+        captured.seek(0)
+        text = captured.read().decode("utf-8", "replace")
+    for line in ANSI_COLOUR.sub("", text).splitlines():
+        if line.strip():
+            logger.warning("onnxruntime: %s", line.strip())
+
+
+@functools.cache
+def onnxruntime() -> ModuleType:
+    """Import ONNX Runtime with its start-up output in our logs.
+
+    Its device warnings are printed while the module is imported, before any
+    setting can apply, so the import is captured; from then on it prints
+    only errors.
+    """
+    with native_stderr_logged():
+        import onnxruntime as ort
+
+        ort.set_default_logger_severity(ORT_ERROR)
+    module: ModuleType = ort  # the package has no type hints
+    return module
 
 
 class OnnxPredictor:
@@ -54,6 +107,7 @@ class OnnxPredictor:
         self._tokenizer.enable_padding(
             pad_id=int(meta["pad_id"]), pad_token=str(meta["pad_token"])
         )
+        ort = onnxruntime()
         options = ort.SessionOptions()
         options.intra_op_num_threads = num_threads
         self._session = ort.InferenceSession(

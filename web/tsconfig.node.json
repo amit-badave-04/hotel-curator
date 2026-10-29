@@ -22,6 +22,8 @@
     "orval.config.ts",
     "playwright.config.ts",
     "security-headers.ts",
+    "seo.ts",
+    "scripts/**/*.ts",
     "e2e/**/*.ts",
     "test/**/*.ts"
   ]

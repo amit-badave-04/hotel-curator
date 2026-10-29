@@ -227,3 +227,63 @@
     }
   }
 }
+
+@layer components {
+  /*
+   * The landing page's hero: two soft glows and a faint dot grid over the
+   * card colour, from the theme tokens, so it follows light and dark.
+   */
+  .landing-hero {
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    padding: 2rem 1.25rem;
+    background:
+      radial-gradient(
+          circle at 1px 1px,
+          color-mix(in oklab, var(--foreground) 9%, transparent) 1px,
+          transparent 0
+        )
+        0 0 / 22px 22px,
+      radial-gradient(
+        48rem 26rem at 0% 0%,
+        color-mix(in oklab, var(--primary) 16%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        36rem 22rem at 100% 100%,
+        color-mix(in oklab, var(--chart-contrast) 12%, transparent),
+        transparent 70%
+      ),
+      var(--card);
+  }
+
+  @media (min-width: 640px) {
+    .landing-hero {
+      padding: 3rem 2.5rem;
+    }
+  }
+
+  /* A thin bar at the top while a page's code downloads. */
+  .route-progress {
+    transform-origin: left;
+    animation: route-progress 1.2s ease-out infinite;
+  }
+
+  @keyframes route-progress {
+    from {
+      transform: scaleX(0.1);
+    }
+    to {
+      transform: scaleX(0.9);
+    }
+  }
+
+  /* FAQ answers open with their own "+" marker, not the browser's triangle. */
+  .landing-faq > summary {
+    list-style: none;
+  }
+
+  .landing-faq > summary::-webkit-details-marker {
+    display: none;
+  }
+}

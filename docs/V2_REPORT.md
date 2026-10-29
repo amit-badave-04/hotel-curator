@@ -2,7 +2,8 @@
 
 _Branch `v2`, pull request
 [amit-badave-04/hotel-curator#1](https://github.com/amit-badave-04/hotel-curator/pull/1)
-(open, not merged). Every number below
+(merged into `main`; the public deployment that followed is planned in
+`docs/deploy/gap-audit.md`). Every number below
 comes from a command that was run; the command or the file that records it
 is named next to it. Anything not done or not verified says so._
 
@@ -67,8 +68,8 @@ validation is the out-of-time and simulation checks above.
 
 | Gate | Result |
 |---|---|
-| Python tests (`pytest --cov`) | Final tree, without the weights as in a fresh clone: 399 passed, 2 skipped (the two eval gates that need the weights; next row), coverage 90%; with the weights present locally, 401 passed |
-| Model evaluation gates (`pytest -m eval`) | 3 passed with the weights present; 1 passed, 2 skipped in a checkout without them (B8) |
+| Python tests (`pytest --cov`) | Final v2 tree, without the weights (not committed then: B8): 399 passed, 2 skipped (the two eval gates that need the weights; next row), coverage 90%; with the weights present locally, 401 passed |
+| Model evaluation gates (`pytest -m eval`) | 3 passed with the weights present; 1 passed, 2 skipped in a checkout without them (the v2 tree, before they were committed: B8). Now that they are in Git LFS, an unpulled pointer fails the two gates instead of skipping them |
 | ruff (lint and format, incl. notebooks), mypy strict (89 files) | clean |
 | Web: eslint, tsc, vitest, vite build, prettier | clean; 74 unit tests passed |
 | End-to-end and accessibility (Playwright + axe, light and dark) | 37 passed (17 journeys, 20 axe checks, no serious or critical violations) |
@@ -98,15 +99,17 @@ Not done:
 - A dedicated inference thread pool (plan §7.2 abuse cases): not built;
   rate limits and size caps bound `analyze` instead.
 - trufflehog, osv-scanner, semgrep and the image scan are not in CI; they
-  ran locally for the security review.
+  ran locally for the security review. (The deployment branch later added
+  a Trivy image scan, workflow linting and Dependabot to CI.)
 - The owner's own `/red-team` procedure (B7) was not run here; an
   equivalent red-team exercise was (section 4).
 
 Not verified in this environment:
 
-- The promoted model's weights are not pushed (B8): `lfs.github.com` is
-  blocked. A fresh clone cannot run `POST /v1/analyze` or the two eval gates
-  that need the file until the owner adds it.
+- The promoted model's weights could not be pushed during v2 (B8:
+  `lfs.github.com` was blocked). Since 2026-10-29 they are in Git LFS, so
+  a clone that has pulled them (`git lfs pull`) runs `POST /v1/analyze`
+  and all three eval gates.
 - Human ground truth: gold labels are an LLM panel's majority, checked
   against human annotators on an external set; the 100-review human audit
   is prepared but needs a person (B3).
@@ -220,8 +223,8 @@ Deviations and disclosures:
 
 ## 7. Owner actions
 
-1. Allow `lfs.github.com` in the environment's network settings, then add the
-   weights (BLOCKERS B8 has the exact commands and SHA-256).
+1. Done on 2026-10-29: `lfs.github.com` was allowed and the weights were
+   added through Git LFS (BLOCKERS B8, closed).
 2. Optional: run your own `/red-team` on `v2` as well (B7); an equivalent
    exercise already ran (security review, section 4.6).
 3. Label the 100-review human audit sheet (B3,

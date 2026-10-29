@@ -6,29 +6,85 @@ unset), so the CLI, the API and the Docker image agree on where data and
 models live. See ``.env.example`` for a documented template.
 """
 
+import ipaddress
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
+from urllib.parse import parse_qs, urlsplit
 
-from pydantic import Field, computed_field
+from pydantic import (
+    Field,
+    SecretStr,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 MAX_PAGE_SIZE = 100
 """Upper bound for search page sizes, in the API schema and in settings."""
+POSTGRES_DRIVER = "postgresql+psycopg://"
+TLS_SSLMODES = frozenset({"require", "verify-ca", "verify-full"})
+
+
+def normalise_database_url(url: str) -> str:
+    """Use the psycopg 3 driver for ``postgres://`` and ``postgresql://`` URLs.
+
+    Hosting providers hand out ``postgres://`` URLs, which SQLAlchemy 2
+    rejects; ``postgresql://`` would pick psycopg2, which is not installed.
+    """
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return POSTGRES_DRIVER + url.removeprefix(prefix)
+    return url
+
+
+def uses_tls_or_socket(url: str) -> bool:
+    """True for a Postgres URL that requires TLS or connects over a socket.
+
+    A repeated parameter counts by its last value, as libpq reads it.
+    """
+    query = parse_qs(urlsplit(url).query)
+    if query.get("host", [""])[-1].startswith("/"):
+        return True
+    return query.get("sslmode", [""])[-1] in TLS_SSLMODES
 
 
 class Settings(BaseSettings):
     """Application settings."""
 
+    # hide_input_in_errors: a failed validation must not print a database
+    # URL, which can carry a password, into the start-up log.
     model_config = SettingsConfigDict(
-        env_prefix="CURATOR_", env_file=".env", extra="ignore"
+        env_prefix="CURATOR_",
+        env_file=".env",
+        extra="ignore",
+        hide_input_in_errors=True,
     )
 
     home: Path = Field(default_factory=Path.cwd)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_format: Literal["console", "json"] = "console"
 
-    database_url: str = "sqlite:///./var/hotel_curator.db"
+    environment: Literal["development", "production"] = Field(
+        default="development",
+        description="production refuses to start without Postgres over TLS "
+        "(or a Unix socket); the API image sets it.",
+    )
+    # Credentials: both URLs may carry a password, so they are SecretStr and
+    # never appear in a repr or a log; read them through db_url() and
+    # migration_db_url().
+    database_url: SecretStr = SecretStr("sqlite:///./var/hotel_curator.db")
+    migration_database_url: SecretStr | None = Field(
+        default=None,
+        description="Role that owns the schema, used only by curator db "
+        "release; defaults to database_url.",
+    )
+    migrate_on_start: bool = Field(
+        default=True,
+        description="The API container runs curator db release before "
+        "serving; off on Fly, where the release command does it once.",
+    )
     model_package: Path | None = None
     tier_policy: Path | None = None
 
@@ -45,10 +101,71 @@ class Settings(BaseSettings):
     )
     forwarded_allow_ips: str | None = Field(
         default=None,
-        description="Proxy addresses whose X-Forwarded-For is trusted for "
-        "client identity (rate limits). Unset: use the TCP peer.",
+        description="Proxies (addresses, CIDR ranges, or * for any peer) "
+        "whose X-Real-IP and X-Request-ID are believed; X-Forwarded-For "
+        "never is. Unset: the client is the TCP peer.",
+    )
+    metrics_port: int | None = Field(
+        default=None,
+        ge=1024,
+        le=65535,
+        description="Port of the Prometheus metrics listener, separate from "
+        "the API's (Fly's [metrics] scrapes it). Unset: no metrics listener.",
+    )
+    metrics_host: str = Field(
+        default="127.0.0.1",
+        description="Address the metrics listener binds: an IP address; :: "
+        "on Fly, whose scraper comes over the private network.",
+    )
+    # Credential: a DSN is a write key for the Sentry project.
+    sentry_dsn: SecretStr | None = Field(
+        default=None,
+        description="Send unexpected errors to Sentry (needs the sentry "
+        "extra). Unset: no error reports leave the process.",
     )
     seed: int = 20261024
+
+    @field_validator("metrics_host")
+    @classmethod
+    def _metrics_host_is_an_address(cls, value: str) -> str:
+        ipaddress.ip_address(value)  # raises ValueError on a host name
+        return value
+
+    @field_validator("forwarded_allow_ips")
+    @classmethod
+    def _proxies_parse(cls, value: str | None) -> str | None:
+        from hotel_curator.api.clientip import TrustedProxies
+
+        TrustedProxies.parse(value)  # raises ValueError on a bad entry
+        return value
+
+    @model_validator(mode="after")
+    def _production_needs_postgres_over_tls(self) -> Self:
+        if self.environment != "production":
+            return self
+        for name, url in (
+            ("database_url", self.db_url()),
+            ("migration_database_url", self.migration_db_url()),
+        ):
+            if not url.startswith(POSTGRES_DRIVER):
+                raise ValueError(f"production needs a Postgres {name}")
+            if not uses_tls_or_socket(url):
+                raise ValueError(
+                    f"production needs sslmode=require (or stricter) in "
+                    f"{name}, or a Unix-socket host"
+                )
+        return self
+
+    def db_url(self) -> str:
+        """The serving database URL, with the driver normalised."""
+        return normalise_database_url(self.database_url.get_secret_value())
+
+    def migration_db_url(self) -> str:
+        """The URL ``curator db release`` migrates and seeds with."""
+        if self.migration_database_url is None:
+            return self.db_url()
+        secret = self.migration_database_url.get_secret_value()
+        return normalise_database_url(secret)
 
     @computed_field  # type: ignore[prop-decorator]
     @property

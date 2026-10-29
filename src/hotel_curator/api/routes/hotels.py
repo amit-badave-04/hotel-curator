@@ -22,6 +22,8 @@ router = APIRouter(prefix="/v1", tags=["hotels"])
 HOTEL_ID = r"^h_[0-9a-f]{10}$"
 CITY = r"^[A-Za-z][A-Za-z .'-]{0,59}$"
 MAX_QUERY = 80
+QUERY = r"^[^\x00-\x1f\x7f]+$"
+"""No control characters: Postgres refuses NUL in text, which would be a 500."""
 MAX_PAGE = 10_000
 MAX_COMPARE = 4
 
@@ -111,7 +113,12 @@ def list_hotels(
     ] = None,
     q: Annotated[
         str | None,
-        Query(min_length=1, max_length=MAX_QUERY, description="Name contains"),
+        Query(
+            min_length=1,
+            max_length=MAX_QUERY,
+            pattern=QUERY,
+            description="Name contains",
+        ),
     ] = None,
     sort: SortOrder = SortOrder.BEST,
     page: Annotated[int, Query(ge=1, le=MAX_PAGE)] = 1,

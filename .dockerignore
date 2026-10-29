@@ -23,6 +23,8 @@ docs
 tests
 scripts
 web
+deploy
+.github
 *.db
 .env
 .env.*

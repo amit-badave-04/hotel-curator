@@ -30,7 +30,9 @@ import {
 } from '@/lib/domain';
 import {
   activeFilterCount,
+  cleanQuery,
   DEFAULT_FILTERS,
+  explorerHref,
   filtersToSearchParams,
   PAGE_SIZE,
   parseFilters,
@@ -82,11 +84,7 @@ function FiltersForm({ filters, update, clear }: FiltersProps) {
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const value = new FormData(event.currentTarget).get('q');
-    update({
-      q: String(value ?? '')
-        .trim()
-        .slice(0, MAX_QUERY_LENGTH),
-    });
+    update({ q: cleanQuery(String(value ?? '')) });
   };
 
   const attributeGroup = (
@@ -366,7 +364,7 @@ export function ExplorerPage() {
   };
   const clear = () =>
     setSearchParams(filtersToSearchParams(DEFAULT_FILTERS), { preventScrollReset: true });
-  const hrefFor = (page: number) => `/?${filtersToSearchParams({ ...filters, page }).toString()}`;
+  const hrefFor = (page: number) => explorerHref({ ...filters, page });
   /**
    * For controls that vanish once used (page links, the empty state's
    * buttons): move focus to the results heading instead of losing it.

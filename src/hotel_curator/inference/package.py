@@ -16,11 +16,12 @@ import numpy as np
 import numpy.typing as npt
 
 from hotel_curator.inference.onnx_predictor import OnnxPredictor
+from hotel_curator.inference.verify import PACKAGE_FILES
 from hotel_curator.ml.calibration import IsotonicCalibrator
 
+__all__ = ["PACKAGE_FILES", "ModelPackage", "Prediction"]
+
 FloatMatrix = npt.NDArray[np.float64]
-PACKAGE_FILES = ("model.onnx", "tokenizer.json", "metadata.json")
-"""Everything a package directory holds; publishing copies exactly these."""
 
 
 @dataclass(frozen=True)

@@ -1,0 +1,22 @@
+# Edge mode "fly" (hotel-curator.fly.dev): Fly's edge terminates TLS and
+# sets Fly-Client-IP from the connection, replacing any value a client
+# sent (ADR 011, A1). A request without it came over Fly's private network,
+# not through the edge, and is keyed on its TCP peer. CF-Connecting-IP is
+# never believed in this mode. Rendered by 15-curator-site.sh.
+include curator/http.conf;
+
+upstream curator_api {
+    server ${CURATOR_API_UPSTREAM};
+}
+
+map $http_fly_client_ip $curator_client_ip {
+    ""      $remote_addr;
+    default $http_fly_client_ip;
+}
+
+server {
+    listen 8080;
+    listen [::]:8080;
+    server_name _;
+    include curator/site.conf;
+}

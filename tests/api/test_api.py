@@ -51,14 +51,16 @@ def _settings(tmp_path: Path, **overrides: object) -> Settings:
     return Settings(**values)  # type: ignore[arg-type]
 
 
-def _client(settings: Settings, results: Path | None) -> TestClient:
-    upgrade(settings.database_url)
+def _client(
+    settings: Settings, results: Path | None, peer: str = "testclient"
+) -> TestClient:
+    upgrade(settings.db_url())
     if results is not None:
-        engine = make_engine(settings.database_url)
+        engine = make_engine(settings.db_url())
         with session_scope(make_session_factory(engine)) as session:
             seed(session, results)
         engine.dispose()
-    return TestClient(create_app(settings))
+    return TestClient(create_app(settings), client=(peer, 50000))
 
 
 @pytest.fixture
@@ -87,6 +89,20 @@ def test_not_ready_without_data(tmp_path: Path) -> None:
     with _client(_settings(tmp_path), None) as c:
         response = c.get("/readyz")
     assert response.status_code == 503
+
+
+def test_not_ready_when_the_database_fails(
+    tmp_path: Path, results_file: Path
+) -> None:
+    settings = _settings(tmp_path)
+    with _client(settings, results_file) as c:
+        engine = make_engine(settings.db_url())
+        with engine.begin() as conn:
+            conn.exec_driver_sql("ALTER TABLE hotels RENAME TO hotels_gone")
+        engine.dispose()
+        response = c.get("/readyz")
+    assert response.status_code == 503
+    assert response.json() == {"status": "database unavailable"}
 
 
 def test_search_defaults_to_best_first(client: TestClient) -> None:
@@ -130,6 +146,8 @@ def test_pagination(client: TestClient) -> None:
         {"sort": "price; DROP TABLE hotels"},
         {"city": "Paris'; DROP TABLE hotels;--"},
         {"q": "x" * 81},
+        {"q": "a\x00b"},
+        {"q": "tab\there"},
         {"strong": "pool"},
     ],
 )
@@ -212,6 +230,14 @@ def test_cities_and_meta(client: TestClient) -> None:
     assert meta["model"] == "test-model"
     assert len(meta["attributes"]) == 8
     assert meta["policy"]["confirmation"] == 0.95
+    assert meta["analyze_available"] is False
+    period = meta["data_period"]
+    assert period == {"first_month": "2015-09", "last_month": "2017-08"}
+
+
+def test_meta_says_when_analyze_can_answer(client: TestClient) -> None:
+    client.app.state.curator._model = _FakeModel()  # type: ignore[attr-defined]
+    assert client.get("/v1/meta").json()["analyze_available"] is True
 
 
 def test_openapi_documents_every_route(client: TestClient) -> None:
@@ -338,6 +364,66 @@ def test_rate_limits(tmp_path: Path, results_file: Path) -> None:
         assert c.get("/healthz").status_code == 200  # probes are not limited
 
 
+NGINX = "172.28.0.10"
+
+
+def _analyze_codes(c: TestClient, n: int, **headers: str) -> list[int]:
+    return [
+        c.post("/v1/analyze", json={"liked": "ok"}, headers=headers).status_code
+        for _ in range(n)
+    ]
+
+
+def test_clients_behind_the_proxy_get_separate_buckets(
+    tmp_path: Path, results_file: Path
+) -> None:
+    settings = _settings(
+        tmp_path, analyze_rate_limit_per_minute=2, forwarded_allow_ips=NGINX
+    )
+    with _client(settings, results_file, peer=NGINX) as c:
+        c.app.state.curator._model = _FakeModel()  # type: ignore[attr-defined]
+        first = {"x-real-ip": "198.51.100.1"}
+        assert _analyze_codes(c, 3, **first) == [200, 200, 429]
+        assert _analyze_codes(c, 2, **{"x-real-ip": "198.51.100.2"}) == [
+            200,
+            200,
+        ]
+        # A client cannot leave its bucket with headers nginx overwrites
+        # or the API ignores.
+        dodges = {"x-forwarded-for": "203.0.113.9", "fly-client-ip": "::1"}
+        assert _analyze_codes(c, 1, **first, **dodges) == [429]
+
+
+def test_forged_identity_headers_from_other_peers_are_ignored(
+    tmp_path: Path, results_file: Path
+) -> None:
+    settings = _settings(
+        tmp_path, analyze_rate_limit_per_minute=2, forwarded_allow_ips=NGINX
+    )
+    with _client(settings, results_file, peer="203.0.113.50") as c:
+        c.app.state.curator._model = _FakeModel()  # type: ignore[attr-defined]
+        codes = [
+            _analyze_codes(c, 1, **{"x-real-ip": f"198.51.100.{i}"})[0]
+            for i in range(3)
+        ]
+        assert codes == [200, 200, 429]
+        sent = "0123456789abcdef0123456789abcdef"
+        echoed = c.get("/v1/cities", headers={"x-request-id": sent})
+        assert echoed.headers["x-request-id"] != sent
+
+
+def test_request_id_from_the_proxy_is_kept(
+    tmp_path: Path, results_file: Path
+) -> None:
+    settings = _settings(tmp_path, forwarded_allow_ips=NGINX)
+    with _client(settings, results_file, peer=NGINX) as c:
+        sent = "0123456789abcdef0123456789abcdef"
+        kept = c.get("/v1/cities", headers={"x-request-id": sent})
+        assert kept.headers["x-request-id"] == sent
+        bad = c.get("/v1/cities", headers={"x-request-id": "bad id"})
+        assert len(bad.headers["x-request-id"]) == 32
+
+
 def test_security_headers_and_request_id(client: TestClient) -> None:
     response = client.get("/v1/cities")
     assert response.headers["x-content-type-options"] == "nosniff"
@@ -362,8 +448,8 @@ def test_cors_allow_list(client: TestClient) -> None:
 
 def test_seed_is_idempotent(tmp_path: Path, results_file: Path) -> None:
     settings = _settings(tmp_path)
-    upgrade(settings.database_url)
-    engine = make_engine(settings.database_url)
+    upgrade(settings.db_url())
+    engine = make_engine(settings.db_url())
     factory = make_session_factory(engine)
     with session_scope(factory) as session:
         assert seed(session, results_file) == 5
@@ -419,7 +505,7 @@ def test_unexpected_errors_keep_the_error_shape_and_headers(
     tmp_path: Path, results_file: Path
 ) -> None:
     settings = _settings(tmp_path)
-    upgrade(settings.database_url)
+    upgrade(settings.db_url())
     app = create_app(settings)
 
     @app.get("/v1/boom")
@@ -498,6 +584,8 @@ def test_meta_evaluates_the_served_model_not_the_latest_winner(
             {
                 "winner": "newer-model",
                 "v1_config": "v1",
+                "test_reviews": 1200,
+                "test_hotels": 182,
                 "rows": [
                     row("v1", 0.6, None),
                     row("test-model", 0.85, diff),
@@ -510,6 +598,7 @@ def test_meta_evaluates_the_served_model_not_the_latest_winner(
     assert served is not None
     assert served.model == "test-model"
     assert served.macro_f1.point == 0.85
+    assert (served.test_reviews, served.test_hotels) == (1200, 182)
     assert load_evaluation(evals, "unknown-model") is None
     assert load_evaluation(evals, None) is None
 

@@ -1,5 +1,7 @@
 import { Link } from 'react-router';
 
+import { EXPLORER_PATH } from '@/lib/filters';
+
 export function NotFoundPage() {
   return (
     <div className="space-y-4">
@@ -7,7 +9,8 @@ export function NotFoundPage() {
       <h1 className="text-2xl font-bold">Page not found</h1>
       <p>There is nothing at this address.</p>
       <p>
-        <Link to="/">Go to the explorer</Link> or <Link to="/about">read how it works</Link>.
+        <Link to={EXPLORER_PATH}>Go to the explorer</Link>, <Link to="/">the home page</Link> or{' '}
+        <Link to="/about">read how it works</Link>.
       </p>
     </div>
   );

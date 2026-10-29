@@ -1,5 +1,8 @@
 # hotel-curator
 
+**Live site: [hotel-curator.fly.dev](https://hotel-curator.fly.dev)** (online
+once the first deploy has run; see [Deploy](#deploy))
+
 **Hotel quality tiers from guest reviews, with the evidence behind every
 tier.** hotel-curator reads what guests wrote about 1,494 European city hotels
 (515,212 Booking.com reviews, 2015-2017), works out which of eight things each
@@ -45,15 +48,16 @@ How the model was chosen: [comparison](docs/model/COMPARISON.md),
 [model card](artifacts/models/roberta-base-ft-train2/MODEL_CARD.md),
 [error analysis](docs/model/ERRORS.md).
 
-> **The trained model's weights are not in this repository yet.** The build
-> environment could not reach Git LFS, which a 126 MB file needs
-> ([BLOCKERS](docs/BLOCKERS.md) B8). The evaluation, the hotel results and
-> the tiers computed with the weights are committed, so search, hotel pages
-> and compare work fully; only "Try the model" (`POST /v1/analyze`) answers
-> "model not loaded" until the weights are added. The corpus part scores
-> (`data/processed/part_scores.parquet`, 13 MB) are not committed, so
-> re-running `make score-hotels` or `make validate-tiers` also needs the
-> weights.
+> **The trained model's weights (126 MB) are stored with Git LFS.** A clone
+> made with Git LFS installed has them; otherwise install Git LFS and run
+> `git lfs pull --include="artifacts/models/*/model.onnx"` (a plain
+> `git lfs pull` also fetches the archived v1 checkpoint, 499 MB). Without
+> them, search, hotel pages and compare still work from the committed
+> results, and only "Try the model" (`POST /v1/analyze`) answers "model not
+> loaded". The corpus part scores (`data/processed/part_scores.parquet`,
+> 13 MB) are not committed, so re-running `make score-hotels` or
+> `make validate-tiers` first needs `make data` and `make score-parts`
+> (1.7 hours on 4 CPU threads).
 
 ## Try it
 
@@ -92,6 +96,37 @@ make setup      # API, data and dev dependencies from uv.lock
 make serve      # SQLite database + demo data, API on http://127.0.0.1:8000
 cd web && npm ci && npm run dev   # web app on http://localhost:5173
 ```
+
+## Deploy
+
+The public site is meant to run at **https://hotel-curator.fly.dev**, and
+later on its own domain behind Cloudflare. It is not live yet: the first
+deploy needs the owner's Fly.io account ([BLOCKERS](docs/BLOCKERS.md) B9).
+The API image carries the model weights from Git LFS, and every Fly build
+checks them against the promotion record.
+
+It runs as three Fly.io apps in `lhr`: the web app (nginx and the React
+app, the only public one), the API (private, reached over Fly's private
+network) and Postgres (private, TLS only). After the first deploy by hand,
+every push to `main` that passes CI deploys once the owner has turned
+deploys on and approves each one, then smoke-tests the public site.
+
+```bash
+make fly-plan                                  # print every command a first deploy runs
+make fly-secrets                               # check .env.fly, stage it as Fly secrets
+make fly-setup                                 # apps, database volume, the API's private address
+make fly-deploy                                # database, API, web, in that order
+make fly-status                                # machines; fails if the API or database is public
+make smoke SMOKE_URL=https://hotel-curator.fly.dev
+make fly-stop                                  # park the site; make fly-start resumes it
+```
+
+| You want to | Read |
+|---|---|
+| Deploy for the first time, handle secrets, redeploy, deploy from GitHub | [docs/deploy/fly.md](docs/deploy/fly.md) |
+| Move the site behind Cloudflare, check it, roll back | [docs/deploy/cloudflare.md](docs/deploy/cloudflare.md) |
+| Run it: status, parking, logs, metrics, alerts, incidents | [docs/RUNBOOK.md](docs/RUNBOOK.md) |
+| Know why it is built this way, and what is still unverified on Fly | [ADR 011](docs/decisions/011-deployment-fly-cloudflare.md) |
 
 ## How it works
 
@@ -137,11 +172,11 @@ flowchart LR
 
 | You want to | Go to |
 |---|---|
-| Find a clean, quiet hotel in Paris and see why it is listed | Explorer (`/`), filters "Strong in" and "Avoid weak" |
+| Find a clean, quiet hotel in Paris and see why it is listed | Explorer (`/explore`), filters "Strong in" and "Not weak in" |
 | Know whether one hotel is good, why, and how sure that is | Hotel page: verdict, grades with likely ranges, quotes for and against, what changed, who it suits, what would change the tier |
 | Compare hotels | Compare page: differences are highlighted only when they are credible |
-| Label your own review text | About page, "Try the model", or `POST /v1/analyze` |
-| Use the tiers in your app | REST API, OpenAPI docs at `/docs` |
+| Label your own review text | "Try the model" on the home page or the About page, or `POST /v1/analyze` |
+| Use the tiers in your app | REST API, OpenAPI docs at `/api/docs` on the site (`/docs` on the API itself) |
 
 ## Repository map
 
@@ -156,7 +191,9 @@ flowchart LR
 | `config/tier_policy.yaml` | every tier parameter (pre-registered) |
 | `data/` | manifests, label sets, demo results (raw data is downloaded, not committed) |
 | `artifacts/` | evaluation reports per model, the served model package, the frozen v1 model |
-| `docs/` | plan, decisions (ADRs), data card, model docs, security review, architecture |
+| `fly.toml`, `web/fly*.toml`, `deploy/` | Fly.io configs, the production Postgres image, pinned tool images |
+| `scripts/` | the public site's deploy, secrets, parking, smoke test and edge checks; the OpenAPI export, notebook builder, end-to-end test data, panel answers and learning curve |
+| `docs/` | plan, decisions (ADRs), data card, model docs, security review, architecture, deployment and runbook |
 | `notebooks/` | thin notebooks that read committed artifacts; v1 notebooks archived in `notebooks/v1/` |
 
 ## Reproduce everything
@@ -194,8 +231,31 @@ Every number in the docs comes from a command in this list; the manifests in
 [v1 audit](docs/v1-audit.md) ·
 [security review](docs/security/v2-security-review.md) ·
 [architecture](docs/architecture/) ·
+[deployment](docs/deploy/fly.md) ·
+[runbook](docs/RUNBOOK.md) ·
 [glossary](docs/GLOSSARY.md) ·
 [v2 report](docs/V2_REPORT.md)
 
-Licence: code MIT ([LICENSE](LICENSE)); data and model provenance in
-[NOTICE](NOTICE).
+## Licence
+
+- **Code:** MIT ([LICENSE](LICENSE)), except the vendored Swagger UI in
+  `src/hotel_curator/api/static/swagger-ui/` (Apache-2.0, with its own
+  LICENSE and NOTICE), which the API docs page uses.
+- **Data:** the Booking.com reviews are "CC0 as declared by the uploader,
+  originally Booking.com content", unconfirmed; review excerpts are shown
+  for illustration, and any commercial use needs a legal review first.
+- **Model weights:** they come with no licence of their own. They derive
+  from roberta-base (recorded as MIT, as its authors published it; not
+  re-verified here) and from labels of that review text, so they inherit
+  its uncertainty ([model
+  card](artifacts/models/roberta-base-ft-train2/MODEL_CARD.md)).
+- **Third-party code** in the web app keeps its own licences: its
+  packages, and the build tools whose code the build adds
+  ([web/public/THIRD-PARTY-NOTICES.txt](web/public/THIRD-PARTY-NOTICES.txt),
+  served at `/THIRD-PARTY-NOTICES.txt`).
+- **The public site** is a free, non-commercial demo, not affiliated with
+  Booking.com. Corrections and removal requests go to the
+  [issue tracker](https://github.com/amit-badave-04/hotel-curator/issues).
+
+Sources, licences and attribution in full: [NOTICE](NOTICE), also served
+at `/NOTICE.txt`.

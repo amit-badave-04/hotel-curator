@@ -1,0 +1,38 @@
+# Fly.io config: hotel-curator's Postgres 16 (private, volume-backed).
+# No [[services]] on purpose: reachable only on Fly's private network as
+# hotel-curator-db.internal:5432 by the API, never publicly (ADR 011).
+# Postgres accepts only curator_owner and curator_app, only over TLS, with
+# scram-sha-256 (init/10-roles.sh). The data is rebuilt from the committed
+# results by the API's release command, so restoring means redeploying.
+# Deploy from this folder with scripts/deploy.py.
+app = "hotel-curator-db"
+primary_region = "lhr"
+# SIGINT is Postgres's fast shutdown: it disconnects clients and stops
+# cleanly instead of waiting for the API's pooled connections.
+kill_signal = "SIGINT"
+kill_timeout = 60
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  POSTGRES_DB = "curator"
+  POSTGRES_USER = "postgres"
+  # A subdirectory, because the volume's root holds lost+found.
+  PGDATA = "/var/lib/postgresql/data/pgdata"
+
+[mounts]
+  source = "pg_data"
+  destination = "/var/lib/postgresql/data"
+
+[checks]
+  [checks.postgres]
+    type = "tcp"
+    port = 5432
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "30s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

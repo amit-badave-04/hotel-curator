@@ -1,0 +1,113 @@
+# Deploy to Fly.io: the API (whose release command migrates and seeds),
+# then the web app, then a smoke test of the public site. ci.yml calls it as
+# its last job when a push to main passed every other job, so it deploys
+# exactly the commit CI tested; to deploy again, re-run that job. The job
+# runs in the GitHub environment "production": its required reviewer (the
+# owner) approves each run, and only it holds the per-app deploy tokens.
+# ADR 011; setup in docs/deploy/fly.md ("Deploying from GitHub"). The
+# database app is deployed by hand (scripts/deploy.py).
+name: deploy
+
+on:
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+env:
+  WEB_APP: hotel-curator
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    # One deploy at a time: a running deploy is never cancelled; a newer
+    # one replaces one still waiting (for approval or its turn).
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment:
+      name: production
+      url: ${{ vars.CURATOR_DOMAIN && format('https://{0}', vars.CURATOR_DOMAIN) || 'https://hotel-curator.fly.dev' }}
+    steps:
+      # The commit this run is for (the one ci just tested). Credentials
+      # stay for the Git LFS pull and the check of main below.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7 # zizmor: ignore[artipacked]
+      # A run for an older commit can reach this point after a newer one
+      # (CI on main runs per commit); only main's current commit deploys.
+      - name: Still the newest commit on main?
+        id: newest
+        run: |
+          head=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$head" = "$GITHUB_SHA" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::main is at $head now; $GITHUB_SHA is not deployed"
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.newest.outputs.deploy == 'true'
+        uses: ./.github/actions/served-model
+      - if: steps.newest.outputs.deploy == 'true'
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.32"
+          enable-cache: false
+      - name: flyctl (pinned image, version checked)
+        if: steps.newest.outputs.deploy == 'true'
+        run: |
+          image=$(sed -n 's/^FROM //p' deploy/tools/flyctl/Dockerfile)
+          want=${image#*:}
+          want=${want%@*}
+          docker pull --quiet "$image"
+          seen=$(scripts/flyctl_docker.sh version)
+          echo "$seen"
+          case "$seen" in
+            *"$want"*) ;;
+            *) echo "::error::flyctl image does not report $want"; exit 1 ;;
+          esac
+      # Everything that can refuse (missing weights, the web app's mode or
+      # domain) refuses here, before the API moves: a dry run still asks
+      # Fly for the web machines, but changes nothing.
+      - name: Check both deploys can go ahead (dry run)
+        if: steps.newest.outputs.deploy == 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_WEB }}
+          FLYCTL: scripts/flyctl_docker.sh
+          EDGE: ${{ vars.CURATOR_EDGE }}
+          DOMAIN: ${{ vars.CURATOR_DOMAIN }}
+        run: |
+          uv run --no-project --python 3.12 scripts/deploy.py --dry-run deploy api
+          set -- --dry-run deploy web
+          if [ -n "$EDGE" ]; then set -- "$@" --edge "$EDGE"; fi
+          if [ -n "$DOMAIN" ]; then set -- "$@" --domain "$DOMAIN"; fi
+          uv run --no-project --python 3.12 scripts/deploy.py "$@"
+      - name: Deploy the API
+        if: steps.newest.outputs.deploy == 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_API }}
+          FLYCTL: scripts/flyctl_docker.sh
+        run: uv run --no-project --python 3.12 scripts/deploy.py deploy api
+      - name: Deploy the web app
+        if: steps.newest.outputs.deploy == 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_WEB }}
+          FLYCTL: scripts/flyctl_docker.sh
+          # Set only to the mode the web app runs in (docs/deploy/fly.md);
+          # left empty, deploy.py keeps the running mode or stops.
+          EDGE: ${{ vars.CURATOR_EDGE }}
+          DOMAIN: ${{ vars.CURATOR_DOMAIN }}
+        run: |
+          set -- deploy web
+          if [ -n "$EDGE" ]; then set -- "$@" --edge "$EDGE"; fi
+          if [ -n "$DOMAIN" ]; then set -- "$@" --domain "$DOMAIN"; fi
+          uv run --no-project --python 3.12 scripts/deploy.py "$@"
+      # Production always serves the model: the API image is built with
+      # REQUIRE_MODEL=1 (fly.toml), and deploy.py stops without the weights.
+      - name: Smoke test
+        if: steps.newest.outputs.deploy == 'true'
+        env:
+          DOMAIN: ${{ vars.CURATOR_DOMAIN }}
+        run: |
+          uv run --no-project --python 3.12 scripts/smoke.py \
+            "https://${DOMAIN:-$WEB_APP.fly.dev}" --model required

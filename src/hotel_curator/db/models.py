@@ -82,3 +82,7 @@ class DatasetInfo(Base):
     model: Mapped[str] = mapped_column(String(120))
     hotels: Mapped[int] = mapped_column(Integer)
     loaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # First and last month ("2015-08") of the usable reviews; empty in rows
+    # seeded before migration 0002 until the next seed fills them.
+    first_month: Mapped[str | None] = mapped_column(String(7), nullable=True)
+    last_month: Mapped[str | None] = mapped_column(String(7), nullable=True)

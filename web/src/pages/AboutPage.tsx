@@ -1,15 +1,13 @@
-import { ExternalLink, ThumbsDown, ThumbsUp } from 'lucide-react';
-import { useId, useRef, useState, type FormEvent } from 'react';
+import { ExternalLink } from 'lucide-react';
 
-import { ApiError } from '@/api/fetcher';
-import { useAnalyzeReview, useGetMeta } from '@/api/generated/endpoints';
-import type { AnalyzeResponse, Attribute, Evaluation, Meta, Tier } from '@/api/generated/model';
+import { useGetMeta } from '@/api/generated/endpoints';
+import type { Evaluation, Meta, Tier } from '@/api/generated/model';
+import { AnalyzePanel } from '@/components/AnalyzePanel';
 import { GradeBadge, TierBadge } from '@/components/badges';
 import { IntervalChart } from '@/components/IntervalChart';
 import { Section } from '@/components/Section';
+import { StatTile } from '@/components/StatTile';
 import { ErrorState, LoadingBlock } from '@/components/states';
-import { Button } from '@/components/ui/button';
-import { Label, Textarea } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -21,38 +19,15 @@ import {
 } from '@/components/ui/table';
 import {
   ATTRIBUTES,
-  attributeName,
   formatCount,
   formatPercent,
-  formatProbability,
   formatScore,
   formatSigned,
   isNotEnough,
   joinAttributes,
-  MAX_PART_CHARS,
   TIERS,
 } from '@/lib/domain';
-
-/** Reads a number from the free-form policy object, with a fallback. */
-function policyNumber(
-  policy: Meta['policy'] | undefined,
-  path: string[],
-  fallback: number,
-): number {
-  let node: unknown = policy;
-  for (const key of path) {
-    if (typeof node !== 'object' || node === null) return fallback;
-    node = (node as Record<string, unknown>)[key];
-  }
-  return typeof node === 'number' && Number.isFinite(node) ? node : fallback;
-}
-
-function policyAttributes(policy: Meta['policy'] | undefined, key: string, fallback: Attribute[]) {
-  const value = policy?.[key];
-  if (!Array.isArray(value)) return fallback;
-  const attributes = value.filter((v): v is Attribute => ATTRIBUTES.includes(v as Attribute));
-  return attributes.length > 0 ? attributes : fallback;
-}
+import { formatPeriod, policyOf } from '@/lib/policy';
 
 /** Tells the two "not enough" tiers apart; their badges read the same. */
 function NotEnoughHint({ tier }: { tier: Tier }) {
@@ -64,27 +39,31 @@ function NotEnoughHint({ tier }: { tier: Tier }) {
   );
 }
 
-function Policy({ meta }: { meta: Meta | undefined }) {
-  const p = meta?.policy;
-  const n = (path: string[], fallback: number) => policyNumber(p, path, fallback);
-  const confirmation = n(['confirmation'], 0.95);
-  const interval = n(['interval_level'], 0.9);
-  const strong2 = n(['two_sided', 'strong'], 0.8);
-  const weak2 = n(['two_sided', 'weak'], 0.5);
-  const strongM = n(['must_be_lines', 'strong'], 0.05);
-  const weakM = n(['must_be_lines', 'weak'], 0.1);
-  const minOpinions = n(['min_opinions'], 10);
-  const minReviews = n(['min_reviews'], 30);
-  const minComplaining = n(['min_complaining_reviews'], 3);
-  const materiality = n(['materiality'], 0.05);
-  const months = n(['excellent', 'min_months'], 6);
-  const monthShare = n(['excellent', 'max_month_share'], 0.25);
-  const comparePr = n(['compare', 'probability'], 0.95);
-  const recent = n(['trends', 'recent_months'], 6);
-  const baseline = n(['trends', 'baseline_months'], 18);
-  const trendPr = n(['trends', 'probability'], 0.9);
-  const essentials = policyAttributes(p, 'essentials', ['cleanliness', 'room', 'staff']);
-  const mustBe = policyAttributes(p, 'must_be', ['noise', 'wifi']);
+/**
+ * The rules, from the served policy or the pre-registered one until it
+ * arrives. Rendered from the first paint, so links to #tiers and #grades
+ * find their target.
+ */
+function Policy({ meta, pending }: { meta: Meta | undefined; pending: boolean }) {
+  const p = policyOf(meta);
+  const confirmation = p.confirmation;
+  const interval = p.interval_level;
+  const strong2 = p.two_sided.strong;
+  const weak2 = p.two_sided.weak;
+  const strongM = p.must_be_lines.strong;
+  const weakM = p.must_be_lines.weak;
+  const minOpinions = p.min_opinions;
+  const minReviews = p.min_reviews;
+  const minComplaining = p.min_complaining_reviews;
+  const materiality = p.materiality;
+  const months = p.excellent.min_months;
+  const monthShare = p.excellent.max_month_share;
+  const comparePr = p.compare.probability;
+  const recent = p.trends.recent_months;
+  const baseline = p.trends.baseline_months;
+  const trendPr = p.trends.probability;
+  const essentials = p.essentials;
+  const mustBe = p.must_be;
   const praisePerComplaint = Math.round(strong2 / (1 - strong2));
 
   return (
@@ -97,8 +76,7 @@ function Policy({ meta }: { meta: Meta | undefined }) {
         </p>
         <Table containerLabel="Tier rules (scrollable table)">
           <TableCaption>
-            Policy version {meta?.params_version ?? 'unknown'}. These values were fixed before any
-            hotel was scored.
+            Policy version {p.params_version}. These values were fixed before any hotel was scored.
           </TableCaption>
           <TableHeader>
             <TableRow>
@@ -122,9 +100,10 @@ function Policy({ meta }: { meta: Meta | undefined }) {
               </TableCell>
               <TableCell>
                 An essential is graded Weak, and is still Weak by the stricter test: every review
-                counts as a full praise or complaint when the model gives it 50% or more, and not at
-                all below that, instead of by its probability. This rule comes before the next one,
-                so too few opinions on one essential never hide a Weak one.
+                counts as a full praise or complaint when the model gives it{' '}
+                {formatPercent(p.hard_label_probability)} or more, and not at all below that,
+                instead of by its probability. This rule comes before the next one, so too few
+                opinions on one essential never hide a Weak one.
               </TableCell>
             </TableRow>
             <TableRow>
@@ -181,6 +160,7 @@ function Policy({ meta }: { meta: Meta | undefined }) {
           <strong>what would change it</strong> names the condition between the hotel and the next
           tier up.
         </p>
+        {pending && <LoadingBlock label="Loading the tier counts" lines={6} />}
         {meta && (
           <Table containerLabel="Tier counts (scrollable table)">
             <TableCaption>Hotels per tier in the data loaded now.</TableCaption>
@@ -308,16 +288,6 @@ function parseRungs(evaluation: Evaluation): Rung[] {
   return rungs;
 }
 
-function Stat({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return (
-    <div className="rounded-lg border bg-card p-4">
-      <dt className="text-sm text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-2xl font-semibold">{value}</dd>
-      <dd className="text-sm text-muted-foreground">{detail}</dd>
-    </div>
-  );
-}
-
 /**
  * The served model's row in the ladder, when it shows other numbers than the
  * headline: the headline is the served ONNX package's own score, the ladder
@@ -350,24 +320,24 @@ function EvaluationView({ evaluation }: { evaluation: Evaluation }) {
   return (
     <div className="space-y-4">
       <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat
+        <StatTile
           label="Served model, macro-F1"
           value={formatScore(evaluation.macro_f1.point)}
           detail={`95% interval ${formatScore(evaluation.macro_f1.low)} to ${formatScore(evaluation.macro_f1.high)}`}
         />
-        <Stat
+        <StatTile
           label="v1, macro-F1"
           value={formatScore(evaluation.v1_macro_f1.point)}
           detail={`95% interval ${formatScore(evaluation.v1_macro_f1.low)} to ${formatScore(evaluation.v1_macro_f1.high)}`}
         />
-        <Stat
+        <StatTile
           label="Difference (served minus v1)"
           value={formatSigned(diff.point)}
           detail={`95% interval ${formatSigned(diff.low)} to ${formatSigned(diff.high)}; ${
             better ? 'credibly better than v1' : 'not credibly better than v1'
           }`}
         />
-        <Stat
+        <StatTile
           label="Mean calibration error (ECE)"
           value={formatScore(evaluation.mean_review_ece)}
           detail="Lower is better; at most 0.050 was required"
@@ -376,8 +346,15 @@ function EvaluationView({ evaluation }: { evaluation: Evaluation }) {
       <p className="text-sm text-muted-foreground">
         Served model: <code className="font-mono">{evaluation.model}</code>. v1 configuration:{' '}
         <code className="font-mono">{evaluation.v1_configuration}</code>. Macro-F1 is the average F1
-        over the 16 labels on the held-out test reviews; intervals come from a bootstrap that
-        resamples hotels.
+        over the 16 labels on the held-out test reviews
+        {evaluation.test_reviews != null
+          ? ` (${formatCount(evaluation.test_reviews)}${
+              evaluation.test_hotels != null
+                ? ` from ${formatCount(evaluation.test_hotels)} hotels`
+                : ''
+            })`
+          : ''}
+        ; intervals come from a bootstrap that resamples hotels.
       </p>
       {checkpoint && (
         <p className="text-sm text-muted-foreground">
@@ -456,196 +433,9 @@ function EvaluationView({ evaluation }: { evaluation: Evaluation }) {
   );
 }
 
-const POLARITY = {
-  positive: { name: 'Praise', icon: ThumbsUp, className: 'text-strong' },
-  negative: { name: 'Complaint', icon: ThumbsDown, className: 'text-weak' },
-} as const;
-
-function AnalyzeResult({ result }: { result: AnalyzeResponse }) {
-  return (
-    <div className="space-y-4">
-      <h3 className="font-semibold">What the model found</h3>
-      {result.parts.length === 0 && <p>No text was analysed.</p>}
-      {result.parts.map((part) => (
-        <div key={part.part} className="space-y-2">
-          <h4 className="text-sm font-semibold">
-            {part.part === 'liked' ? 'Liked text' : 'Disliked text'}{' '}
-            <span className="font-normal text-muted-foreground">
-              ({formatCount(part.characters)} characters)
-            </span>
-          </h4>
-          {part.labels.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No attribute was detected with enough confidence.
-            </p>
-          ) : (
-            <ul className="space-y-1">
-              {part.labels.map((label) => {
-                const polarity =
-                  label.polarity === 'negative' ? POLARITY.negative : POLARITY.positive;
-                const Icon = polarity.icon;
-                const name = ATTRIBUTES.includes(label.attribute as Attribute)
-                  ? attributeName(label.attribute as Attribute)
-                  : label.attribute;
-                return (
-                  <li
-                    key={label.label}
-                    className="flex flex-wrap items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm"
-                  >
-                    <Icon aria-hidden="true" className={`size-4 ${polarity.className}`} />
-                    <span className="font-medium">{name}</span>
-                    <span>{polarity.name}</span>
-                    <span className="ml-auto tabular-nums text-muted-foreground">
-                      {formatProbability(label.probability)} likely
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      ))}
-      <p className="text-xs text-muted-foreground">
-        Model: <code className="font-mono">{result.model}</code>. Probabilities are calibrated: of
-        the labels shown at 80%, about 8 in 10 are right. Your text is not stored or sent back.
-      </p>
-    </div>
-  );
-}
-
-function AnalyzeError({ error }: { error: unknown }) {
-  if (error instanceof ApiError && error.status === 503) {
-    return (
-      <ErrorState error={error} title="The model is not available right now">
-        <p className="text-sm">
-          The review classifier is not loaded on this server. Search, hotel pages and compare still
-          work; they use scores computed in advance.
-        </p>
-      </ErrorState>
-    );
-  }
-  if (error instanceof ApiError && error.status === 429) {
-    return <ErrorState error={error} title="Too many requests" />;
-  }
-  if (error instanceof ApiError && error.status === 422) {
-    return (
-      <ErrorState error={error} title="The text could not be analysed">
-        {error.fields.length > 0 && (
-          <ul className="list-disc pl-5 text-sm">
-            {error.fields.map((field, i) => (
-              <li key={i}>
-                {field.location.filter((part) => part !== 'body').join(' ')}: {field.message}
-              </li>
-            ))}
-          </ul>
-        )}
-      </ErrorState>
-    );
-  }
-  return <ErrorState error={error} title="The text could not be analysed" />;
-}
-
-/** One sentence for screen readers when a result arrives. */
-function resultSummary(result: AnalyzeResponse): string {
-  const count = result.parts.reduce((total, part) => total + part.labels.length, 0);
-  if (count === 0) return 'Analysis done: no attribute was detected with enough confidence.';
-  return `Analysis done: ${count === 1 ? '1 label' : `${count} labels`} found. They are listed below the form.`;
-}
-
-function AnalyzePanel() {
-  const ids = useId();
-  const [liked, setLiked] = useState('');
-  const [disliked, setDisliked] = useState('');
-  const [problem, setProblem] = useState<string | null>(null);
-  const likedRef = useRef<HTMLTextAreaElement>(null);
-  const analyze = useAnalyzeReview();
-  const problemId = `${ids}-problem`;
-
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!liked.trim() && !disliked.trim()) {
-      setProblem('Write something in at least one of the two boxes.');
-      likedRef.current?.focus();
-      return;
-    }
-    setProblem(null);
-    analyze.mutate({ data: { liked: liked.trim(), disliked: disliked.trim() } });
-  };
-
-  const field = (
-    key: 'liked' | 'disliked',
-    label: string,
-    hint: string,
-    value: string,
-    setValue: (value: string) => void,
-  ) => (
-    <div className="space-y-1.5">
-      <Label htmlFor={`${ids}-${key}`}>{label}</Label>
-      <Textarea
-        id={`${ids}-${key}`}
-        ref={key === 'liked' ? likedRef : undefined}
-        name={key}
-        value={value}
-        maxLength={MAX_PART_CHARS}
-        onChange={(event) => {
-          setValue(event.target.value.slice(0, MAX_PART_CHARS));
-          if (problem) setProblem(null);
-        }}
-        aria-invalid={problem ? true : undefined}
-        aria-describedby={problem ? `${problemId} ${ids}-${key}-count` : `${ids}-${key}-count`}
-        placeholder={hint}
-        rows={4}
-      />
-      <p id={`${ids}-${key}-count`} className="text-xs text-muted-foreground">
-        {formatCount(value.length)} of {formatCount(MAX_PART_CHARS)} characters
-      </p>
-    </div>
-  );
-
-  return (
-    <div className="space-y-4 rounded-lg border bg-card p-4">
-      <form onSubmit={onSubmit} className="space-y-4" aria-describedby={`${ids}-intro`} noValidate>
-        <p id={`${ids}-intro`} className="text-sm text-muted-foreground">
-          Type a review the way the booking site splits it. The model labels each part with the
-          attributes it mentions and whether it is praise or a complaint. Nothing is stored.
-        </p>
-        <div className="grid gap-4 md:grid-cols-2">
-          {field(
-            'liked',
-            'What the guest liked',
-            'e.g. Friendly staff and a spotless room',
-            liked,
-            setLiked,
-          )}
-          {field(
-            'disliked',
-            'What the guest disliked',
-            'e.g. Street noise at night and slow wifi',
-            disliked,
-            setDisliked,
-          )}
-        </div>
-        {problem && (
-          <p id={problemId} role="alert" className="text-sm font-medium text-weak">
-            {problem}
-          </p>
-        )}
-        <Button type="submit" disabled={analyze.isPending}>
-          {analyze.isPending ? 'Analysing...' : 'Analyse review'}
-        </Button>
-      </form>
-      {/* Always on the page, so the result is announced when it arrives. */}
-      <p role="status" className="sr-only">
-        {analyze.isSuccess ? resultSummary(analyze.data) : analyze.isPending ? 'Analysing...' : ''}
-      </p>
-      {analyze.isError && <AnalyzeError error={analyze.error} />}
-      {analyze.isSuccess && <AnalyzeResult result={analyze.data} />}
-    </div>
-  );
-}
-
 export function AboutPage() {
   const meta = useGetMeta();
+  const period = formatPeriod(meta.data?.data_period);
 
   return (
     <div className="max-w-4xl space-y-10">
@@ -654,10 +444,13 @@ export function AboutPage() {
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">How hotel-curator works</h1>
         <p className="text-lg">
           hotel-curator reads what guests wrote and grades each hotel on eight attributes, with how
-          sure we are and the review text behind each grade. The grades add up to a tier.
+          sure we are and, wherever a review is clear enough to cite, quotes behind each grade. The
+          grades add up to a tier.
         </p>
         <p className="text-muted-foreground">
-          The reviews date from August 2015 to August 2017
+          {period
+            ? `The reviews date from ${period}`
+            : 'The reviews cover a fixed period in the past'}
           {meta.data ? ` and cover ${formatCount(meta.data.hotels)} hotels` : ''}. A tier describes
           what guests wrote then, not how a hotel is today.
         </p>
@@ -718,11 +511,7 @@ export function AboutPage() {
           <p className="text-sm">The rules below use the pre-registered default values.</p>
         </ErrorState>
       ) : null}
-      {meta.isPending ? (
-        <LoadingBlock label="Loading the tier policy" lines={4} />
-      ) : (
-        <Policy meta={meta.data} />
-      )}
+      <Policy meta={meta.data} pending={meta.isPending} />
 
       <Section id="limits" title="Limits and caveats">
         <ul className="list-disc space-y-2 pl-6">
@@ -732,8 +521,9 @@ export function AboutPage() {
             carry into the model.
           </li>
           <li>
-            <strong>Old data.</strong> Reviews are from August 2015 to August 2017. Hotels change;
-            the product never claims current quality.
+            <strong>Old data.</strong>{' '}
+            {period ? `Reviews are from ${period}.` : 'Reviews cover a fixed period in the past.'}{' '}
+            Hotels change; the product never claims current quality.
           </li>
           <li>
             <strong>Licence unconfirmed.</strong> The reviews were published as CC0 by a third party
@@ -772,7 +562,7 @@ export function AboutPage() {
       </Section>
 
       <Section id="try" title="Try the model">
-        <AnalyzePanel />
+        <AnalyzePanel available={meta.data?.analyze_available} checking={meta.isPending} />
       </Section>
 
       <Section id="developers" title="For developers">

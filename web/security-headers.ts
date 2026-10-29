@@ -1,5 +1,5 @@
 /**
- * Security headers for the static app. nginx.conf sets the same values in
+ * Security headers for the static app. nginx/site.conf sets the same values in
  * production (test/nginx-headers.test.ts keeps the two in sync), and
  * `vite preview` sets them so end-to-end tests run under the real policy.
  */

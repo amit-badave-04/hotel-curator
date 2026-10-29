@@ -125,6 +125,9 @@ def test_model_card_contains_headline_numbers() -> None:
     )
     assert "lowest F1: food_negative (0.800)" in card
     assert "comparison with modern encoders is partial" in card
+    assert card.endswith(
+        "needs the legal review `NOTICE` asks for.\n"
+    )  # the licence status of the weights, last
     review_ece = card.split("ECE (calibrated; rule 3) | ")[1][:6]
     assert np.isclose(float(review_ece), 0.01)
 

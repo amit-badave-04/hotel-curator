@@ -17,9 +17,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from limits.strategies import MovingWindowRateLimiter
 
 from hotel_curator import __version__
+from hotel_curator.api.clientip import TrustedProxies
+from hotel_curator.api.errorreports import (
+    flush_error_reports,
+    init_error_reports,
+)
 from hotel_curator.api.errors import ErrorResponse, install_handlers
+from hotel_curator.api.metrics import ApiMetrics, MetricsServer
 from hotel_curator.api.middleware import (
     BodySizeLimitMiddleware,
+    ErrorReporter,
     RequestContextMiddleware,
 )
 from hotel_curator.api.ratelimit import (
@@ -60,15 +67,37 @@ def _model_dir(settings: Settings) -> Path | None:
         return None
 
 
+def _start_metrics(
+    settings: Settings, metrics: ApiMetrics
+) -> MetricsServer | None:
+    """Start the metrics listener when a port is configured.
+
+    A port that cannot be bound is logged as an error, not fatal: the API
+    serves without metrics rather than not at all, and the missing series
+    trip the "no metrics" alert (docs/RUNBOOK.md).
+    """
+    if settings.metrics_port is None:
+        return None
+    try:
+        listener = metrics.serve(settings.metrics_port, settings.metrics_host)
+    except OSError as exc:
+        logger.error("Metrics listener not started: %s", exc)
+        return None
+    logger.info("Metrics on port %d", listener.port)
+    return listener
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Build the FastAPI application."""
     settings = settings or get_settings()
     configure_logging(settings.log_level, settings.log_format)
     limiter = new_limiter()
+    metrics = ApiMetrics()
+    report_error = init_error_reports(settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        engine = make_engine(settings.database_url)
+        engine = make_engine(settings.db_url())
         app.state.curator = AppState(
             settings=settings,
             engine=engine,
@@ -77,8 +106,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             policy=TierPolicy.load(settings.resolved_tier_policy),
             model_dir=_model_dir(settings),
         )
-        app.state.curator.model()  # load at startup; a failure is recorded
+        # Load at startup; a failure is recorded, never retried.
+        metrics.set_model_loaded(app.state.curator.model() is not None)
+        listener = _start_metrics(settings, metrics)
         yield
+        if listener is not None:
+            listener.close()
+        if report_error is not None:
+            flush_error_reports()
         engine.dispose()
 
     app = FastAPI(
@@ -95,14 +130,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             429: {"model": ErrorResponse},
         },
     )
-    _add_middleware(app, settings, limiter)
+    app.state.metrics = metrics
+    _add_middleware(app, settings, limiter, metrics, report_error)
     install_handlers(app)
     _include_routers(app)
     return app
 
 
 def _add_middleware(
-    app: FastAPI, settings: Settings, limiter: MovingWindowRateLimiter
+    app: FastAPI,
+    settings: Settings,
+    limiter: MovingWindowRateLimiter,
+    metrics: ApiMetrics,
+    report_error: ErrorReporter | None,
 ) -> None:
     # Starlette runs the last-added middleware first: request context (ids,
     # headers, access log, unexpected errors) wraps CORS (so 429s and 413s
@@ -128,7 +168,12 @@ def _add_middleware(
         allow_methods=["GET", "POST"],
         allow_headers=["content-type"],
     )
-    app.add_middleware(RequestContextMiddleware)
+    app.add_middleware(
+        RequestContextMiddleware,
+        trusted=TrustedProxies.parse(settings.forwarded_allow_ips),
+        observe=metrics.observe,
+        report_error=report_error,
+    )
 
 
 def _include_routers(app: FastAPI) -> None:

@@ -1,0 +1,18 @@
+# Edge mode "local" (docker compose): nginx is the first hop, so the client
+# is the TCP peer. Rendered by 15-curator-site.sh; ${...} are filled in.
+include curator/http.conf;
+
+upstream curator_api {
+    server ${CURATOR_API_UPSTREAM};
+}
+
+map $remote_addr $curator_client_ip {
+    default $remote_addr;
+}
+
+server {
+    # IPv4 only: Docker disables IPv6 inside containers by default.
+    listen 8080;
+    server_name _;
+    include curator/site.conf;
+}

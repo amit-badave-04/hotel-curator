@@ -24,14 +24,53 @@ from tests.helpers import invoke_cli, synthetic_results, toy_label_set
 
 
 def test_db_upgrade_and_seed_are_idempotent(home: Path) -> None:
+    _write_demo(home)
+    invoke_cli("db", "upgrade")
+    assert "loaded 5 hotels" in invoke_cli("db", "seed")
+    assert "up to date" in invoke_cli("db", "seed")
+
+
+def _write_demo(home: Path) -> None:
     demo = home / "data" / "demo"
     demo.mkdir(parents=True)
     payload = [r.model_dump(mode="json") for r in synthetic_results()]
     with gzip.open(demo / "hotel_results.json.gz", "wt") as handle:
         json.dump(payload, handle)
-    invoke_cli("db", "upgrade")
-    assert "loaded 5 hotels" in invoke_cli("db", "seed")
-    assert "up to date" in invoke_cli("db", "seed")
+
+
+def test_db_release_migrates_then_seeds_once(home: Path) -> None:
+    _write_demo(home)
+    assert not (home / "var").exists()
+    assert "loaded 5 hotels" in invoke_cli("db", "release")
+    assert "up to date" in invoke_cli("db", "release")
+    assert "up to date" in invoke_cli("db", "release", "--if-enabled")
+
+
+def test_db_release_if_enabled_skips_when_migrate_on_start_is_off(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from hotel_curator.config import get_settings
+
+    _write_demo(home)
+    monkeypatch.setenv("CURATOR_MIGRATE_ON_START", "false")
+    get_settings.cache_clear()
+    assert "release skipped" in invoke_cli("db", "release", "--if-enabled")
+    assert not (home / "var" / "cli.db").exists()
+    assert "loaded 5 hotels" in invoke_cli("db", "release")
+
+
+def test_db_release_logs_json_where_logs_are_json(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from hotel_curator.config import get_settings
+
+    _write_demo(home)
+    monkeypatch.setenv("CURATOR_LOG_FORMAT", "json")
+    get_settings.cache_clear()
+    output = invoke_cli("db", "release")
+    records = [json.loads(line) for line in output.split("\n") if line]
+    assert records[-1]["event"].startswith("loaded 5 hotels from ")
+    assert records[-1]["logger"] == "hotel_curator.cli.db"
 
 
 def _split(prefix: str, seed: int) -> LabeledParts:
@@ -244,3 +283,30 @@ def test_encoder_rung_name_tags_every_non_default_setting() -> None:
         name(extra=True, train_fraction=0.5, seed=7, learning_rate=2e-5)
         == "roberta-base-ft-frac0.5-seed7-lr2e-05-train2"
     )
+
+
+def test_db_release_after_a_newer_image_leaves_the_schema_alone(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sqlalchemy import text
+
+    from hotel_curator.config import get_settings
+    from hotel_curator.db import release
+    from hotel_curator.db.session import make_engine
+
+    _write_demo(home)
+    assert "loaded 5 hotels" in invoke_cli("db", "release")
+    # A rollback: a newer image migrated to a revision this code lacks.
+    engine = make_engine(get_settings().db_url())
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE alembic_version SET version_num = '9999'"))
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        release.logger, "warning", lambda msg, *a: warnings.append(msg % a)
+    )
+    assert "up to date" in invoke_cli("db", "release")
+    assert warnings and warnings[0].startswith("Database is at revision 9999")
+    with engine.connect() as conn:
+        version = conn.execute(text("SELECT version_num FROM alembic_version"))
+        assert version.scalar_one() == "9999"
+    engine.dispose()

@@ -16,10 +16,10 @@ help: ## List targets
 # --- setup -----------------------------------------------------------------
 .PHONY: setup setup-ml
 setup: ## Install the API, data and dev dependencies from uv.lock
-	$(UV) sync --frozen --extra data --extra dev --extra postgres
+	$(UV) sync --frozen --extra data --extra dev --extra postgres --extra sentry
 
 setup-ml: ## Also install the training stack (torch, transformers, scikit-learn, ...)
-	$(UV) sync --frozen --extra data --extra dev --extra postgres --extra ml
+	$(UV) sync --frozen --extra data --extra dev --extra postgres --extra sentry --extra ml
 
 # --- data ------------------------------------------------------------------
 .PHONY: data eda
@@ -97,6 +97,32 @@ db: ## Create/upgrade the local database and load the demo data
 
 serve: db ## Run the API on http://127.0.0.1:8000 (docs at /docs)
 	$(RUN) curator serve
+
+# --- deploy (Fly.io; docs/deploy/fly.md) -----------------------------------
+.PHONY: fly-plan fly-secrets fly-setup fly-deploy fly-status fly-stop fly-start smoke
+fly-plan: ## Print every flyctl command a first deploy runs (runs nothing)
+	$(RUN) python scripts/deploy.py plan
+
+fly-secrets: ## Check .env.fly, then stage it as Fly secrets (values on stdin)
+	$(RUN) python scripts/push_fly_secrets.py push
+
+fly-setup: ## Create the three apps, the database volume, the API private IP
+	$(RUN) python scripts/deploy.py setup
+
+fly-deploy: ## Deploy database, API, web, in that order (FLY_DEPLOY_ARGS="--edge ...")
+	$(RUN) python scripts/deploy.py deploy $(FLY_DEPLOY_ARGS)
+
+fly-status: ## Machines of each app; fails if the API or database is public
+	$(RUN) python scripts/deploy.py status
+
+fly-stop: ## Park the site: web and API to zero machines, database stopped
+	$(RUN) python scripts/ops.py stop
+
+fly-start: ## Resume a parked site: database, API, web; then run make smoke
+	$(RUN) python scripts/ops.py start
+
+smoke: ## Smoke-test a deployed site (SMOKE_URL=https://hotel-curator.fly.dev)
+	$(RUN) python scripts/smoke.py $(or $(SMOKE_URL),https://hotel-curator.fly.dev)
 
 # --- quality ---------------------------------------------------------------
 .PHONY: lint format typecheck test test-fast cov check

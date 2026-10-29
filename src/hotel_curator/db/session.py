@@ -2,18 +2,31 @@
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from urllib.parse import parse_qs, urlsplit
 
 from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import ConnectionPoolEntry
 
+CONNECT_TIMEOUT_SECONDS = 5
+"""Fail a connection attempt fast so /readyz answers instead of hanging."""
+POOL_SIZE = 5
+MAX_OVERFLOW = 5
+POOL_RECYCLE_SECONDS = 300
+"""Replace pooled connections every five minutes, under any idle cut-off."""
+HIDE_PARAMETERS = True
+"""Keep bound values (a visitor's search terms) out of error messages, which
+reach the logs and error reports; the SQL text stays."""
+
 
 def make_engine(database_url: str) -> Engine:
     """Create an engine; SQLite gets foreign keys and thread sharing."""
     if database_url.startswith("sqlite"):
         engine = create_engine(
-            database_url, connect_args={"check_same_thread": False}
+            database_url,
+            connect_args={"check_same_thread": False},
+            hide_parameters=HIDE_PARAMETERS,
         )
 
         @event.listens_for(engine, "connect")
@@ -25,7 +38,21 @@ def make_engine(database_url: str) -> Engine:
             cursor.close()
 
         return engine
-    return create_engine(database_url, pool_pre_ping=True)
+    query = parse_qs(urlsplit(database_url).query)
+    connect_args = (
+        {}
+        if "connect_timeout" in query
+        else {"connect_timeout": CONNECT_TIMEOUT_SECONDS}
+    )
+    return create_engine(
+        database_url,
+        pool_pre_ping=True,
+        pool_size=POOL_SIZE,
+        max_overflow=MAX_OVERFLOW,
+        pool_recycle=POOL_RECYCLE_SECONDS,
+        connect_args=connect_args,
+        hide_parameters=HIDE_PARAMETERS,
+    )
 
 
 def make_session_factory(engine: Engine) -> sessionmaker[Session]:

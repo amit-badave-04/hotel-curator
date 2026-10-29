@@ -95,7 +95,7 @@ flowchart LR
     direction TB
     g1[data/labels/, data/manifests/]
     g2[artifacts/evals/]
-    g3[artifacts/models/&lt;winner&gt;/<br/>without model.onnx, B8]
+    g3[artifacts/models/&lt;winner&gt;/<br/>model.onnx in Git LFS]
     g4[data/demo/, config/]
     g5[docs/model/, docs/data/, docs/labeling/]
   end
@@ -109,7 +109,7 @@ flowchart LR
 ```
 
 Anything large or re-downloadable stays local; anything a reader or the
-online half needs is committed.
+online half needs is committed, the 126 MB `model.onnx` through Git LFS.
 
 ## Reproducibility
 

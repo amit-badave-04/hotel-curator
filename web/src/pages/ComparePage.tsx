@@ -32,6 +32,7 @@ import {
   isWhole,
   MAX_COMPARE,
 } from '@/lib/domain';
+import { EXPLORER_PATH } from '@/lib/filters';
 import { cn } from '@/lib/utils';
 
 /**
@@ -289,7 +290,7 @@ function PickMore({ ids }: { ids: string[] }) {
     <div className="space-y-4 rounded-lg border bg-card p-4">
       <p>
         Pick two to {MAX_COMPARE} hotels to compare. Use &quot;Add to compare&quot; on the{' '}
-        <Link to="/">explorer</Link> or on a hotel page.
+        <Link to={EXPLORER_PATH}>explorer</Link> or on a hotel page.
       </p>
       {listed.length > 0 && (
         <div className="space-y-2">
@@ -435,7 +436,7 @@ export function ComparePage() {
             </ul>
             {ids.length < MAX_COMPARE && (
               <p className="text-sm">
-                <Link to="/">Add another hotel from the explorer</Link>
+                <Link to={EXPLORER_PATH}>Add another hotel from the explorer</Link>
               </p>
             )}
           </section>

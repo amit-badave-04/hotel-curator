@@ -1,9 +1,13 @@
 # Security review: hotel-curator v2
 
-_Status: final for the v2 pull request. Gates ran on 2026-10-26 against the
-tree of the quality-and-security commit; every claim below names the
-command or test that backs it. A red-team exercise ran on 2026-10-26
-(section 4.6); the owner's own red-team procedure remains available._
+_Status: sections 1 to 6 are final for the v2 pull request (merged). Gates
+ran on 2026-10-26 against the tree of the quality-and-security commit;
+every claim names the command or test that backs it. A red-team exercise
+ran on 2026-10-26 (section 4.6); the owner's own red-team procedure remains
+available. Section 7 covers the public deployment on Fly.io and later
+Cloudflare (branch `deploy/fly-cloudflare`): its gates ran on 2026-10-29,
+and where it changes what sections 1 to 6 say about the public site, the
+earlier text points to it._
 
 ## 1. What is being protected
 
@@ -17,7 +21,8 @@ user accounts, no payment data and no user-submitted content at rest.
 | Integrity of tiers and evidence | a wrong or manipulated tier misleads travellers and harms hotels |
 | Reviewer privacy | reviews mention staff names; reviewer nationality, room and dates could identify people |
 | Build and supply chain | pinned data, pretrained weights and dependencies decide what the model learns and runs |
-| Secrets | none are needed; the goal is to keep it that way |
+| Secrets | none in the compose setup. The public site needs database passwords and URLs, two deploy tokens, Cloudflare's origin key and an optional Sentry DSN, all kept outside git and images (section 7.3) |
+| Visitors' privacy | nothing a visitor submits is stored or reported, or logged outside nginx's rare critical-error lines (section 7.5); the public site's nginx logs each visitor's address for the rate limits (section 7) |
 
 ## 2. Threats and abuse cases
 
@@ -31,13 +36,13 @@ user accounts, no payment data and no user-submitted content at rest.
 | Third-party script in the API docs page | Swagger UI is vendored (pinned SHA-256) and served from the API itself under a CSP that allows only `'self'` | `tests/api/test_docs.py` |
 | Broken or missing model package | the API starts without it, logs why, answers 503 on `analyze`, and never retries per request | `::test_a_broken_model_package_is_reported_not_raised`, `::test_the_reason_a_model_is_missing_is_logged` |
 | Cross-origin abuse | CORS allow-list from settings, no credentials; in Docker the browser sees one origin | `::test_cors_allow_list` |
-| Clickjacking, MIME sniffing | `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`; nginx adds a strict CSP | `::test_security_headers_and_request_id`, `web/nginx.conf` |
+| Clickjacking, MIME sniffing | `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`; nginx adds a strict CSP | `::test_security_headers_and_request_id`, `web/nginx/site.conf`, `tests/edge/test_nginx.py` |
 | Malicious model files | weights only as safetensors or ONNX; `torch.load(weights_only=True)` for the one pickle conversion; `local_files_only=True`; no `trust_remote_code` | `tests/unit/test_security_invariants.py`, `tests/unit/test_bases.py::test_convert_refuses_pickled_code` |
 | Tampered downloads | HTTPS only, SHA-256 pins on every data file and weight file, Docker layers by digest; tar extraction reads only named regular files | `tests/unit/test_download.py`, `tests/unit/test_bases.py` |
 | Prompt injection into the labelling LLM | review text in a delimited block, explicit "data, not instructions", closing delimiter neutralised; no LLM at serving time | `tests/unit/test_prompt.py` |
 | Tier poisoning | `analyze` never writes; tiers come only from the offline pipeline | architecture; `routes/analyze.py` |
 | De-anonymising reviewers, naming staff | quotes show month and traveler type only; parts that probably name a person are not quoted (a person-introducing word before a corpus-rare word, or a rare capitalised word in a part about staff; ADR 006 E5), names spaCy finds in the rest are masked, long digit runs too; nationality, room type and nights never served. Best effort: on the 31,485 served quotes none of the staff names the independent review found remains, and a manual check of 90 quotes with rare capitalised words found no staff name (checked on the run with a fixed 500-part cut-off, 8 quotes different from the final one); some residual risk stays | `tests/unit/test_names.py` (real corpus parts the NER missed), `tests/unit/test_explain_evidence.py::test_a_part_naming_someone_is_replaced_by_the_next`, `::test_redactor_masks_names_numbers_and_emails`, `tests/unit/test_security_invariants.py::test_sr9_*` |
-| Container breakout / privilege | non-root users, pinned base images by digest, healthchecks, read-only API filesystem, `no-new-privileges` (API, web and db), a database with no network at all (Unix socket shared only with the API), and an API database role that is not a superuser, so a foothold in the API cannot run `COPY ... PROGRAM` or read server files in the db container | `Dockerfile`, `web/Dockerfile`, `docker-compose.yml`, `docker/db-init/10-app-role.sh`, `tests/unit/test_compose_config.py` |
+| Container breakout / privilege | non-root users, pinned base images by digest, healthchecks, read-only API filesystem, `no-new-privileges` (API, web and db), a database with no network at all (Unix socket shared only with the API), and an API database role that is not a superuser, so a foothold in the API cannot run `COPY ... PROGRAM` or read server files in the db container. This is the compose setup; on Fly the read-only filesystem, `no-new-privileges` and the network-less database do not carry over, and other controls replace them (section 7) | `Dockerfile`, `web/Dockerfile`, `docker-compose.yml`, `docker/db-init/10-app-role.sh`, `tests/unit/test_compose_config.py` |
 
 ## 3. Requirements SR-1..SR-14
 
@@ -58,7 +63,7 @@ before the code was written. The tests named here run in CI on pushes to
 | SR-9 | Snippets capped and redacted | met, best effort | `tests/unit/test_names.py`, `tests/unit/test_explain_evidence.py::test_redactor_masks_names_numbers_and_emails`, `::test_a_part_naming_someone_is_replaced_by_the_next`, `tests/unit/test_security_invariants.py::test_sr9_quotes_never_carry_identifying_review_metadata`; residual risk in section 2 |
 | SR-10 | HTTPS + SHA-256 downloads, safe extraction | met | `tests/unit/test_download.py` (plain HTTP and redirects to HTTP refused, checksum mismatch deletes the file), `tests/unit/test_bases.py` (only listed regular files are read from an archive and written under their base name, so no member can choose its path; links refused), `tests/unit/test_security_invariants.py::test_sr10_downloads_are_https_only` |
 | SR-11 | LLM labelling treats reviews as data | met | `tests/unit/test_prompt.py::test_reviews_cannot_close_the_delimiter`, `::test_tag_variants_cannot_close_the_data_block`; no LLM in the serving path |
-| SR-12 | Non-root, pinned, healthchecked containers | met | `docker inspect`: API user `curator` (uid 10001) with a `/healthz` healthcheck, web user `101` with a `wget /` healthcheck; every base image pinned by digest |
+| SR-12 | Non-root, pinned, healthchecked containers | met | `docker inspect` (v2): API user `curator` (uid 10001) with a `/healthz` healthcheck, web user `101` with a `wget` healthcheck on `/` (since the deployment branch it polls `/healthz`: `web/Dockerfile`); every base image pinned by digest. On Fly, the API's checks poll `/readyz` and `/healthz`; the web app's poll `/` in Fly mode and `/healthz` on port 8080 in Cloudflare mode (`fly.toml`, `web/fly.toml`, `web/fly.cloudflare.toml`) |
 | SR-13 | CORS allow-list | met | `::test_cors_allow_list` (credentials off, allow-list from settings) |
 | SR-14 | Parameterised SQL, allow-listed sorting | met | `::test_search_filters` (literal `%`), `::test_search_rejects_bad_input` (SQL strings); sort orders come from an enum mapped to fixed `ORDER BY` clauses |
 
@@ -123,9 +128,10 @@ PyPI databases. Counts are unique (package, version, advisory) triples.
 |---|---|---|---|---|
 | API (`python:3.12-slim`, Debian 13) | 93, of which 12 with a fixed version, all in the base image's own pip 25.0.1 | `Dockerfile` removes pip from the runtime stage; the app runs from `/opt/venv`, which has no pip | 81, none with a fixed version | Debian 13 base packages (glibc, util-linux, systemd, perl, ...) for which Debian has published no fix. The digest is the newest `python:3.12-slim` build (checked with `docker buildx imagetools inspect`). Bump the digest when Debian ships fixes |
 | web (`nginx-unprivileged:1.30.6-alpine3.24`) | 2, both fixed in Alpine: brotli-libs 1.2.0-r1 (decoder overflow, fixed 1.2.1-r0) and zlib 1.3.2-r0 (`gzwrite`/`gzprintf` overflow, fixed 1.3.2-r1) | none | 2 | Not reachable in this image: `ldd /usr/sbin/nginx` shows no brotli library (only freetype and libcurl need it), and nginx's gzip uses zlib's streaming deflate, not the `gz*` file API. The pinned digest is the newest build of the stable line, and the newer mainline build (1.31.7) ships the same versions. An `apk upgrade` step was tried, but the Alpine mirror is blocked in the build session, so it could not be built or verified here; bump the digest when upstream rebuilds |
-| db (`postgres:16-alpine`) | 62, all in `gosu` (Go 1.24.6 standard library, `golang.org/x/sys` 0.1.0, `moby/sys/user` 0.1.0) | none | 62 | `gosu` runs once in the entrypoint to drop root and then execs Postgres; it never handles network input. The database has no network at all (Unix socket only). The digest is the newest `postgres:16-alpine` build |
+| db (`postgres:16-alpine`) | 62, all in `gosu` (Go 1.24.6 standard library, `golang.org/x/sys` 0.1.0, `moby/sys/user` 0.1.0) | none | 62 | `gosu` runs once in the entrypoint to drop root and then execs Postgres; it never handles network input. In compose the database has no network at all (Unix socket only); the Fly database, built on the same digest, listens on the private network (section 7). The digest is the newest `postgres:16-alpine` build |
 
-Image scanning is not in CI (section 6).
+Image scanning was not in CI for v2; since the deployment branch CI scans
+the API and web images with Trivy (section 7.4).
 
 ### 4.4 Static analysis (SR-7)
 
@@ -181,16 +187,30 @@ and secrets in image layers.
   only the API's role may connect; it owns the `curator` database (to
   migrate and seed) but is not a superuser. The superuser connects only
   from inside the db container. Anyone who can already read Docker's
-  volumes (root on the host) is beyond this protection. A real deployment
-  points `CURATOR_DATABASE_URL` at its own database and credentials.
+  volumes (root on the host) is beyond this protection. The public
+  deployment uses passwords over TLS instead (section 7).
 - **In the laptop compose setup the rate limit is shared by all clients.**
-  Docker publishes the ports on 127.0.0.1 through its proxy, so every
-  request reaches nginx and the API from the bridge gateway address and
-  every host client falls in one bucket (red team, section 4.6). The
-  limiter itself is per client: deployed with nginx as the entry point and
-  a front end that preserves client addresses (and
-  `CURATOR_FORWARDED_ALLOW_IPS` set to that proxy), each client gets its
-  own bucket. Never expose `:8000` directly.
+  This risk is now limited to compose. Docker publishes the ports on
+  127.0.0.1 through its proxy, so every request reaches nginx from the
+  bridge gateway address and every host client falls in one bucket (red
+  team, section 4.6). On Fly each client gets its own bucket (ADR 011,
+  client-IP trust chain; it rests on Fly and Cloudflare behaving as
+  documented, assumptions A1, A8 and A13):
+  - nginx overwrites `X-Real-IP` with `Fly-Client-IP` (Fly mode) or with
+    `CF-Connecting-IP` from Cloudflare's ranges behind origin pulls
+    (Cloudflare mode), and blanks every other identity header;
+  - the API reads only `X-Real-IP`, only from peers in
+    `CURATOR_FORWARDED_ALLOW_IPS`, and never `X-Forwarded-For`;
+  - IPv6 clients are counted per /64.
+
+  Tests: `tests/edge/test_nginx.py` (real nginx in all three modes) and
+  `tests/api/test_api.py::test_clients_behind_the_proxy_get_separate_buckets`
+  and `::test_forged_identity_headers_from_other_peers_are_ignored`.
+
+  What remains: on Fly the API trusts `X-Real-IP` from any peer (`*`),
+  because Fly's proxy sits between nginx and the API. So another app in
+  the same Fly organisation could pick its own bucket. Never expose
+  `:8000` directly.
 - **Rate-limit counters are per process.** With several workers each
   enforces its own limit; a shared store (Redis) is a configuration change.
 - **Health probes, docs and the OpenAPI schema are not rate-limited**
@@ -213,6 +233,252 @@ and secrets in image layers.
   limit, 2 parts of at most 2,000 characters each truncated to 128 tokens,
   and the 64 KB body limit. A per-route limiter would only change which
   route degrades under a flood.
-- **Not in CI:** trufflehog, osv-scanner, semgrep and the image scan ran
-  locally for this review (section 4); CI runs gitleaks, pip-audit, bandit
-  and npm audit. No Dependabot or Renovate configuration.
+- **Not in CI:** trufflehog, osv-scanner and semgrep ran locally for this
+  review (section 4); CI runs gitleaks, pip-audit, bandit and npm audit. The
+  deployment branch adds Trivy, workflow linting and Dependabot (section
+  7.4).
+
+## 7. The public deployment (Fly.io, then Cloudflare)
+
+The branch `deploy/fly-cloudflare` takes the product from a laptop to the
+internet: three Fly.io apps (the web app, the only public one; the API;
+Postgres), a deploy workflow, and later a Cloudflare cutover. The design is
+ADR 011; operations are in `docs/RUNBOOK.md`. Nothing was run against Fly
+or Cloudflare from the build environment, which cannot reach them: what
+depends on their behaviour is listed as assumptions A1 to A22 in ADR 011,
+each with the check that confirms it at the first deploy. The tests named
+here run in CI (`tests/edge` against real nginx and `tests/postgres`
+against the real database image, in their own jobs).
+
+### 7.1 What changes
+
+- The site faces the internet, first at `hotel-curator.fly.dev` (Fly's
+  edge terminates TLS), later on a domain behind Cloudflare (Cloudflare
+  terminates TLS and reaches the origin with its client certificate).
+- Secrets now exist (7.3).
+- The database is no longer network-less: it listens on Fly's private
+  network, behind TLS and passwords.
+- Code reaches production from CI, through a workflow that holds deploy
+  tokens.
+- Visitors' addresses are logged by nginx for the rate limits.
+
+### 7.2 Threats and controls
+
+| Threat | Controls | Evidence |
+|---|---|---|
+| Forged client identity, to dodge or exhaust another visitor's rate limit (Fly mode) | nginx computes one client address (`Fly-Client-IP`, else the TCP peer) and writes it into `X-Real-IP`, blanking `X-Forwarded-For`, `Forwarded`, `Fly-Client-IP`, `CF-Connecting-IP` and `True-Client-IP`; the API reads only `X-Real-IP`, only one valid value, only from trusted peers; IPv6 per /64; uvicorn never rewrites the peer | `tests/edge/test_nginx.py::test_fly_mode_trusts_fly_client_ip_only`, `::test_local_mode_keys_on_the_peer_and_drops_forged_headers`, `tests/unit/test_client_ip.py::test_anything_but_one_valid_x_real_ip_means_the_peer`, `::test_ipv6_clients_share_a_bucket_per_64`, `tests/api/test_api.py::test_clients_behind_the_proxy_get_separate_buckets`, `::test_forged_identity_headers_from_other_peers_are_ignored`, `tests/api/test_serve.py::test_serve_never_lets_uvicorn_rewrite_the_client_or_log_on_its_own`. That Fly's edge replaces a client-sent `Fly-Client-IP` is assumption A1, and that Fly's proxy on the Flycast hop passes nginx's `X-Real-IP` unchanged is A13 |
+| Bypassing Cloudflare by reaching the origin directly (Cloudflare mode) | Fly passes TCP 443 through to nginx, which refuses the handshake for any other name (so `hotel-curator.fly.dev` serves nothing), answers 400 without Cloudflare's client certificate, 403 when the PROXY source is outside Cloudflare's committed ranges and 421 for another `Host`; port 8080 answers only `/healthz`; a connection that sends nothing is closed after 10 s, not 60 s (Fly's connection limit is shared with Cloudflare's traffic: 7.5); a weekly workflow fails when Cloudflare's ranges change; `scripts/check_edge.py` probes every origin address after the cutover | `tests/edge/test_nginx.py::test_cloudflare_mode_refuses_everything_else`, `::test_cloudflare_mode_trusts_cf_connecting_ip_from_cloudflare`, `::test_cloudflare_mode_health_port_serves_nothing_else`, `::test_cloudflare_mode_drops_idle_direct_connections_quickly`, `::test_check_edge_sees_the_cloudflare_origin_locked`, `tests/unit/test_check_edge.py::test_every_address_must_refuse`, `::test_an_open_unreached_or_unproven_origin_fails`; assumptions A7, A8, A14 |
+| Reaching the API or the database from the internet | neither has a public address: deploys pass `--no-public-ips`, the API has only a Flycast service, the database none; `make fly-status` fails if either lists a public address | `tests/unit/test_fly_config.py::test_api_is_private_warm_and_built_with_checked_weights`, `::test_database_is_private_and_keeps_its_data_on_the_volume`, `tests/unit/test_deploy_scripts.py::test_plan_deploys_private_apps_without_public_addresses`, `::test_status_fails_when_a_private_app_has_a_public_address`; assumption A3 |
+| Database access and privilege | TLS required; `hostssl` with scram for exactly two roles, neither a superuser; the serving role can only read; the superuser only by local peer; replication refused; the app roles reach only their database; the serving role cannot create large objects or take advisory locks (both granted to every role by default), has at most 20 connections and 64 MB of temporary files; a release waits at most 2 minutes for the lock, then fails with a message that says so; production settings refuse any network URL without `sslmode=require` or stricter (a Unix socket is also accepted); the owner role's URL is removed from the server's environment; releases are serialised by an advisory lock | `tests/postgres/test_release.py::test_connections_use_tls_and_plain_ones_are_refused`, `::test_the_superuser_cannot_connect_over_the_network`, `::test_nobody_gets_a_replication_connection`, `::test_the_roles_reach_only_their_database`, `::test_neither_role_is_a_superuser`, `::test_serving_role_reads_but_cannot_write`, `::test_the_release_lock_is_held_until_the_release_ends`, `::test_a_stuck_release_lock_fails_the_release_with_a_clear_message`, `::test_serving_role_cannot_take_the_release_lock_or_store_objects`, `tests/unit/test_postgres_init.py::test_pg_hba_admits_exactly_two_roles_over_tls`, `tests/unit/test_config.py::test_production_refuses_plain_or_sqlite_urls`, `tests/unit/test_api_entrypoint.py::test_the_server_never_inherits_the_owner_url` |
+| Secrets leaking through the repository, images, command lines or logs | 7.3 | 7.3 |
+| Abuse of the deploy pipeline or its tokens | the deploy workflow runs only when CI calls it, for a push to `main` that passed every job, once the owner turns deploys on (repository variable `CURATOR_DEPLOY`); in the GitHub environment `production`, whose reviewer (the owner) approves each run; only for `main`'s newest commit; one app-scoped token per app, reaching only its own steps; read-only `GITHUB_TOKEN`; no `pull_request_target` or `workflow_run`; no expression pasted into a script; actions pinned by SHA; flyctl from an image pinned by digest whose version is checked first, the token passed into it by name only | `tests/unit/test_workflows.py::test_deploy_runs_only_from_ci_for_main_in_the_production_environment`, `::test_ci_deploys_after_every_other_job_on_a_push_to_main`, `::test_deploy_steps_run_in_order_only_for_mains_newest_commit`, `::test_each_token_reaches_only_the_step_that_uses_it`, `::test_workflows_read_only_and_never_run_untrusted_triggers`, `::test_no_expression_is_pasted_into_a_shell_script`, `::test_every_action_is_local_or_pinned_to_a_commit`, `::test_the_wrapper_runs_flyctl_with_the_token_by_name_only`, `::test_the_wrapper_refuses_unpinned_images_and_outside_paths`; the reviewer and branch rule are repository settings (`docs/deploy/fly.md`); assumptions A15, A16, A21 |
+| The owner's computer, through commands the scripts print | `scripts/ops.py` and `scripts/deploy.py` check every domain they read back from Fly (anyone with the web app's deploy token can set it) against the domain pattern, and the edge mode against the two known ones, before putting either in a command the owner is told to run or a message, never echo a value that fails, and print commands shell-quoted; `scripts/smoke.py` and `scripts/check_edge.py` never follow redirects, so the address they were given is the only one they reach | `tests/unit/test_ops.py::test_stop_never_prints_a_command_from_settings_it_cannot_trust`, `tests/unit/test_deploy_scripts.py::test_a_recorded_host_that_is_not_a_domain_is_never_echoed`, `tests/unit/test_smoke.py::test_a_redirect_is_an_answer_and_is_never_followed` |
+| A vulnerable or tampered dependency, image or tool | Trivy scans the API and web images in CI (a fixable CRITICAL fails the job); actionlint and zizmor lint the workflows; Dependabot proposes weekly updates with a 14-day cooldown for actions, Python, npm, base images and the tool images; checkouts keep no credentials unless they pull Git LFS or check `main`'s head, and `.git` never enters a build context | `tests/unit/test_workflows.py::test_the_trivy_step_runs_the_pinned_scanner_on_both_images`, `::test_tool_images_are_pinned_by_digest_where_dependabot_sees_them`, `::test_dependabot_covers_every_ecosystem_and_the_tool_images`; `.dockerignore` |
+| A deploy with missing or substituted model weights | every Fly build of the API runs `curator model verify-served` against the hashes `promotion.json` judged; `scripts/deploy.py` refuses Git LFS pointers before uploading; the smoke test requires the model | `tests/unit/test_verify_served.py::test_api_image_checks_the_weights_when_required`, `::test_wrong_model_file_is_reported`, `tests/unit/test_deploy_scripts.py::test_weights_check_finds_pointers_and_missing_models`, `tests/unit/test_smoke.py::test_one_broken_thing_fails_its_own_check` |
+| A stale or wrong release reaching visitors | only `main`'s newest commit deploys; a dry run of both deploys refuses missing weights or, with no mode variable set, a parked web app or a web deploy that would quietly leave Cloudflare mode or a recorded domain, before anything moves; migrations are additive, so a rollback keeps working; a failed smoke test is visible and rollback is documented | `tests/unit/test_workflows.py::test_deploy_steps_run_in_order_only_for_mains_newest_commit`, `tests/unit/test_deploy_scripts.py::test_a_refusal_comes_before_any_deploy`, `::test_a_redeploy_keeps_cloudflare_mode_unless_told_otherwise`, `::test_a_parked_web_app_needs_its_mode_named`, `tests/unit/test_smoke.py`; `docs/deploy/fly.md` ("Deploying again") |
+| Visitors' data in logs, error reports or metrics | nginx's access log has the path without its query string and only id-shaped provider ids, and its error log keeps only critical errors (nginx's error messages quote the request line, query string included, so a critical one can still carry search terms: 7.5); the API logs no client address and no submitted text, and its database engines hide bound values from error messages; Sentry is off unless a DSN is set, and then reports only unexpected 500s with no integrations, breadcrumbs, local variables or request data; metric labels are a fixed method set, route templates and statuses; a search term with control characters is refused (422) before it reaches Postgres, which refuses NUL, so no visitor can cause a 500, and an error report, at will | `tests/api/test_api.py::test_search_rejects_bad_input`, `tests/edge/test_nginx.py::test_the_access_log_is_json_with_fly_and_cloudflare_ids`, `::test_no_nginx_log_holds_a_query_string_even_when_the_api_is_down`, `tests/api/test_serve.py::test_serve_logs_only_json_and_finishes_a_request_on_sigterm`, `tests/api/test_observability.py::test_a_failed_search_logs_and_reports_no_search_terms`, `::test_an_unexpected_error_is_reported_without_request_data`, `::test_requests_are_counted_by_route_template_with_bounded_labels`, `tests/unit/test_logging.py` |
+| The metrics endpoint as a way in or a leak | a listener of its own (port 9091) that no Fly service exposes and nginx never proxies; nothing but counters, with no request data | `tests/unit/test_fly_config.py::test_api_metrics_are_scraped_from_a_port_no_service_exposes`, `tests/api/test_observability.py::test_metrics_have_their_own_listener_that_stops_with_the_app`; assumptions A10, A18 |
+| Running up cost, or flooding `analyze` | the v2 rate limits (120 a minute per client on `/v1`, 30 on `analyze`) now see real clients; one machine per app, with request concurrency limits; a WAF rate rule on `analyze` after the cutover; `make fly-stop` parks the site | `tests/api/test_api.py::test_rate_limits`, `tests/unit/test_ops.py`; the WAF rule is a dashboard setting (`docs/deploy/cloudflare.md`) |
+| Licence exposure from serving third-party data, models and code | `NOTICE` (served at `/NOTICE.txt`) states each source's licence or that it is unverified, the model weights' licence status and the site's terms; the licences of the bundled packages and of the build tools that add code are served at `/THIRD-PARTY-NOTICES.txt` (UTF-8, so labelled), generated from the lock file, and a test fails when the app imports a package it does not list; the smoke test checks both files are served | `web/test/public-files.test.ts`, `tests/edge/test_nginx.py::test_text_is_served_as_utf8_and_api_answers_keep_their_type`, `tests/unit/test_smoke.py::test_one_broken_thing_fails_its_own_check`, `::test_a_missing_third_party_file_fails_the_attribution_check` |
+
+### 7.3 Secrets
+
+| Secret | Where it lives | How it is kept out of sight |
+|---|---|---|
+| Three database passwords; the serving and owner database URLs | Fly secrets of the database and API apps | written by `scripts/push_fly_secrets.py` to a git-ignored `.env.fly` created with mode 0600, checked for consistency, sent to `flyctl secrets import` on stdin, never printed; settings hold the URLs as secrets and errors name the setting, not the URL; the owner URL is unset before the server starts |
+| Cloudflare's origin certificate key (with its certificate and the origin-pull CA) | Fly secrets of the web app, Cloudflare mode only | added by `push_fly_secrets.py origin-tls`, which checks the files as nginx will load them; written at start to a 0700 directory as 0600 files, never echoed |
+| Two deploy tokens, one per app, 90 days | the GitHub environment `production` | piped from `flyctl tokens create` into `gh secret set`, never on screen; each reaches only its own workflow steps; flyctl gets it by name |
+| A Sentry DSN (optional) | a Fly secret of the API | checked for shape and never quoted; held as a secret setting |
+
+`.env` and `.env.*` are git-ignored and excluded from both image build
+contexts. Evidence: `tests/unit/test_deploy_scripts.py::test_push_sends_values_on_stdin_and_never_prints_them`,
+`::test_init_writes_a_private_file_once`, `::test_a_mangled_url_is_reported_without_its_contents`,
+`::test_a_malformed_dsn_is_refused_without_being_quoted`,
+`::test_origin_tls_refuses_swapped_or_partial_files`,
+`tests/edge/test_nginx.py::test_cloudflare_secrets_are_written_privately_and_never_printed`,
+`tests/unit/test_config.py::test_database_urls_and_the_dsn_never_appear_in_repr`,
+`tests/unit/test_workflows.py::test_each_token_reaches_only_the_step_that_uses_it`.
+
+### 7.4 Gate results
+
+The gates ran on 2026-10-29 between 04:51 and 04:53 UTC on the branch's
+code at `fe860a0`. The OSV database was downloaded fresh that morning (MD5
+checked). This section's commit also changes code: the CI image-scan step
+(`.github/workflows/ci.yml`), nginx's error log and charset
+(`web/nginx/http.conf`), the smoke test (`scripts/smoke.py`), the model
+card generator (`src/hotel_curator/ml/reports.py`), the web app's footer
+and a script that writes its notices file (`web/src`, `web/scripts`,
+`web/package.json`). So bandit, actionlint with shellcheck and zizmor ran again on the final
+tree before committing (results below; bandit then counted 14,846 lines),
+gitleaks scanned the staged changes, and the dependency gates stand
+because no lock file changed.
+
+| Gate | Scope | Result |
+|---|---|---|
+| `gitleaks git` | the branch's 9 commits; all 19 commits on every ref; the tree | 0 findings each |
+| `trufflehog git` and `filesystem` | every branch; the tree | 0 verified; 6 unverified in each, the same 6 and all false positives: the SHA-256 of the `sentry-sdk` wheel in `uv.lock` (matched as a Sentry token), and placeholder credentials in test fixtures (`u:p`, `o:secret-pw`, `o:hunter2` in `tests/unit/test_config.py`; `user:pass` in `web/test/seo.test.ts`), there to test URL handling and redaction |
+| `osv-scanner scan source --offline` | `uv.lock` (195 packages), `web/package-lock.json` (587 packages) | no known vulnerabilities |
+| `pip-audit` 2.10.0 `--require-hashes` | 190 locked Python packages | 0 known vulnerabilities; the spaCy model `en-core-web-sm` is not auditable (installed from a pinned URL) |
+| `npm audit` | 600 packages (62 production) | 0 of any severity |
+| `bandit` 1.9.4 | `src/` and `scripts/` (14,812 lines; 14,846 on the final tree) | 0 findings each time; the scripts' reviewed suppressions are the `subprocess` calls that run flyctl with arguments they build, `scripts/check_edge.py`'s certificate-less probes (they test whether the origin refuses), and `scripts/smoke.py`'s URL open (its base address admits only https, or http on the local machine) |
+| actionlint 1.7.12 (with shellcheck 0.11.0), zizmor 1.31.1 offline, medium and above | `.github/workflows`, at `fe860a0` and on the final tree | 0 findings each time |
+
+Not re-run for this section: semgrep (its rule sets are unreachable from
+the build environment) and the image scans, which run in CI with Trivy;
+no Docker daemon was available here.
+
+Preparing this section found three defects, all fixed in the same commit:
+the CI image scan never scanned anything (the scanner's image and the
+image being scanned shared a shell variable, so each call ran the scanned
+image instead of Trivy, which would have failed the containers job and so
+every deploy; no CI run had reached it yet, since CI runs on pull requests
+and on pushes to `main`; `tests/unit/test_workflows.py::test_the_trivy_step_runs_the_pinned_scanner_on_both_images`
+now runs the step's own script and fails on the old one); nginx's error
+log, left at the base image's default, quoted the request line of every
+failed request, search terms included, whenever the API did not answer
+(`tests/edge/test_nginx.py::test_no_nginx_log_holds_a_query_string_even_when_the_api_is_down`
+reproduced it; the error log now keeps only critical errors); and no test
+covered the Sentry DSN staying out of the settings' text form, or
+`curator serve` keeping uvicorn from rewriting the client address (both
+added).
+
+### 7.5 Residual risks
+
+- **Unverified provider behaviour.** Every Fly and Cloudflare behaviour the
+  controls rely on is an assumption (A1 to A22) until its first-deploy
+  check passes.
+- **The Fly organisation is a trust boundary.** Any app in the same
+  organisation can reach the API (and choose its own rate-limit bucket and
+  request id, since the API trusts `X-Real-IP` from any peer), the
+  metrics listener (no authentication), nginx's port 8080 directly (and
+  set its own `Fly-Client-IP`), and Postgres on 5432 (where it still needs
+  a role's 32-byte random password). Keep the organisation to these three
+  apps, or give them one of their own.
+- **The database's identity is not verified.** The API connects with
+  `sslmode=require`, which encrypts but does not check the self-signed
+  server certificate; traffic between Fly hosts is assumed encrypted (A12).
+- **The owner role's URL reaches every API machine.** Fly gives every
+  secret to every machine of an app; the entrypoint keeps it out of the
+  server's environment, but Fly's in-machine API and `ssh console` still
+  reach it. A separate release app holding only that secret would close
+  this.
+- **Compose-only hardening is absent on Fly:** the API's root filesystem is
+  writable (SQLite is refused in production, so nothing writes outside
+  `/tmp`), and there is no `no-new-privileges` (each machine is its own
+  microVM). Non-root users and pinned images remain.
+- **Zone-level origin pulls prove "came through Cloudflare", not "came
+  through this zone".** The name and `Host` checks narrow this;
+  per-hostname origin pulls with the owner's own certificate would close
+  it.
+- **Fail-safe shared buckets.** If the address chain breaks (Cloudflare
+  sends no `CF-Connecting-IP`, or a rollback to Fly mode while Cloudflare
+  still proxies), visitors share one rate-limit bucket until it is fixed.
+  When Cloudflare starts using a new address range, visitors routed
+  through it get 403 until `web/nginx/cloudflare-ips.conf` is updated and
+  the web app redeployed; the weekly range check flags the change.
+- **Tampered rows survive a release.** The release skips loading when the
+  committed file's digest is already recorded, so rows changed directly in
+  the database (by someone holding the owner role's password) stay until
+  the volume is rebuilt or the data reloaded.
+- **Fly's HTTP proxy sits on the Flycast hop** between nginx and the API.
+  The compose red team found no request smuggling between nginx and
+  uvicorn; that hop on Fly has not been tested.
+- **Direct connections can crowd out Cloudflare (Cloudflare mode).**
+  Anyone can open TCP connections to the origin address and send nothing.
+  nginx closes each after 10 s, but Fly's connection limit for the web
+  app (250) is shared with Cloudflare's own connections, so about 25 new
+  connections a second keep visitors out; the flood never passes through
+  Cloudflare, whose protections therefore do not apply. Fly's own handling
+  of such floods is not verified (A14). A larger limit, more machines, or
+  an origin address nobody learns would raise the cost.
+- **The serving role can still change its own password and its own
+  session defaults** (`search_path`, `statement_timeout`). Postgres lets
+  every role do both, so a foothold in the API can lock the API out of the
+  database until the superuser resets them (docs/deploy/fly.md, "Changing
+  a database password"). A transaction it leaves open can also hold up a
+  release that changes the schema: the 2-minute bound covers only the
+  release lock.
+- **Removals reach the live site only.** A removed review excerpt stays in
+  the repository's history and the public source dataset, and an API
+  rollback to an image built before the removal serves it again until the
+  current data is deployed (docs/deploy/fly.md, "Deploying again").
+- **The repository holds whole reviews.** The annotation samples
+  (`data/labels/*/sample.parquet`, on `main` before this branch) hold
+  9,800 whole reviews, unredacted, with the source's reviewer fields; they
+  are copies of rows in the public source dataset, and the site serves only
+  short excerpts of some of them, with month and traveller type, but the
+  public repository republishes them whole (NOTICE says so). Dropping those
+  fields would need the labelling records rebuilt, and history rewritten
+  to take them out of past commits: the owner's decision (BLOCKERS B10).
+- **Checks that stay manual.** The deploy workflow does not re-check that
+  the API and database have no public address (its tokens are scoped to
+  one app each; `make fly-status` does). The `production` environment's
+  reviewer and branch rule, and every Cloudflare setting, live outside the
+  repository.
+- **Scan coverage.** CI's image scan covers the images CI builds; Fly's
+  remote builder makes its own from the same Dockerfiles and pinned
+  digests, and the Fly database image and the flyctl image are not
+  scanned. The edge tests run the site templates on the CI runner's nginx,
+  not inside the shipped web image, which CI starts only in local mode.
+- **Visitors' addresses** are in nginx's access log, kept as long as Fly's
+  log view keeps it. nginx's critical errors (rare: a failed file or
+  temporary-file write while serving a request, for example) quote the
+  request line with its query string, so one could carry search terms;
+  the edge test covers only the common case, an unanswered API. When Sentry is on, a report carries the exception's
+  message, which no longer includes SQL parameters.
+- **Data at rest:** the repository does not address encryption of the
+  database volume or its snapshots; everything on it can be rebuilt from
+  git.
+- The v2 risks in section 5 still apply: per-process rate-limit counters
+  (one API machine), unlimited probes and docs, base packages with no
+  upstream fix, the unconfirmed data licence. HSTS stays at one day until
+  the domain is settled.
+
+### 7.6 Red-team exercise (2026-10-29)
+
+Six attacker teams attacked the branch's code at `428ccdc`, one surface
+each: the edge in its three modes; the API as deployed (with the committed
+model); CI, deploy and the supply chain; the operator scripts, secrets and
+the Postgres app; the built web app; data, model and visitors' privacy.
+Every finding needed a proof of concept run locally (real nginx 1.24 from
+the site templates, the API, PostgreSQL 16 over TLS built from
+`deploy/postgres/init`, Chromium); Fly and Cloudflare could not be reached,
+so behaviour that depends on them rests on ADR 011's assumptions. Two
+skeptics then judged each finding, one re-running the proof and one
+judging its impact. This is an equivalent exercise, not the owner's own
+red-team procedure (BLOCKERS B7). A separate code-only security review of
+`git diff main` (high-confidence findings only) found nothing.
+
+| Finding | Votes (real / not) | Outcome |
+|---|---|---|
+| Idle direct connections to the Cloudflare-mode origin each hold one of Fly's connection slots for nginx's 60 s default, and the slots are shared with Cloudflare | 2 / 0 (medium, low) | nginx now gives up after 10 s (`tests/edge/test_nginx.py::test_cloudflare_mode_drops_idle_direct_connections_quickly`); the remaining risk is in 7.5 |
+| The read-only serving role could create large objects until the volume filled, take the release lock so every release waited for ever, and use up connection slots | 2 / 0 (low) | revoked the large-object and advisory-lock functions from every role but the owner's release lock, a 20-connection limit and a 64 MB temporary-file limit, a 2-minute wait for the release lock (`tests/postgres/test_release.py`); a role changing its own password or session defaults remains (7.5) |
+| `ops.py` and `deploy.py` printed a redeploy command built from unchecked machine settings, which the web app's deploy token can set: the owner's computer could run what they hold | 2 / 0 (low) | domains are checked against the domain pattern and the mode against the two known ones before either is printed, a value that fails is never echoed, and commands are shell-quoted (`tests/unit/test_ops.py`, `tests/unit/test_deploy_scripts.py`) |
+| A NUL in the hotel search term made a 500 on demand: an error report, a 7 KB traceback and a 5xx-alert hit per request | 2 / 0 (low) | control characters in the search term get 422 (`tests/api/test_api.py::test_search_rejects_bad_input`) |
+| `smoke.py` followed redirects to any host and echoed part of the answer into the job log | 1 / 1 | redirects are answers, never followed (`tests/unit/test_smoke.py::test_a_redirect_is_an_answer_and_is_never_followed`) |
+| A crafted docs link (`//other.example/..%2Fapi/docs`, which nginx serves as `/api/docs`) set Swagger UI's request URL to another host; the CSP stopped every request | 1 / 1 | the docs page takes its prefix from a fixed list and uses its own origin (`web/test/docs-init.test.ts`) |
+| An API rollback serves a removed review excerpt again | 1 / 1 | documented in the rollback steps and NOTICE; 7.5 |
+| The public repository holds 9,800 whole reviews with reviewer fields, which NOTICE described as "short review excerpts" | 1 / 1 (low, info) | NOTICE corrected; the data itself is the owner's decision (7.5, BLOCKERS B10) |
+| nginx's JSON access log can carry bytes that are not UTF-8 | 0 / 2 | none |
+
+The teams recorded 92 attacks the deployment resisted (edge 11, API 13,
+pipeline 15, operator scripts and secrets 16, web 20, data and privacy 17),
+among them: request smuggling (CL/TE, duplicate lengths, obs-fold) between
+nginx and the API; forging every client-identity header in each mode;
+the origin lock against other names, missing or foreign client
+certificates and addresses outside Cloudflare's ranges; path tricks around
+`/api/` and the health port; cache poisoning and deception; log injection
+through paths and ids; renderer injection through the mode and domain
+settings; workflow injection, untrusted triggers, cache poisoning from a
+pull request and swapped weights reaching a deploy; secrets on command
+lines, in output, in images and in the server's environment; escalation
+from either database role; DOM XSS through URLs, hashes and stored values;
+open redirects; CSP gaps; third-party requests; analyze as a denial of
+service, an extraction path or an HTML injector; and personal data in the
+31,485 served quotes.
+
+### 7.7 Not done yet
+
+- The owner's own red-team procedure (BLOCKERS B7).
+- The first-deploy checks of A1 to A22, and the owner's settings (BLOCKERS
+  B9).

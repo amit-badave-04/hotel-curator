@@ -85,6 +85,7 @@ export const handlers = [
 
   http.get('*/api/v1/meta', () => HttpResponse.json(meta())),
 
-  // Like the dev API today: the model package is not loaded.
+  // The model went away after /v1/meta said it was loaded (or a test
+  // overrides this with an answer).
   http.post('*/api/v1/analyze', () => apiError(503, 'unavailable', 'The model is not loaded.')),
 ];

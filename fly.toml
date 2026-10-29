@@ -1,0 +1,88 @@
+# Fly.io config: hotel-curator API (FastAPI + the int8 ONNX model).
+# Private on purpose: no public address. The web app reaches it on Fly's
+# private network at hotel-curator-api.flycast:8000, which needs a private
+# IPv6 (flyctl ips allocate-v6 --private -a hotel-curator-api). ADR 011.
+# Always warm: the model loads at start (~450 MiB resident), so a cold start
+# would make a visitor's first analyze slow. One machine (--ha=false): the
+# rate limiter lives in memory. Deploy with scripts/deploy.py.
+app = "hotel-curator-api"
+primary_region = "lhr"
+# uvicorn finishes in-flight requests for 20 s after SIGTERM
+# (GRACEFUL_SHUTDOWN_SECONDS in src/hotel_curator/cli/db.py).
+kill_signal = "SIGTERM"
+kill_timeout = 30
+
+[build]
+  dockerfile = "Dockerfile"
+  [build.args]
+    # Refuse to build unless the served weights match promotion.json.
+    REQUIRE_MODEL = "1"
+
+[deploy]
+  # Migrate and seed once per deploy, under a database lock; idempotent.
+  release_command = "curator db release"
+
+[env]
+  CURATOR_ENVIRONMENT = "production"
+  CURATOR_LOG_FORMAT = "json"
+  # The release command does it; machines only serve.
+  CURATOR_MIGRATE_ON_START = "false"
+  # One origin behind nginx: no cross-origin callers.
+  CURATOR_CORS_ORIGINS = "[]"
+  # Rate limits key on X-Real-IP, which nginx overwrites. Fly's proxy sits
+  # between nginx and this private app, so the TCP peer is never nginx's
+  # own address: believe X-Real-IP from any peer. Only apps in the same
+  # Fly organisation can reach the API at all (ADR 011).
+  CURATOR_FORWARDED_ALLOW_IPS = "*"
+  # Prometheus metrics on a listener of their own, scraped by Fly through
+  # [metrics] below; not a service, so nothing outside the private network
+  # reaches it. :: because the scraper comes over private IPv6.
+  CURATOR_METRICS_PORT = "9091"
+  CURATOR_METRICS_HOST = "::"
+
+# Flycast service: reachable only through the private IPv6 above.
+[[services]]
+  protocol = "tcp"
+  internal_port = 8000
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 8000
+    handlers = ["http"]
+
+  # Most calls are short reads; analyze is capped at 30 per minute per
+  # client by the app itself.
+  [services.concurrency]
+    type = "requests"
+    soft_limit = 20
+    hard_limit = 40
+
+  # Readiness: the database answers and hotel data is loaded.
+  [[services.http_checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "60s"
+    method = "get"
+    path = "/readyz"
+
+# Liveness: the process answers.
+[checks]
+  [checks.alive]
+    type = "http"
+    port = 8000
+    method = "get"
+    path = "/healthz"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "60s"
+
+[metrics]
+  port = 9091
+  path = "/metrics"
+
+# Measured peak RSS 451 MiB with the model warm; 1 GB leaves over 30% headroom.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

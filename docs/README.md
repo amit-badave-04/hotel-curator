@@ -7,7 +7,7 @@ by question.
 |---|---|
 | What is v2, who is it for, and how was it planned? | [specs/v2-plan.md](specs/v2-plan.md) (includes the Status table) |
 | What was wrong with v1? | [v1-audit.md](v1-audit.md) |
-| Why was each major choice made? | [decisions/](decisions/) (ADRs 001-010) |
+| Why was each major choice made? | [decisions/](decisions/) (ADRs 001-011) |
 | What data is used, what are its quirks and licence? | [data/DATA_CARD.md](data/DATA_CARD.md), [data/EDA.md](data/EDA.md), [../NOTICE](../NOTICE) |
 | How were reviews labelled, and how good are the labels? | [labeling/GUIDELINES.md](labeling/GUIDELINES.md), [labeling/AGREEMENT.md](labeling/AGREEMENT.md), [labeling/EXTERNAL_CHECK.md](labeling/EXTERNAL_CHECK.md), [labeling/HUMAN_AUDIT.md](labeling/HUMAN_AUDIT.md) |
 | Which model won, by how much, and why? | [model/COMPARISON.md](model/COMPARISON.md), [the model card](../artifacts/models/roberta-base-ft-train2/MODEL_CARD.md) |
@@ -15,7 +15,12 @@ by question.
 | How are tiers computed, and do they hold up? | [decisions/006-tier-scheme.md](decisions/006-tier-scheme.md), [model/TIERS.md](model/TIERS.md) |
 | How is the system put together? | [architecture/](architecture/) |
 | Is it secure? | [security/v2-security-review.md](security/v2-security-review.md) |
+| Which licences apply to the code, data, model and the packages the web app bundles? | [../NOTICE](../NOTICE), [../web/public/THIRD-PARTY-NOTICES.txt](../web/public/THIRD-PARTY-NOTICES.txt), [the model card](../artifacts/models/roberta-base-ft-train2/MODEL_CARD.md#licence-and-use) |
 | What tools were available while building it? | [TOOLING.md](TOOLING.md) |
 | What is blocked or needs the owner? | [BLOCKERS.md](BLOCKERS.md) |
 | What do the terms mean? | [GLOSSARY.md](GLOSSARY.md) |
 | What was delivered, verified, and left open? | [V2_REPORT.md](V2_REPORT.md) |
+| What stands between `main` and a public deployment, and in which order is it closed? | [deploy/gap-audit.md](deploy/gap-audit.md) |
+| How do I create, deploy and redeploy the Fly apps, and handle their secrets? | [deploy/fly.md](deploy/fly.md) |
+| How is the site moved behind Cloudflare, and how do I check the result? | [deploy/cloudflare.md](deploy/cloudflare.md) |
+| How do I run the live site: status, parking, logs, metrics, alerts, error reports, incidents? | [RUNBOOK.md](RUNBOOK.md) |

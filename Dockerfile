@@ -15,12 +15,18 @@ RUN --mount=type=secret,id=extra_ca,required=false \
 WORKDIR /src
 COPY pyproject.toml uv.lock README.md LICENSE ./
 RUN --mount=type=secret,id=extra_ca,required=false \
-    with-extra-ca uv sync --frozen --no-dev --extra postgres --no-install-project
+    with-extra-ca uv sync --frozen --no-dev --extra postgres --extra sentry \
+        --no-install-project
 COPY src ./src
 RUN --mount=type=secret,id=extra_ca,required=false \
-    with-extra-ca uv sync --frozen --no-dev --extra postgres --no-editable
+    with-extra-ca uv sync --frozen --no-dev --extra postgres --extra sentry \
+        --no-editable
 
 FROM python:3.12-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704
+# Production builds pass REQUIRE_MODEL=1: the image then cannot be built
+# unless the served weights, pulled from Git LFS, are present and are exactly
+# the files the promotion rule judged (files_sha256 in promotion.json).
+ARG REQUIRE_MODEL=0
 ENV PATH=/opt/venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -42,8 +48,13 @@ COPY artifacts/evals/promotion.json ./artifacts/evals/promotion.json
 COPY artifacts/models ./artifacts/models
 COPY docker/api-entrypoint.sh /usr/local/bin/api-entrypoint.sh
 RUN rm -rf ./artifacts/models/v1-roberta-base \
+    && if [ "$REQUIRE_MODEL" = "1" ]; then curator model verify-served; fi \
     && chmod 0755 /usr/local/bin/api-entrypoint.sh \
     && mkdir -p /app/var && chown curator:curator /app/var
+# Set after the build-time check above (which runs on the default SQLite
+# settings): from here on the app refuses to start without Postgres over TLS
+# or a Unix socket.
+ENV CURATOR_ENVIRONMENT=production
 USER curator
 EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=5 \

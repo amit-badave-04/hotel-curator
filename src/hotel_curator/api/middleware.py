@@ -3,14 +3,26 @@
 import json
 import time
 import uuid
+from collections.abc import Callable
 
 import structlog
 from fastapi import HTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from hotel_curator.api.clientip import (
+    REQUEST_ID_HEADER,
+    TrustedProxies,
+    client_address,
+    forwarded_request_id,
+)
 from hotel_curator.api.errors import STATUS_CODES
 
 logger = structlog.get_logger("hotel_curator.access")
+
+Observer = Callable[[Scope, int, float], None]
+"""Receives each answered request: its scope, status and seconds taken."""
+ErrorReporter = Callable[[BaseException, str], None]
+"""Receives an unexpected error and the id of the request it broke."""
 
 SECURITY_HEADERS = (
     (b"x-content-type-options", b"nosniff"),
@@ -18,7 +30,6 @@ SECURITY_HEADERS = (
     (b"x-frame-options", b"DENY"),
     (b"cache-control", b"no-store"),
 )
-REQUEST_ID_HEADER = b"x-request-id"
 TOO_LARGE = "The request body is too large."
 
 
@@ -56,11 +67,22 @@ class RequestContextMiddleware:
 
     It is the outermost middleware, so it also answers unexpected errors:
     Starlette's own 500 handler sits outside every user middleware and would
-    send a response without the request id and security headers.
+    send a response without the request id and security headers. The same
+    timing feeds ``observe`` (metrics), and an unexpected error also goes to
+    ``report_error`` (error reports), when they are given.
     """
 
-    def __init__(self, app: ASGIApp) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        trusted: TrustedProxies | None = None,
+        observe: Observer | None = None,
+        report_error: ErrorReporter | None = None,
+    ) -> None:
         self.app = app
+        self.trusted = trusted or TrustedProxies()
+        self.observe = observe
+        self.report_error = report_error
 
     async def __call__(
         self, scope: Scope, receive: Receive, send: Send
@@ -69,8 +91,13 @@ class RequestContextMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        request_id = uuid.uuid4().hex
-        scope.setdefault("state", {})["request_id"] = request_id
+        request_id = (
+            forwarded_request_id(scope, self.trusted) or uuid.uuid4().hex
+        )
+        state = scope.setdefault("state", {})
+        state["request_id"] = request_id
+        # Read by the rate limiter; never logged (an address is personal).
+        state["client"] = client_address(scope, self.trusted)
         started = time.perf_counter()
         status: int | None = None
 
@@ -78,7 +105,11 @@ class RequestContextMiddleware:
             nonlocal status
             if message["type"] == "http.response.start":
                 status = message["status"]
-                headers = list(message.get("headers", []))
+                headers = [
+                    (name, value)
+                    for name, value in message.get("headers", [])
+                    if name.lower() != REQUEST_ID_HEADER
+                ]
                 headers.append((REQUEST_ID_HEADER, request_id.encode()))
                 headers.extend(SECURITY_HEADERS)
                 message["headers"] = headers
@@ -86,23 +117,28 @@ class RequestContextMiddleware:
 
         try:
             await self.app(scope, receive, send_wrapper)
-        except Exception:
+        except Exception as exc:
             # Logged here (no request data, no locals) and answered with the
             # standard body; not re-raised, so nothing else answers twice.
             logger.exception("unhandled error", request_id=request_id)
+            if self.report_error is not None:
+                self.report_error(exc, request_id)
             if status is None:
                 await send_error(
                     send_wrapper, 500, "Internal error.", request_id
                 )
         finally:
+            seconds = time.perf_counter() - started
             logger.info(
                 "request",
                 request_id=request_id,
                 method=scope.get("method"),
                 path=scope.get("path"),
                 status=status or 500,
-                ms=round(1000 * (time.perf_counter() - started), 1),
+                ms=round(1000 * seconds, 1),
             )
+            if self.observe is not None:
+                self.observe(scope, status or 500, seconds)
 
 
 class BodySizeLimitMiddleware:

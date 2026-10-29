@@ -40,10 +40,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # 1 = refuse to build without the served weights (CI sets it when
+        # they are tracked in Git LFS, and pulls them first).
+        REQUIRE_MODEL: ${REQUIRE_MODEL:-0}
     environment:
       CURATOR_DATABASE_URL: postgresql+psycopg://curator@/curator?host=/var/run/postgresql
-      # Rate limits key on the client address; trust X-Forwarded-For only
-      # from the web proxy's fixed address below.
+      # Rate limits key on X-Real-IP, which nginx overwrites; believe it
+      # only from the web proxy's fixed address below.
       CURATOR_FORWARDED_ALLOW_IPS: 172.28.0.10
     depends_on:
       db:
@@ -65,6 +69,10 @@ services:
     build:
       context: ./web
       dockerfile: Dockerfile
+    environment:
+      # local: nginx is the first hop, the client is the TCP peer.
+      CURATOR_EDGE: local
+      CURATOR_API_UPSTREAM: api:8000
     depends_on:
       api:
         condition: service_healthy
