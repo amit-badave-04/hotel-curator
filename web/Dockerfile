@@ -17,7 +17,7 @@ RUN VITE_PUBLIC_ORIGIN="$VITE_PUBLIC_ORIGIN" npm run build
 # Serve it with nginx as a non-root user on port 8080 (8443 in Cloudflare
 # mode). The site is rendered at start for CURATOR_EDGE (local, fly or
 # cloudflare) by nginx/15-curator-site.sh; see ADR 011.
-FROM nginxinc/nginx-unprivileged:1.30.6-alpine3.24@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03 AS runtime
+FROM nginxinc/nginx-unprivileged:1.31.7-alpine3.24@sha256:b5047b9b76845eac124358373c6852377c52e4b05834a47647e955dd91cb8f1e AS runtime
 # Alpine fixed brotli-libs (CVE-2026-111497, 1.2.1-r0) after the newest
 # build of this image; drop this once the pinned image includes the fix.
 USER root
